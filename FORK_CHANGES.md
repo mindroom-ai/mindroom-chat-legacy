@@ -2,6 +2,19 @@
 
 ## Runbook
 
+### Insert an escaped translation value once, even when it holds its own placeholder (2026-11-02)
+
+- Why: a display name such as `Maya////////{{userName}}` turned one member-event line ("<b>{{userName}}</b> joined the room") into 1,000 copies of the name, and invite cards hit the same once they show display names (#491).
+  i18next 23.12.2 (`Interpolator.interpolate`) advances its scan by the raw value's length but inserts the escaped value.
+  When escaping (`/` to `&#x2F;`, `&` to `&amp;`) adds more than the text after an inner placeholder, the scan resumes inside the inserted value and inserts it again, up to `maxReplaces` (1000).
+  Chat's `Trans` calls for member events and invites pass `escapeValue: true`, so a display name with enough slashes and the line's own placeholder hits it.
+- Change: `patches/i18next+23.12.2.patch` backports the core of i18next 26.5's fix to the ESM and CJS builds: the value is spliced in at the match position and the scan advances by the inserted length.
+  Splicing does not apply `String.replace`'s `$` patterns, so the `regexSafe` escaping goes too.
+  Upgrading instead is three i18next majors (and a react-i18next major) away.
+- Tests: `i18nInterpolation.test.ts` interpolates `Maya////$&{{userName}}` with `escapeValue: true` and expects it once and literally; it fails without the patch.
+  react-i18next's `Trans` still interpolates its text nodes once more, so a name holding the line's placeholder shows twice; that is bounded and unchanged here.
+- Next: drop the patch with an i18next upgrade to 26.5 or later.
+
 ### Open Spark email backlinks from messages (2026-11-02)
 
 - Why: Spark's `readdlespark://` backlinks open one email directly in Spark on desktop and mobile, but Chat drops their `href`, so the link text shows without a link.
