@@ -2537,6 +2537,19 @@
         "approvedExactArguments": "已按这些确切参数批准",
         "approvedAnyArguments": "已批准此工具的任意参数"
       },
+      "approvalRangeEdit": {
+        "cell": "单元格",
+        "before": "修改前",
+        "after": "修改后",
+        "empty": "空",
+        "valueKept": "保留值",
+        "numberFormat": "格式：{{format}}",
+        "noChanges": "没有单元格更改。",
+        "moreChanges": "其他已更改的单元格（见全部参数）：{{count}}",
+        "unchangedCells": "未更改的单元格：{{count}}",
+        "openInExcel": "在 Excel 中打开",
+        "openInBrowser": "在浏览器中打开"
+      },
       "approvalReviewCall": {
         "pending": "待处理",
         "callStatus": "调用 {{number}} · {{status}}",

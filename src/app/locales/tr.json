@@ -2537,6 +2537,19 @@
         "approvedExactArguments": "Tam olarak bu bağımsız değişkenler için onaylandı",
         "approvedAnyArguments": "Bu aracın herhangi bir bağımsız değişkeni için onaylandı"
       },
+      "approvalRangeEdit": {
+        "cell": "Hücre",
+        "before": "Önce",
+        "after": "Sonra",
+        "empty": "boş",
+        "valueKept": "değer korunur",
+        "numberFormat": "Biçim: {{format}}",
+        "noChanges": "Hücre değişikliği yok.",
+        "moreChanges": "Diğer değişen hücreler, tüm bağımsız değişkenlerde: {{count}}",
+        "unchangedCells": "Değişmeyen hücreler: {{count}}",
+        "openInExcel": "Excel'de aç",
+        "openInBrowser": "Tarayıcıda aç"
+      },
       "approvalReviewCall": {
         "pending": "bekliyor",
         "callStatus": "Çağrı {{number}} · {{status}}",

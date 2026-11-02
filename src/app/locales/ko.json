@@ -2537,6 +2537,19 @@
         "approvedExactArguments": "이 인수 그대로 승인됨",
         "approvedAnyArguments": "이 도구의 모든 인수에 대해 승인됨"
       },
+      "approvalRangeEdit": {
+        "cell": "셀",
+        "before": "변경 전",
+        "after": "변경 후",
+        "empty": "비어 있음",
+        "valueKept": "값 유지",
+        "numberFormat": "서식: {{format}}",
+        "noChanges": "변경되는 셀이 없습니다.",
+        "moreChanges": "추가로 변경되는 셀(모든 인수에 표시): {{count}}",
+        "unchangedCells": "변경되지 않는 셀: {{count}}",
+        "openInExcel": "Excel에서 열기",
+        "openInBrowser": "브라우저에서 열기"
+      },
       "approvalReviewCall": {
         "pending": "대기 중",
         "callStatus": "호출 {{number}} · {{status}}",

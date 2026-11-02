@@ -2569,6 +2569,19 @@
         "approvedExactArguments": "Approuvé pour ces arguments exacts",
         "approvedAnyArguments": "Approuvé pour n'importe quels arguments de cet outil"
       },
+      "approvalRangeEdit": {
+        "cell": "Cellule",
+        "before": "Avant",
+        "after": "Après",
+        "empty": "vide",
+        "valueKept": "valeur conservée",
+        "numberFormat": "Format : {{format}}",
+        "noChanges": "Aucune cellule modifiée.",
+        "moreChanges": "Autres cellules modifiées, visibles dans tous les arguments : {{count}}",
+        "unchangedCells": "Cellules inchangées : {{count}}",
+        "openInExcel": "Ouvrir dans Excel",
+        "openInBrowser": "Ouvrir dans le navigateur"
+      },
       "approvalReviewCall": {
         "pending": "en attente",
         "callStatus": "Appel {{number}} · {{status}}",

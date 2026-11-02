@@ -51,6 +51,7 @@ const LITERAL_TOKENS: Readonly<Record<string, readonly string[]>> = {
   'featureUi.call.callView.yourBrowserDoesNotSupportWebrtcWhich': ['WebRTC'],
   'mindroomUi.calls.agentCallButton.browserUnsupported': ['WebRTC'],
   'mindroomUi.autoApprove.ownUntil': ['!auto_approve off'],
+  'mindroomUi.messages.approvalRangeEdit.openInExcel': ['Excel'],
   'featureUi.roomSettings.permissions.pingRoom': ['@room'],
   'featureUi.settings.devices.otherDevices.manageYourDevicesOnOidcDashboard': ['OIDC'],
   'featureUi.settings.notifications.specialMessages.mentionRoom': ['@room'],

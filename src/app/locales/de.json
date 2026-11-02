@@ -2537,6 +2537,19 @@
         "approvedExactArguments": "Für genau diese Argumente genehmigt",
         "approvedAnyArguments": "Für beliebige Argumente dieses Werkzeugs genehmigt"
       },
+      "approvalRangeEdit": {
+        "cell": "Zelle",
+        "before": "Vorher",
+        "after": "Nachher",
+        "empty": "leer",
+        "valueKept": "Wert bleibt",
+        "numberFormat": "Format: {{format}}",
+        "noChanges": "Keine Zelländerungen.",
+        "moreChanges": "Weitere geänderte Zellen, unter allen Argumenten: {{count}}",
+        "unchangedCells": "Unveränderte Zellen: {{count}}",
+        "openInExcel": "In Excel öffnen",
+        "openInBrowser": "Im Browser öffnen"
+      },
       "approvalReviewCall": {
         "pending": "ausstehend",
         "callStatus": "Aufruf {{number}} · {{status}}",

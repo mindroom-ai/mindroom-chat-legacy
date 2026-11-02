@@ -94,6 +94,7 @@ vi.mock('folds', () => ({
     React.createElement(Tag, props, children),
 }));
 
+vi.mock('./ApprovalRangeEdit.css', () => ({}));
 vi.mock('./ApprovalArgumentFields.css', () => ({
   Arguments: 'Arguments',
   Fields: 'Fields',

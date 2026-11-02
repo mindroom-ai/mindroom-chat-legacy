@@ -2601,6 +2601,19 @@
         "approvedExactArguments": "Одобрено для этих точных аргументов",
         "approvedAnyArguments": "Одобрено для любых аргументов этого инструмента"
       },
+      "approvalRangeEdit": {
+        "cell": "Ячейка",
+        "before": "До",
+        "after": "После",
+        "empty": "пусто",
+        "valueKept": "значение без изменений",
+        "numberFormat": "Формат: {{format}}",
+        "noChanges": "Ячейки не меняются.",
+        "moreChanges": "Другие изменённые ячейки, во всех аргументах: {{count}}",
+        "unchangedCells": "Неизменённые ячейки: {{count}}",
+        "openInExcel": "Открыть в Excel",
+        "openInBrowser": "Открыть в браузере"
+      },
       "approvalReviewCall": {
         "pending": "ожидает",
         "callStatus": "Вызов {{number}} · {{status}}",

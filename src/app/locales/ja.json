@@ -2537,6 +2537,19 @@
         "approvedExactArguments": "この引数どおりで承認済み",
         "approvedAnyArguments": "このツールの任意の引数で承認済み"
       },
+      "approvalRangeEdit": {
+        "cell": "セル",
+        "before": "変更前",
+        "after": "変更後",
+        "empty": "空",
+        "valueKept": "値は変更なし",
+        "numberFormat": "書式: {{format}}",
+        "noChanges": "変更されるセルはありません。",
+        "moreChanges": "その他の変更セル（すべての引数に表示）: {{count}}",
+        "unchangedCells": "変更のないセル: {{count}}",
+        "openInExcel": "Excel で開く",
+        "openInBrowser": "ブラウザーで開く"
+      },
       "approvalReviewCall": {
         "pending": "保留中",
         "callStatus": "呼び出し {{number}} · {{status}}",

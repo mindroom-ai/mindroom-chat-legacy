@@ -1222,6 +1222,19 @@
         "approvedExactArguments": "ঠিক এই আর্গুমেন্টগুলোর জন্য অনুমোদিত",
         "approvedAnyArguments": "এই টুলের যেকোনো আর্গুমেন্টের জন্য অনুমোদিত"
       },
+      "approvalRangeEdit": {
+        "cell": "সেল",
+        "before": "আগে",
+        "after": "পরে",
+        "empty": "খালি",
+        "valueKept": "মান একই থাকবে",
+        "numberFormat": "ফরম্যাট: {{format}}",
+        "noChanges": "কোনো সেল বদলাচ্ছে না।",
+        "moreChanges": "আরও বদলানো সেল, সব আর্গুমেন্টে দেখানো: {{count}}",
+        "unchangedCells": "অপরিবর্তিত সেল: {{count}}",
+        "openInExcel": "Excel-এ খুলুন",
+        "openInBrowser": "ব্রাউজারে খুলুন"
+      },
       "approvalReviewCall": {
         "callStatus": "কল {{number}} · {{status}}",
         "pending": "মুলতুবি",

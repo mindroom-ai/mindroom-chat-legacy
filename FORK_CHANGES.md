@@ -2,6 +2,23 @@
 
 ## Runbook
 
+### Review Excel range edits cell by cell (2026-11-02)
+
+- Why: the approval card for MindRoom's `microsoft_files_excel_update_range` showed raw `values` and `expected_formulas` grids, so a reviewer could not see which cells an edit changes, and a formula replaced by a plain number looked like any other value.
+- Change: `excelRangeEdit.ts` reads the call's complete arguments as a per-cell diff: only changed cells, by Excel address, with before (`expected_formulas`), after (`values`, where `null` keeps the value), and any `number_formats` entry.
+  A cell counts as unchanged only when type and value are equal and its text holds no `***redacted***`, because two different redacted secrets render the same; the backend leaves exactly those cells unwritten.
+  Matrix carries floats and integers past 2**53 - 1 as text, so the number `1.5` and the text `"1.5"` compare equal here; the backend refuses a change between a number and the same text, so a cell the table shows as unchanged is never written.
+  `ApprovalRangeEdit` draws the diff as a table above the argument fields, inside `ApprovalArguments`, so the card, the review panel, and the receipt all show it.
+  A change between values that would look alike, such as text `"42"` and the number `42`, `"a"` and `"a "`, or text with a zero-width or direction-override character, shows both sides as JSON with those characters escaped, so the change is visible.
+  It links the workbook to desktop Excel (`ms-excel:ofe|u|<url>`) and the browser only for `https` SharePoint addresses (including OneDrive for work or school), where Graph's Excel functions work, and shows the host beside the links, since the address comes from the agent and a reviewer may open it before approving.
+  A `|` in the address is encoded, since it separates Office URI arguments.
+  A card with only a truncated preview shows the table once its complete arguments load, so a preview cannot hide a changed cell; for this tool they load without a click, since larger edits often arrive as an attachment.
+  The range label and cell addresses render left to right and cell values isolate their direction, so right-to-left layouts do not reorder formulas.
+- Requires: mindroom-ai/mindroom#3667, which adds `expected_formulas` and `number_formats`; calls without them keep the plain argument fields.
+- Tests: `excelRangeEdit.test.ts`, `ApprovalRangeEdit.test.tsx`, and `e2e/excel-range-approval.spec.ts` (phone and desktop, light and dark).
+  The 16 non-English translations still need a native-speaker check.
+- Next: none.
+
 ### Insert an escaped translation value once, even when it holds its own placeholder (2026-11-02)
 
 - Why: a display name such as `Maya////////{{userName}}` turned one member-event line ("<b>{{userName}}</b> joined the room") into 1,000 copies of the name, and invite cards hit the same once they show display names (#491).

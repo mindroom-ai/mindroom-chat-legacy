@@ -2569,6 +2569,19 @@
         "approvedExactArguments": "Aprovado para estes argumentos exatos",
         "approvedAnyArguments": "Aprovado para quaisquer argumentos desta ferramenta"
       },
+      "approvalRangeEdit": {
+        "cell": "Célula",
+        "before": "Antes",
+        "after": "Depois",
+        "empty": "vazia",
+        "valueKept": "valor mantido",
+        "numberFormat": "Formato: {{format}}",
+        "noChanges": "Nenhuma célula alterada.",
+        "moreChanges": "Mais células alteradas, em todos os argumentos: {{count}}",
+        "unchangedCells": "Células inalteradas: {{count}}",
+        "openInExcel": "Abrir no Excel",
+        "openInBrowser": "Abrir no navegador"
+      },
       "approvalReviewCall": {
         "pending": "pendente",
         "callStatus": "Chamada {{number}} · {{status}}",

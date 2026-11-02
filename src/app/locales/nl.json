@@ -2537,6 +2537,19 @@
         "approvedExactArguments": "Goedgekeurd voor precies deze argumenten",
         "approvedAnyArguments": "Goedgekeurd voor willekeurige argumenten van deze tool"
       },
+      "approvalRangeEdit": {
+        "cell": "Cel",
+        "before": "Oud",
+        "after": "Nieuw",
+        "empty": "leeg",
+        "valueKept": "waarde blijft",
+        "numberFormat": "Opmaak: {{format}}",
+        "noChanges": "Geen celwijzigingen.",
+        "moreChanges": "Meer gewijzigde cellen, onder alle argumenten: {{count}}",
+        "unchangedCells": "Ongewijzigde cellen: {{count}}",
+        "openInExcel": "Openen in Excel",
+        "openInBrowser": "Openen in browser"
+      },
       "approvalReviewCall": {
         "pending": "in behandeling",
         "callStatus": "Aanroep {{number}} · {{status}}",

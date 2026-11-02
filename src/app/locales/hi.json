@@ -1222,6 +1222,19 @@
         "approvedExactArguments": "ठीक इन्हीं आर्ग्युमेंट के लिए स्वीकृत",
         "approvedAnyArguments": "इस टूल के किसी भी आर्ग्युमेंट के लिए स्वीकृत"
       },
+      "approvalRangeEdit": {
+        "cell": "सेल",
+        "before": "पहले",
+        "after": "बाद में",
+        "empty": "खाली",
+        "valueKept": "मान वही रहेगा",
+        "numberFormat": "फ़ॉर्मैट: {{format}}",
+        "noChanges": "कोई सेल नहीं बदलता।",
+        "moreChanges": "और बदले गए सेल, सभी आर्गुमेंट में: {{count}}",
+        "unchangedCells": "न बदले गए सेल: {{count}}",
+        "openInExcel": "Excel में खोलें",
+        "openInBrowser": "ब्राउज़र में खोलें"
+      },
       "approvalReviewCall": {
         "callStatus": "कॉल {{number}} · {{status}}",
         "pending": "लंबित",

@@ -2665,6 +2665,19 @@
         "approvedExactArguments": "تمت الموافقة على هذه الوسائط بعينها",
         "approvedAnyArguments": "تمت الموافقة على أي وسائط لهذه الأداة"
       },
+      "approvalRangeEdit": {
+        "cell": "خلية",
+        "before": "قبل",
+        "after": "بعد",
+        "empty": "فارغة",
+        "valueKept": "تبقى القيمة",
+        "numberFormat": "التنسيق: ⁨{{format}}⁩",
+        "noChanges": "لا تتغير أي خلية.",
+        "moreChanges": "خلايا أخرى متغيرة، معروضة ضمن كل الوسائط: ⁨{{count}}⁩",
+        "unchangedCells": "خلايا بلا تغيير: ⁨{{count}}⁩",
+        "openInExcel": "فتح في Excel",
+        "openInBrowser": "فتح في المتصفح"
+      },
       "approvalReviewCall": {
         "pending": "معلق",
         "callStatus": "الاستدعاء ⁨{{number}}⁩ · ⁨{{status}}⁩",

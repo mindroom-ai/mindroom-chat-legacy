@@ -2537,6 +2537,19 @@
         "approvedExactArguments": "已依這些確切引數核准",
         "approvedAnyArguments": "已核准此工具的任意引數"
       },
+      "approvalRangeEdit": {
+        "cell": "儲存格",
+        "before": "修改前",
+        "after": "修改後",
+        "empty": "空白",
+        "valueKept": "保留值",
+        "numberFormat": "格式：{{format}}",
+        "noChanges": "沒有儲存格變更。",
+        "moreChanges": "其他已變更的儲存格（見所有引數）：{{count}}",
+        "unchangedCells": "未變更的儲存格：{{count}}",
+        "openInExcel": "在 Excel 中開啟",
+        "openInBrowser": "在瀏覽器中開啟"
+      },
       "approvalReviewCall": {
         "pending": "待處理",
         "callStatus": "呼叫 {{number}} · {{status}}",

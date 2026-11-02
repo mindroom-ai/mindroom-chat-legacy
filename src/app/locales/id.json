@@ -2537,6 +2537,19 @@
         "approvedExactArguments": "Disetujui untuk argumen persis ini",
         "approvedAnyArguments": "Disetujui untuk argumen apa pun pada alat ini"
       },
+      "approvalRangeEdit": {
+        "cell": "Sel",
+        "before": "Sebelum",
+        "after": "Sesudah",
+        "empty": "kosong",
+        "valueKept": "nilai tetap",
+        "numberFormat": "Format: {{format}}",
+        "noChanges": "Tidak ada sel yang berubah.",
+        "moreChanges": "Sel lain yang berubah, ada di semua argumen: {{count}}",
+        "unchangedCells": "Sel yang tidak berubah: {{count}}",
+        "openInExcel": "Buka di Excel",
+        "openInBrowser": "Buka di browser"
+      },
       "approvalReviewCall": {
         "pending": "menunggu",
         "callStatus": "Panggilan {{number}} · {{status}}",
