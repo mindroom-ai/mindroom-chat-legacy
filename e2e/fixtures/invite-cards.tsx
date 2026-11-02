@@ -25,6 +25,7 @@ const inviters: Array<[userId: string, displayName: string]> = [
   ['@maya:matrix.localhost', 'مايا'],
   ['@mallory:evil.example', '⁧Maya (@maya:matrix.localhost)‎‏'],
   ['@mallory:evil.example', '⁩‫Maya (@maya:matrix.localhost)'],
+  ['@mallory:evil.example', 'Maya (@maya:matrix.localhost)\u0085\u2029\u200F'],
 ];
 
 const invites = inviters.map(([inviterId, displayname], index) => {

@@ -66,8 +66,9 @@ import { settingsAtom } from '../../../state/settings';
 import { acceptInvite, acceptInvites } from './acceptInvite';
 
 const COMPACT_CARD_WIDTH = 548;
-// Embedding, override and isolate controls; a display name keeps none of them.
-const BIDI_CONTROLS = /[\u202A-\u202E\u2066-\u2069]/g;
+// Embedding, override and isolate controls, and paragraph separators (C0/C1
+// controls such as NEL, and U+2029) that would end the isolates around the name.
+const BIDI_CONTROLS = /[\p{Cc}\u2029\u202A-\u202E\u2066-\u2069]/gu;
 
 type InviteData = {
   room: Room;

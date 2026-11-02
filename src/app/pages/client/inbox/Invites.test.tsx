@@ -43,6 +43,13 @@ it.each([
     `${PDI}\u202B\u2067Maya (@maya:matrix.localhost)\u200E\u200F`,
     `${FSI}Maya (@maya:matrix.localhost)\u200E\u200F${PDI} (${LRI}@mallory:evil.example${PDI})`,
   ],
+  // A paragraph separator in the name would end every isolate around it.
+  [
+    'paragraph separators in the name',
+    '@mallory:evil.example',
+    'Maya (@maya:matrix.localhost)\u0085\u2029\u200F',
+    `${FSI}Maya (@maya:matrix.localhost)\u200F${PDI} (${LRI}@mallory:evil.example${PDI})`,
+  ],
 ])('shows an inviter with %s next to the real ID', (_case, inviterId, displayname, expected) => {
   const myUserId = '@me:matrix.localhost';
   const mx = createClient({ baseUrl: 'https://matrix.example', userId: myUserId });
