@@ -338,12 +338,13 @@ const detectDivergence = (
 /**
  * Add the fetched events (oldest first) to the SDK thread, which after an app
  * open usually holds only its latest page. Events older than that page go in
- * as backfill. Appending them would make the SDK announce each one as a new
- * reply or a live event, and listeners that re-render or persist per event
- * froze the app for seconds when a reconcile fetched a long thread's history.
- * An unopened thread is left alone: loading its first page replaces its
- * timeline and replays buffered relations as new events. The repaired batch
- * still reaches the render through `onRepaired`.
+ * as backfill, and newer ones are appended as history, not live events
+ * (replies still announce NewReply). Listeners re-rendered and persisted each
+ * live event on its own, which froze the app for seconds when a reconcile
+ * fetched a long thread.
+ * The repaired batch reaches the render through `onRepaired` and the cache
+ * through `persistRepair`. An unopened thread is left alone: loading its first
+ * page replaces its timeline and replays its buffered relations.
  *
  * Only events newer than every event an older segment holds go to the live
  * segment. After a sync gap, or once history is joined behind it, older
@@ -372,7 +373,7 @@ const addFetchedEventsToThread = (thread: Thread, events: MatrixEvent[]): void =
   const [earliest] = thread.events;
   // A window that starts at the root already reaches the thread's start.
   if (earliest !== undefined && earliest.getId() === thread.id) {
-    thread.addEvents(liveEvents, false);
+    thread.addEventsAsHistory(liveEvents);
     return;
   }
   const newerIndex = earliest
@@ -381,7 +382,7 @@ const addFetchedEventsToThread = (thread: Thread, events: MatrixEvent[]): void =
   const backfillCount = newerIndex === -1 ? liveEvents.length : newerIndex;
   // Backfill is prepended one event at a time, so it goes in newest first.
   if (backfillCount > 0) thread.addEvents(liveEvents.slice(0, backfillCount).reverse(), true);
-  if (backfillCount < liveEvents.length) thread.addEvents(liveEvents.slice(backfillCount), false);
+  if (backfillCount < liveEvents.length) thread.addEventsAsHistory(liveEvents.slice(backfillCount));
 };
 
 /**

@@ -35,7 +35,7 @@ vi.mock('./MindroomHtmlBlocks.css', () => ({
 
 describe('Mindroom paste marker HTML blocks', () => {
   it('renders paste marker spans as badges', async () => {
-    const { withMindroomToolTraceMarkerParserOptions } = await import('./MindroomHtmlBlocks');
+    const { markerParserOptions } = await import('../../test-utils/markerParserOptions');
     const formattedBody = [
       '<p>Before ',
       '<span data-mindroom-paste-marker="true" data-mindroom-paste-id="paste-a3f19c" data-mindroom-paste-chars="18421" data-mindroom-paste-file="mindroom-paste-a3f19c.txt">',
@@ -45,10 +45,7 @@ describe('Mindroom paste marker HTML blocks', () => {
     ].join('');
     // Production passes the message content whose formatted_body is parsed;
     // marker-aware parsing activates from that content.
-    const parserOptions = withMindroomToolTraceMarkerParserOptions(
-      {},
-      { formatted_body: formattedBody }
-    );
+    const parserOptions = markerParserOptions({}, { formatted_body: formattedBody });
     const renderer = create(
       React.createElement(React.Fragment, null, parse(formattedBody, parserOptions))
     );

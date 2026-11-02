@@ -5,7 +5,6 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin';
 import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfill';
 import inject from '@rollup/plugin-inject';
-import topLevelAwait from 'vite-plugin-top-level-await';
 import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'fs';
 import path from 'path';
@@ -32,6 +31,10 @@ const getBuildVersion = () => {
 };
 
 const buildVersion = getBuildVersion();
+
+// The first browser versions with native top-level await, which noVNC and pdfjs use.
+// The app already needs Safari 15.4 for structuredClone and Array.prototype.at.
+const browserTarget = ['chrome89', 'edge89', 'firefox89', 'safari15'];
 const releaseVersion = readReleaseVersion(process.env, path.resolve());
 
 function appVersionManifest() {
@@ -90,6 +93,11 @@ export const copyFiles = {
     },
     {
       src: 'public/manifest.json',
+      dest: '',
+    },
+    {
+      // No notices by default; the Docker image serves an operator's file instead (README).
+      src: 'public/notices.json',
       dest: '',
     },
     {
@@ -218,12 +226,6 @@ export default defineConfig({
     authenticationRecoveryAssets(),
     serverStaleServiceWorkerCleanup(`${appBasePath}/sw.js`),
     serverMatrixSdkCryptoWasm(matrixCryptoWasmPath),
-    topLevelAwait({
-      // The export name of top-level await promise for each chunk module
-      promiseExportName: '__tla',
-      // The function to generate import names of top-level await promise in each chunk module
-      promiseImportName: (i) => `__tla_${i}`,
-    }),
     viteStaticCopy(copyFiles),
     vanillaExtractPlugin(),
     wasm(),
@@ -237,7 +239,7 @@ export default defineConfig({
       injectManifest: {
         injectionPoint: 'self.__WB_MANIFEST',
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
-        globPatterns: ['**/*.{js,wasm,css,html}'],
+        globPatterns: ['**/*.{js,wasm,css,html}', 'assets/thinking-mark-*.svg'],
         globIgnores: [
           'public/element-call/**',
           'runtime-config.js',
@@ -261,6 +263,7 @@ export default defineConfig({
     // re-optimizes dependencies and reloads every open page.
     include: ['workbox-precaching', 'workbox-routing', '@vanilla-extract/recipes/createRuntimeFn'],
     esbuildOptions: {
+      target: browserTarget,
       define: {
         global: 'globalThis',
       },
@@ -274,17 +277,12 @@ export default defineConfig({
     },
   },
   build: {
+    target: browserTarget,
     outDir: 'dist',
     sourcemap: true,
     copyPublicDir: false,
     rollupOptions: {
       plugins: [inject({ Buffer: ['buffer', 'Buffer'] })],
-      output: {
-        // Keep the raw artwork out of the main chunk so both stay below the PWA cache limit.
-        manualChunks(id) {
-          if (id.endsWith('/thinking-mark.svg?raw')) return 'thinking-mark';
-        },
-      },
     },
   },
 });

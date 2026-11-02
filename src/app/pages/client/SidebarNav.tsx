@@ -22,6 +22,7 @@ import {
 import { CreateTab } from './sidebar/CreateTab';
 import { useClientConfig } from '../../hooks/useClientConfig';
 import { MindroomTab } from '../../mindroom/sidebar/MindroomTab';
+import { useShowLocalMindroom } from '../../mindroom/local-mindroom/useShowLocalMindroom';
 import {
   useShowCanvasesInSidebar,
   useSimpleMode,
@@ -48,7 +49,8 @@ export function SidebarNav({
     ? sidebar?.showExploreCommunityInSimpleMode ?? false
     : sidebar?.showExploreCommunity ?? true;
   const showAddSpace = !simpleMode && (sidebar?.showAddSpace ?? true);
-  const showMindRoom = !simpleMode && (sidebar?.showMindRoom ?? true);
+  const localMindroom = useShowLocalMindroom();
+  const showMindRoom = !simpleMode && localMindroom;
   const showSecondStack = showExploreCommunity || showMindRoom || showAddSpace;
 
   return (

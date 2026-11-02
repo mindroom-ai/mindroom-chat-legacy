@@ -48,7 +48,7 @@ export function EmoticonAutocomplete({
   const useAuthentication = useMediaAuthentication();
 
   const imagePacks = useRelevantImagePacks(ImageUsage.Emoticon, imagePackRooms);
-  const recentEmoji = useRecentEmoji(mx, 20);
+  const recentEmoji = useRecentEmoji(mx, 20, imagePacks);
 
   const searchList = useMemo(() => {
     const list: Array<EmoticonSearchItem> = [];

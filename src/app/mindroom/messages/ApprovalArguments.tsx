@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
 import { Button, Icon, Icons, Text } from 'folds';
 import { useMatrixClient } from '../../hooks/useMatrixClient';
-import { useMediaAuthentication } from '../../hooks/useMediaAuthentication';
 import { ToolApprovalData } from './toolApproval';
 import { downloadMindroomSidecarBlob } from './sidecarDownload';
 import { ApprovalArgumentFields, countArgumentFields } from './ApprovalArgumentFields';
@@ -13,7 +12,6 @@ const PREVIEW_FIELDS = 3;
 export function ApprovalArguments({ approval }: { approval: ToolApprovalData }) {
   const { t } = useTranslation();
   const mx = useMatrixClient();
-  const auth = useMediaAuthentication();
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState<{ sourceKey: string; value: Record<string, unknown> }>();
   const [error, setError] = useState(false);
@@ -27,7 +25,7 @@ export function ApprovalArguments({ approval }: { approval: ToolApprovalData }) 
     const source = JSON.parse(sourceKey) as ToolApprovalData['argumentSource'];
     if (!open || complete || !source) return undefined;
     setError(false);
-    void downloadMindroomSidecarBlob(mx, source, auth)
+    void downloadMindroomSidecarBlob(mx, source)
       .then(async (blob) => {
         const value: unknown = JSON.parse(await blob.text());
         if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -40,7 +38,7 @@ export function ApprovalArguments({ approval }: { approval: ToolApprovalData }) 
     return () => {
       active = false;
     };
-  }, [mx, auth, open, complete, sourceKey, retry]);
+  }, [mx, open, complete, sourceKey, retry]);
   const shown = complete ?? approval.arguments;
   const total = countArgumentFields(shown);
   return (

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { MatrixClient } from 'matrix-js-sdk';
-import { useMediaAuthentication } from '../../hooks/useMediaAuthentication';
 import { downloadCachedAttachment } from '../messages/attachmentRepository';
 import { MAX_CANVAS_DOCUMENT_BYTES, type ChatUiCanvas } from '../ui-actions/chatUiProtocol';
 
@@ -19,7 +18,6 @@ export function useCanvasPage(
   canvas: ChatUiCanvas,
   attempt = 0
 ): CanvasPage {
-  const useAuthentication = useMediaAuthentication();
   const document = 'document' in canvas ? canvas.document : undefined;
   const mxcUrl = document?.mxcUrl;
   // A retry is a new attempt at the same reference.
@@ -39,7 +37,6 @@ export function useCanvasPage(
         encryptedFile: document.encryptedFile,
         mimeType: 'text/html',
       },
-      useAuthentication,
       {
         roomId,
         eventId: revisionEventId,
@@ -53,7 +50,7 @@ export function useCanvasPage(
     return () => controller.abort();
     // The reference identifies the content; a new upload has a new MXC URL.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mx, roomId, key, useAuthentication]);
+  }, [mx, roomId, key]);
 
   if ('html' in canvas) return { status: 'ready', html: canvas.html };
   return loaded && loaded.key === key ? loaded.page : { status: 'loading' };

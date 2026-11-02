@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatMindroomAiRunNumber,
+  formatMindroomAiRunPercentage,
+  formatMindroomCostUsd,
+  getMindroomAiRunTokenParts,
   formatMindroomAiRunTimeToFirstToken,
   getMindroomAiRunCompactModelLabel,
   getMindroomAiRunContextBarSegments,
-  getMindroomAiRunContextCacheLabel,
   getMindroomAiRunContextLabel,
-  getMindroomAiRunUsageCacheLabel,
   getMindroomAiRunModelLabel,
-  getMindroomAiRunUsageLabel,
 } from './aiRunDisplay';
 
 describe('getMindroomAiRunModelLabel', () => {
@@ -90,37 +90,6 @@ describe('getMindroomAiRunCompactModelLabel', () => {
   });
 });
 
-describe('getMindroomAiRunUsageLabel', () => {
-  it('formats token counts in a compact summary', () => {
-    expect(
-      getMindroomAiRunUsageLabel({
-        inputTokens: 1024,
-        outputTokens: 256,
-        totalTokens: 1280,
-      })
-    ).toBe('in 1,024 • out 256 • total 1,280');
-  });
-
-  it('returns undefined when no usage values are present', () => {
-    expect(getMindroomAiRunUsageLabel({})).toBeUndefined();
-  });
-});
-
-describe('getMindroomAiRunUsageCacheLabel', () => {
-  it('formats cumulative run cache counters separately from token totals', () => {
-    expect(
-      getMindroomAiRunUsageCacheLabel({
-        cacheReadTokens: 20000,
-        cacheWriteTokens: 500,
-      })
-    ).toBe('read 20,000 • write 500');
-  });
-
-  it('returns undefined when no cumulative cache counters are present', () => {
-    expect(getMindroomAiRunUsageCacheLabel({})).toBeUndefined();
-  });
-});
-
 describe('getMindroomAiRunContextLabel', () => {
   it('formats context usage with a percentage', () => {
     expect(
@@ -128,7 +97,17 @@ describe('getMindroomAiRunContextLabel', () => {
         contextInputTokens: 500,
         contextWindowTokens: 2000,
       })
-    ).toBe('500 / 2,000 (25.0%)');
+    ).toBe('500 of 2,000 · 25.0%');
+  });
+
+  it('formats the percentage as the context bar tooltips do', () => {
+    expect(
+      getMindroomAiRunContextLabel(
+        { contextInputTokens: 500, contextWindowTokens: 2000 },
+        undefined,
+        'ru'
+      )
+    ).toBe(`500 of 2\u00a0000 · ${formatMindroomAiRunPercentage(25, 'ru')}`);
   });
 
   it('returns undefined for incomplete or invalid context values', () => {
@@ -142,53 +121,27 @@ describe('getMindroomAiRunContextLabel', () => {
   });
 });
 
-describe('getMindroomAiRunContextCacheLabel', () => {
-  it('formats latest-request cache and non-cache-read context counters', () => {
-    expect(
-      getMindroomAiRunContextCacheLabel({
-        contextCacheReadInputTokens: 9000,
-        contextCacheWriteInputTokens: 10,
-        contextUncachedInputTokens: 130,
-      })
-    ).toBe('read 9,000 • write 10 • not read 130');
-  });
-
-  it('returns undefined when no latest-request cache counters are present', () => {
-    expect(getMindroomAiRunContextCacheLabel({})).toBeUndefined();
-  });
-});
-
 describe('getMindroomAiRunContextBarSegments', () => {
-  it('maps latest-request cache, new input, and reserve to context-window bar segments', () => {
+  it('maps latest-request cache and new input to context-window bar segments', () => {
     expect(
       getMindroomAiRunContextBarSegments({
         contextInputTokens: 65,
         contextWindowTokens: 100,
         contextCacheReadInputTokens: 20,
-        contextCacheWriteInputTokens: 5,
         contextUncachedInputTokens: 45,
       })
     ).toEqual([
       {
         key: 'cacheRead',
-        label: 'Cache read',
+        label: 'From cache',
         tokens: 20,
         percentage: 20,
-        title: 'Cache read: 20 tokens (20.0% of window)',
       },
       {
         key: 'newInput',
         label: 'New input',
         tokens: 45,
         percentage: 45,
-        title: 'New input: 45 tokens (45.0% of window); cache write: 5 tokens',
-      },
-      {
-        key: 'reserve',
-        label: 'Reserve',
-        tokens: 35,
-        percentage: 35,
-        title: 'Reserve: 35 tokens (35.0% of window)',
       },
     ]);
   });
@@ -215,29 +168,20 @@ describe('getMindroomAiRunContextBarSegments', () => {
     expect(segments).toEqual([
       expect.objectContaining({
         key: 'cacheRead',
-        label: 'Cache read',
+        label: 'From cache',
         tokens: 153294,
-        title: 'Cache read: 153,294 tokens (76.6% of window); reported cache read: 281,264 tokens',
       }),
       expect.objectContaining({
         key: 'newInput',
         label: 'New input',
         tokens: 0,
         percentage: 0,
-        title: 'New input: 0 tokens (0.0% of window)',
-      }),
-      expect.objectContaining({
-        key: 'reserve',
-        label: 'Reserve',
-        tokens: 46706,
-        title: 'Reserve: 46,706 tokens (23.4% of window)',
       }),
     ]);
     expect(segments?.[0]?.percentage).toBeCloseTo(76.647);
-    expect(segments?.[2]?.percentage).toBeCloseTo(23.353);
   });
 
-  it('renders a context usage bar even when cache counters are absent', () => {
+  it('renders the context as plain input when cache counters are absent', () => {
     expect(
       getMindroomAiRunContextBarSegments({
         contextInputTokens: 65,
@@ -245,41 +189,12 @@ describe('getMindroomAiRunContextBarSegments', () => {
       })
     ).toEqual([
       {
-        key: 'cacheRead',
-        label: 'Cache read',
-        tokens: 0,
-        percentage: 0,
-        title: 'Cache read: 0 tokens (0.0% of window)',
-      },
-      {
-        key: 'newInput',
-        label: 'New input',
+        key: 'input',
+        label: 'Input',
         tokens: 65,
         percentage: 65,
-        title: 'New input: 65 tokens (65.0% of window)',
-      },
-      {
-        key: 'reserve',
-        label: 'Reserve',
-        tokens: 35,
-        percentage: 35,
-        title: 'Reserve: 35 tokens (35.0% of window)',
       },
     ]);
-  });
-
-  it('omits invalid cache-write counts from the new-input segment title', () => {
-    const segments = getMindroomAiRunContextBarSegments({
-      contextInputTokens: 65,
-      contextWindowTokens: 100,
-      contextCacheReadInputTokens: 20,
-      contextCacheWriteInputTokens: -5,
-      contextUncachedInputTokens: 45,
-    });
-
-    expect(segments?.find((segment) => segment.key === 'newInput')?.title).toBe(
-      'New input: 45 tokens (45.0% of window)'
-    );
   });
 });
 
@@ -294,8 +209,77 @@ describe('formatMindroomAiRunTimeToFirstToken', () => {
   });
 });
 
+describe('formatMindroomAiRunPercentage', () => {
+  it('formats a share with one decimal in the percent style of each locale', () => {
+    expect(formatMindroomAiRunPercentage(82.64, 'en')).toBe('82.6%');
+    expect(formatMindroomAiRunPercentage(82.64, 'de')).toBe('82,6\u00a0%');
+  });
+});
+
 describe('formatMindroomAiRunNumber', () => {
   it('formats numbers with grouping separators', () => {
     expect(formatMindroomAiRunNumber(12345)).toBe('12,345');
+  });
+});
+
+describe('formatMindroomCostUsd', () => {
+  it.each([
+    [0, '$0.00'],
+    [0.00004, '$0.00004'],
+    [0.0000123, '$0.000012'],
+    [0.0001, '$0.0001'],
+    [0.000423, '$0.00042'],
+    [0.0031, '$0.0031'],
+    [0.0421, '$0.042'],
+    [0.0999, '$0.10'],
+    [0.5, '$0.50'],
+    [1.234, '$1.23'],
+    [1234.5, '$1,234.50'],
+  ])('formats %s as %s', (usd, expected) => {
+    expect(formatMindroomCostUsd(usd, 'en')).toBe(expected);
+  });
+});
+
+describe('getMindroomAiRunTokenParts', () => {
+  it('splits input into cache reads and new input when the backend reports the split', () => {
+    const tokens = getMindroomAiRunTokenParts({
+      inputTokens: 1674,
+      cacheReadTokens: 1408,
+      uncachedInputTokens: 266,
+      outputTokens: 31,
+    });
+
+    expect(tokens?.total).toBe(1705);
+    expect(tokens?.parts.map(({ key, label, tokens: count }) => [key, label, count])).toEqual([
+      ['cacheRead', 'From cache', 1408],
+      ['newInput', 'New input', 266],
+      ['output', 'Output', 31],
+    ]);
+    expect(tokens?.parts[0].percentage).toBeCloseTo((1408 / 1705) * 100);
+  });
+
+  it('keeps input whole for replies recorded before the split was sent', () => {
+    expect(
+      getMindroomAiRunTokenParts({
+        inputTokens: 1674,
+        cacheReadTokens: 1408,
+        outputTokens: 31,
+      })?.parts.map(({ key, tokens }) => [key, tokens])
+    ).toEqual([
+      ['input', 1674],
+      ['output', 31],
+    ]);
+  });
+
+  it('leaves out kinds the reply did not use', () => {
+    expect(
+      getMindroomAiRunTokenParts({ uncachedInputTokens: 100, outputTokens: 10 })?.parts.map(
+        ({ key }) => key
+      )
+    ).toEqual(['newInput', 'output']);
+  });
+
+  it('returns undefined without token counts', () => {
+    expect(getMindroomAiRunTokenParts({})).toBeUndefined();
   });
 });

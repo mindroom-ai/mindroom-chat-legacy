@@ -5,12 +5,15 @@ import { useMatrixClient } from '../../hooks/useMatrixClient';
 import { markRoomAndThreadsAsRead, markThreadAsRead } from '../notifications/readReceipts';
 
 type UseRoomEscapeReadReceiptsOptions = {
+  /** A panel covers the conversation, so its messages are not in view. */
+  conversationHidden?: boolean;
   hideActivity: boolean;
   roomId: string;
   threadId?: string;
 };
 
 export const useRoomEscapeReadReceipts = ({
+  conversationHidden = false,
   hideActivity,
   roomId,
   threadId,
@@ -21,14 +24,14 @@ export const useRoomEscapeReadReceipts = ({
     window,
     useCallback(
       (evt) => {
-        if (!isKeyHotkey('escape', evt)) return;
+        if (conversationHidden || !isKeyHotkey('escape', evt)) return;
         if (threadId) {
           markThreadAsRead(mx, roomId, threadId, hideActivity);
           return;
         }
         markRoomAndThreadsAsRead(mx, roomId, hideActivity);
       },
-      [hideActivity, mx, roomId, threadId]
+      [conversationHidden, hideActivity, mx, roomId, threadId]
     )
   );
 };

@@ -15,6 +15,7 @@ Update this guide alongside intentional changes to shared visual behavior.
 | Composer, audio player, inline summaries, tool/approval disclosures, typing and approval bars | Reuse the shared material and rim, with spacing between separate surfaces.                                                                                   |
 | Rows within a glass panel, including nested approval receipts                                 | Let the enclosing surface own the glass; avoid stacking opaque fills, rims, or blur on every child. Selection and semantic states can retain their own fill. |
 | Following/status strip below the composer                                                     | Flat blur only while it contains status text; an empty strip stays fully clear and unblurred so messages remain visible.                                     |
+| Operator notice banners above the app                                                         | Flat strip in the level's Folds `Container` colors with a bottom `ContainerLine`; in normal flow, so the layout below shrinks instead of being covered.      |
 
 The room toolbar and the floating thread banner are different surfaces.
 The toolbar has room navigation and member/menu controls; the banner has thread details and actions.

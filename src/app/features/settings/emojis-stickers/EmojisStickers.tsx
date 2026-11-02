@@ -3,6 +3,7 @@ import { Box, Text, IconButton, Icon, Icons } from 'folds';
 import { useTranslation } from 'react-i18next';
 import { Page, PageContent, PageHeader, PageScroll } from '../../../components/page';
 import { GlobalPacks } from './GlobalPacks';
+import { ServerPack } from './ServerPack';
 import { UserPack } from './UserPack';
 import { ImagePack } from '../../../plugins/custom-emoji';
 import { ImagePackView } from '../../../components/image-pack-view';
@@ -45,6 +46,7 @@ export function EmojisStickers({ requestClose }: EmojisStickersProps) {
         <PageContent>
           <Box direction="Column" gap="700">
             <UserPack onViewPack={setImagePack} />
+            <ServerPack onViewPack={setImagePack} />
             <GlobalPacks onViewPack={setImagePack} />
           </Box>
         </PageContent>

@@ -616,7 +616,7 @@ index d5d7e36..f31466e 100644
  
          // the timelines are not contiguous.
 diff --git a/node_modules/matrix-js-sdk/lib/models/thread.js b/node_modules/matrix-js-sdk/lib/models/thread.js
-index b02b81f..9181254 100644
+index b02b81f..0ab8b3d 100644
 --- a/node_modules/matrix-js-sdk/lib/models/thread.js
 +++ b/node_modules/matrix-js-sdk/lib/models/thread.js
 @@ -53,12 +53,36 @@ export function determineFeatureSupport(stable, unstable) {
@@ -656,7 +656,7 @@ index b02b81f..9181254 100644
      this.id = id;
      this.rootEvent = rootEvent;
      /**
-@@ -114,12 +138,22 @@ export class Thread extends ReadReceipt {
+@@ -114,12 +138,27 @@ export class Thread extends ReadReceipt {
       */
      _defineProperty(this, "initialEventsFetched", !Thread.hasServerSideSupport);
      _defineProperty(this, "initalEventFetchProm", void 0);
@@ -673,6 +673,11 @@ index b02b81f..9181254 100644
       */
      _defineProperty(this, "replayEvents", []);
 -    _defineProperty(this, "onTimelineReset", /*#__PURE__*/_asyncToGenerator(function* () {
++    /**
++     * MindRoom: set while events the thread lacked are added, which are not announced as live (`data.liveEvent`
++     * stays false). A replay of buffered relations also skips this thread's own per-event handling.
++     */
++    _defineProperty(this, "addingHistory", void 0);
 +    _defineProperty(this, "onTimelineReset", /*#__PURE__*/_asyncToGenerator(function* (_room, timelineSet) {
 +      // MindRoom: every thread timeline reset reaches all threads through the room; only a room gap makes this root
 +      // stale. An unopened thread refreshes its root when it is initialized.
@@ -680,7 +685,17 @@ index b02b81f..9181254 100644
        // We hit a gappy sync, ask the server for an update
        yield _this.processRootEventPromise;
        _this.processRootEventPromise = undefined;
-@@ -197,6 +231,7 @@ export class Thread extends ReadReceipt {
+@@ -159,6 +198,9 @@ export class Thread extends ReadReceipt {
+       };
+     }());
+     _defineProperty(this, "onTimelineEvent", (event, room, toStartOfTimeline) => {
++      // MindRoom: a replayed relation is history the first page lacked; the replay's TimelineReset and Update
++      // cover it once.
++      if (this.addingHistory === "replayed") return;
+       // Add a synthesized receipt when paginating forward in the timeline
+       if (!toStartOfTimeline) {
+         var sender = event.getSender();
+@@ -197,6 +239,7 @@ export class Thread extends ReadReceipt {
      }
      this.room = opts.room;
      this.client = opts.client;
@@ -688,15 +703,20 @@ index b02b81f..9181254 100644
      this.pendingEventOrdering = (_opts$pendingEventOrd = opts.pendingEventOrdering) !== null && _opts$pendingEventOrd !== void 0 ? _opts$pendingEventOrd : PendingEventOrdering.Chronological;
      this.timelineSet = new EventTimelineSet(this.room, {
        timelineSupport: true,
-@@ -269,6 +304,7 @@ export class Thread extends ReadReceipt {
+@@ -269,9 +312,11 @@ export class Thread extends ReadReceipt {
    }
    addEventToTimeline(event, toStartOfTimeline) {
      if (!this.findEventById(event.getId())) {
 +      this.flushPendingTimelineReset();
        this.timelineSet.addEventToTimeline(event, this.liveTimeline, {
          toStartOfTimeline,
-         fromCache: false,
-@@ -300,6 +336,7 @@ export class Thread extends ReadReceipt {
+-        fromCache: false,
++        // MindRoom: history the thread lacked is not live.
++        fromCache: this.addingHistory !== undefined,
+         roomState: this.roomState,
+         addToState: false
+       });
+@@ -300,6 +345,7 @@ export class Thread extends ReadReceipt {
      if (this.findEventById(eventId)) {
        return;
      }
@@ -704,7 +724,7 @@ index b02b81f..9181254 100644
      this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState, false);
    }
    addEvents(events, toStartOfTimeline) {
-@@ -385,6 +422,12 @@ export class Thread extends ReadReceipt {
+@@ -385,6 +431,12 @@ export class Thread extends ReadReceipt {
         * This fix keeps a reference to those events and replay them once the thread
         * has been initialised properly.
         */
@@ -717,7 +737,7 @@ index b02b81f..9181254 100644
        (_this$replayEvents = this.replayEvents) === null || _this$replayEvents === void 0 || _this$replayEvents.push(event);
  
        // For annotations (reactions), aggregate immediately (pre-init) to keep
-@@ -457,7 +500,7 @@ export class Thread extends ReadReceipt {
+@@ -457,7 +509,7 @@ export class Thread extends ReadReceipt {
      var _this4 = this;
      return _asyncToGenerator(function* () {
        var bundledRelationship = _this4.getRootEventBundledRelationship();
@@ -726,7 +746,7 @@ index b02b81f..9181254 100644
          _this4.replyCount = bundledRelationship.count;
          _this4._currentUserParticipated = !!bundledRelationship.current_user_participated;
          var mapper = _this4.client.getEventMapper();
-@@ -480,6 +523,52 @@ export class Thread extends ReadReceipt {
+@@ -480,6 +532,52 @@ export class Thread extends ReadReceipt {
      this.pendingReplyCount = pendingEvents.length;
    }
  
@@ -779,7 +799,7 @@ index b02b81f..9181254 100644
    /**
     * Reset the live timeline of all timelineSets, and start new ones.
     *
-@@ -495,41 +584,33 @@ export class Thread extends ReadReceipt {
+@@ -495,41 +593,33 @@ export class Thread extends ReadReceipt {
     * Removing just the old live timeline whilst preserving previous ones is not supported.
     */
    resetLiveTimeline(backPaginationToken, forwardPaginationToken) {
@@ -846,7 +866,39 @@ index b02b81f..9181254 100644
    }
    updateThreadFromRootEvent() {
      var _this6 = this;
-@@ -548,7 +629,25 @@ export class Thread extends ReadReceipt {
+@@ -545,10 +635,54 @@ export class Thread extends ReadReceipt {
+       yield _this6.processRootEvent();
+     })();
+   }
++  /**
++   * MindRoom: append events the thread lacked, such as a fetched page of its history, without announcing them as
++   * live. Announced as live events, each was saved to the cache and re-rendered on its own, which froze the app
++   * for seconds on a long thread. Replies still count and announce {@link ThreadEvent.NewReply}.
++   */
++  addEventsAsHistory(events) {
++    this.addingHistory = "fetched";
++    try {
++      this.addEvents(events, false);
++    } finally {
++      this.addingHistory = undefined;
++    }
++  }
++
++  /**
++   * MindRoom: an unopened thread buffers every reaction and the newest edit of each reply from the saved sync and
++   * live sync until it is shown or opened, often hundreds; replay them as history.
++   */
++  replayBufferedEvents() {
++    this.addingHistory = "replayed";
++    try {
++      for (var event of this.replayEvents ?? []) {
++        this.addEvent(event, false);
++      }
++    } finally {
++      this.addingHistory = undefined;
++    }
++    this.replayEvents = null;
++  }
    updateThreadMetadata() {
      var _this7 = this;
      return _asyncToGenerator(function* () {
@@ -856,10 +908,7 @@ index b02b81f..9181254 100644
 +        if (!_this7.client.clientRunning) return;
 +        if (!Thread.hasServerSideSupport) {
 +          _this7.initialEventsFetched = true;
-+          for (const event of _this7.replayEvents ?? []) {
-+            _this7.addEvent(event, false);
-+          }
-+          _this7.replayEvents = null;
++          _this7.replayBufferedEvents();
 +        }
 +      }
        _this7.updatePendingReplyCount();
@@ -872,7 +921,7 @@ index b02b81f..9181254 100644
        if (!_this7.processRootEventPromise) {
          // We only want to do this once otherwise we end up rolling back to the last unsigned summary we have for the thread
          _this7.processRootEventPromise = _this7.updateThreadFromRootEvent();
-@@ -556,7 +655,8 @@ export class Thread extends ReadReceipt {
+@@ -556,7 +690,8 @@ export class Thread extends ReadReceipt {
        yield _this7.processRootEventPromise;
        if (!_this7.initialEventsFetched) {
          if (_this7.initalEventFetchProm) {
@@ -882,7 +931,18 @@ index b02b81f..9181254 100644
          } else {
            // fetch initial events to allow proper pagination
            try {
-@@ -596,6 +696,10 @@ export class Thread extends ReadReceipt {
+@@ -586,16 +721,17 @@ export class Thread extends ReadReceipt {
+             // the pagination has finished. The important thing is that we're not await-ing anything
+             // else between setting this and adding events, so no races.
+             _this7.initialEventsFetched = true;
+-            for (var event of _this7.replayEvents) {
+-              _this7.addEvent(event, false);
+-            }
+-            _this7.replayEvents = null;
++            _this7.replayBufferedEvents();
+             // just to make sure that, if we've created a timeline window for this thread before the thread itself
+             // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.
+             _this7.emit(RoomEvent.TimelineReset, _this7.room, _this7.timelineSet, true);
            } catch (e) {
              logger.error("Failed to load start of newly created thread: ", e);
              _this7.initialEventsFetched = false;
@@ -893,7 +953,7 @@ index b02b81f..9181254 100644
            }
          }
        }
-@@ -603,12 +707,58 @@ export class Thread extends ReadReceipt {
+@@ -603,12 +739,58 @@ export class Thread extends ReadReceipt {
      })();
    }
  
@@ -952,7 +1012,7 @@ index b02b81f..9181254 100644
        var recursionSupport = (_this8$client$canSupp = _this8.client.canSupport.get(Feature.RelationsRecursion)) !== null && _this8$client$canSupp !== void 0 ? _this8$client$canSupp : ServerSupport.Unsupported;
        if (recursionSupport === ServerSupport.Unsupported) {
          for (var _len = _arguments.length, events = new Array(_len), _key = 0; _key < _len; _key++) {
-@@ -862,4 +1012,3 @@ export function threadFilterTypeToFilter(type) {
+@@ -862,4 +1044,3 @@ export function threadFilterTypeToFilter(type) {
        return "all";
    }
  }
@@ -968,7 +1028,7 @@ index fa1ae65..b3b6135 100644
 +{"version":3,"file":"thread.js","names":["PendingEventOrdering","TypedReEmitter","RelationType","MatrixEvent","MatrixEventEvent","Direction","EventTimeline","EventTimelineSet","RoomEvent","ServerControlledNamespacedValue","logger","ReadReceipt","ReceiptType","Feature","ServerSupport","ThreadEvent","FeatureSupport","determineFeatureSupport","stable","unstable","Stable","Experimental","None","threadResetTokenConversionRequests","WeakMap","convertThreadResetToken","client","roomId","token","direction","requests","get","Map","set","key","JSON","stringify","existingRequest","request","createMessagesRequest","cleanup","delete","size","then","Thread","constructor","id","rootEvent","opts","_this","_opts$pendingEventOrd","this","_defineProperty","hasServerSideSupport","_asyncToGenerator","processRootEventPromise","undefined","event","redaction","isRelation","THREAD_RELATION_TYPE","name","room","eventShouldLiveIn","threadId","getId","status","replyCount","updatePendingReplyCount","emit","Update","_ref2","threadRootId","threadEvent","timeline","clearEventMetadata","lastEvent","_currentUserParticipated","Delete","_this$lastEvent","getAssociatedId","updateThreadMetadata","_x","_x2","_x3","apply","arguments","toStartOfTimeline","sender","getSender","shouldSendLocalEchoReceipt","addLocalEchoReceipt","Read","onEcho","_ref3","NewReply","_x4","_x5","setMaxListeners","Error","pendingEventOrdering","Chronological","timelineSet","timelineSupport","pendingEvents","reEmitter","reEmit","Timeline","TimelineReset","on","BeforeRedaction","onBeforeRedaction","Redaction","onRedaction","LocalEchoUpdated","onLocalEcho","onTimelineReset","onTimelineEvent","processReceipts","receipts","setEventMetadata","fetchRootEvent","_this2","eventData","fetchRoomEvent","mapper","getEventMapper","e","error","processEvent","setServerSideSupport","FILTER_RELATED_BY_SENDERS","setPreferUnstable","FILTER_RELATED_BY_REL_TYPES","setServerSideListSupport","hasServerSideListSupport","setServerSideFwdPaginationSupport","hasServerSideFwdPaginationSupport","_this$client$canSuppo","recursionSupport","canSupport","RelationsRecursion","Unsupported","_this$getReadReceiptF","oldReceiptEventId","getReadReceiptForUserId","eventId","receiptEvent","findEventById","getTs","roomState","getLiveTimeline","getState","FORWARDS","addEventToTimeline","liveTimeline","fromCache","addToState","insertEventIntoTimeline","addEvents","events","forEach","ev","addEvent","length","lastReply","isNewestReply","localTimestamp","decryptEventIfNeeded","Annotation","Replace","addRelatedThreadEvent","fetchEditsWhereNeeded","initialEventsFetched","_this$replayEvents","replayEvents","push","_this$timelineSet$rel","relations","aggregateChildEvent","_this$client$canSuppo2","_this3","_ref5","receiptType","userId","receipt","synthetic","addReceiptToStructure","getRootEventBundledRelationship","getServerAggregatedRelation","processRootEvent","_this4","bundledRelationship","count","current_user_participated","_objectSpread","latest_event","room_id","unfilteredPendingEvents","Detached","getPendingEvents","filter","_this$lastEvent2","lastPendingEvent","pendingReplyCount","resetLiveTimeline","backPaginationToken","forwardPaginationToken","_this5","oldLive","newLive","newBackward","oldForward","res","Forward","end","Backward","start","getPaginationToken","setPaginationToken","updateThreadFromRootEvent","_this6","_this7","initalEventFetchProm","addEventsToTimeline","paginateEventTimeline","backwards","_arguments","_this8","_this8$client$canSupp","_len","Array","_key","Promise","all","isAnEncryptedThreadMessage","map","_ref6","getType","limit","editEvent","makeReplaced","_x6","setThread","_event$event","unsigned","matches","i","replyToEvent","_ref7","_this$lastPendingEven","getEvents","has","hasCurrentUserParticipated","getUnfilteredTimelineSet","addReceipt","getEventReadUpTo","ignoreSynthesized","isCurrentUser","getUserId","beforeFirstThreadedReceipt","getOldestThreadedReceiptTs","lastReplyId","readUpToId","unthreadedReceipt","getLastUnthreadedReceiptFor","_this$timeline","_ev$getId","ts","hasUserReadEvent","_this$lastReply$getTs","_this$lastReply","_this$room$getLastUnt","_this$room$getLastUnt2","_this$lastReply$getTs2","_this$lastReply2","unthreadedReceiptTs","beforeLastUnthreadedReceipt","setUnread","type","setThreadUnreadNotificationCount","isEncrypted","isThreadRoot","ThreadFilterType","threadFilterTypeToFilter","My"],"sources":["../../src/models/thread.ts"],"sourcesContent":["/*\nCopyright 2021 - 2023 The Matrix.org Foundation C.I.C.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    http://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n*/\n\nimport { type MatrixClient, PendingEventOrdering } from \"../client.ts\";\nimport { TypedReEmitter } from \"../ReEmitter.ts\";\nimport { RelationType } from \"../@types/event.ts\";\nimport { type IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from \"./event.ts\";\nimport { Direction, EventTimeline } from \"./event-timeline.ts\";\nimport { EventTimelineSet, type EventTimelineSetHandlerMap } from \"./event-timeline-set.ts\";\nimport { type NotificationCountType, type Room, RoomEvent } from \"./room.ts\";\nimport { type RoomState } from \"./room-state.ts\";\nimport { ServerControlledNamespacedValue } from \"../NamespacedValue.ts\";\nimport { logger } from \"../logger.ts\";\nimport { ReadReceipt } from \"./read-receipt.ts\";\nimport { type CachedReceiptStructure, type Receipt, ReceiptType } from \"../@types/read_receipts.ts\";\nimport { Feature, ServerSupport } from \"../feature.ts\";\n\nexport enum ThreadEvent {\n    New = \"Thread.new\",\n    Update = \"Thread.update\",\n    NewReply = \"Thread.newReply\",\n    ViewThread = \"Thread.viewThread\",\n    Delete = \"Thread.delete\",\n}\n\nexport type ThreadEmittedEvents = Exclude<ThreadEvent, ThreadEvent.New> | RoomEvent.Timeline | RoomEvent.TimelineReset;\n\nexport type ThreadEventHandlerMap = {\n    [ThreadEvent.Update]: (thread: Thread) => void;\n    [ThreadEvent.NewReply]: (thread: Thread, event: MatrixEvent) => void;\n    [ThreadEvent.ViewThread]: () => void;\n    [ThreadEvent.Delete]: (thread: Thread) => void;\n} & EventTimelineSetHandlerMap;\n\ninterface IThreadOpts {\n    room: Room;\n    client: MatrixClient;\n    pendingEventOrdering?: PendingEventOrdering;\n    receipts?: CachedReceiptStructure[];\n}\n\nexport enum FeatureSupport {\n    None = 0,\n    Experimental = 1,\n    Stable = 2,\n}\n\nexport function determineFeatureSupport(stable: boolean, unstable: boolean): FeatureSupport {\n    if (stable) {\n        return FeatureSupport.Stable;\n    } else if (unstable) {\n        return FeatureSupport.Experimental;\n    } else {\n        return FeatureSupport.None;\n    }\n}\n\ntype ThreadResetTokenResponse = Awaited<ReturnType<MatrixClient[\"createMessagesRequest\"]>>;\n\n// A limited sync gives every thread in a room the same tokens. Share their conversion while it is in flight instead\n// of issuing two identical /messages requests for every materialized thread.\nconst threadResetTokenConversionRequests = new WeakMap<\n    MatrixClient,\n    Map<string, Promise<ThreadResetTokenResponse>>\n>();\n\nconst convertThreadResetToken = (\n    client: MatrixClient,\n    roomId: string,\n    token: string,\n    direction: Direction,\n): Promise<ThreadResetTokenResponse> => {\n    let requests = threadResetTokenConversionRequests.get(client);\n    if (!requests) {\n        requests = new Map();\n        threadResetTokenConversionRequests.set(client, requests);\n    }\n\n    const key = JSON.stringify([roomId, token, direction]);\n    const existingRequest = requests.get(key);\n    if (existingRequest) return existingRequest;\n\n    const request = client.createMessagesRequest(roomId, token, 1, direction);\n    requests.set(key, request);\n\n    const cleanup = (): void => {\n        if (requests.get(key) !== request) return;\n        requests.delete(key);\n        if (requests.size === 0) threadResetTokenConversionRequests.delete(client);\n    };\n    void request.then(cleanup, cleanup);\n\n    return request;\n};\n\nexport class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerMap> {\n    public static hasServerSideSupport = FeatureSupport.None;\n    public static hasServerSideListSupport = FeatureSupport.None;\n    public static hasServerSideFwdPaginationSupport = FeatureSupport.None;\n\n    /**\n     * A reference to all the events ID at the bottom of the threads\n     */\n    public readonly timelineSet: EventTimelineSet;\n\n    private _currentUserParticipated = false;\n\n    private reEmitter: TypedReEmitter<ThreadEmittedEvents, ThreadEventHandlerMap>;\n\n    /**\n     * The last event in this thread, if we don't yet have this in the timeline.\n     *\n     * When we run {@link processRootEvent} (which I think happens during the\n     * setting-up of the thread), we set this to the event pointed to by the\n     * server in `latest_event` [1] that came through with the thread root.\n     *\n     * [1]: https://spec.matrix.org/v1.8/client-server-api/#server-side-aggregation-of-mthread-relationships\n     *\n     * Later, when we have populated the timeline, this is set to undefined, so\n     * that methods like {@link replyToEvent} fall through to use lastReply,\n     * which looks in the timeline for the latest event that is a \"thread reply\"\n     * i.e. directly refers to the thread root with an m.thread relation.\n     *\n     * So it looks like this is only really relevant when initialEventsFetched\n     * is false, because as soon as the initial events have been fetched, we\n     * should have a proper chunk of timeline from the pagination fetch.\n     *\n     * If all replies in this thread are redacted, this is set to the root\n     * event. I'm not clear what the meaning of this is, since usually after the\n     * initial events have been fetched, lastEvent should be undefined.\n     * In fact, the whole usage inside onRedaction looks suspect - it may be\n     * that we were thinking lastEvent always refers to the actual last event,\n     * but it only does so before initialEventsFetched becomes true.\n     *\n     * The usage of lastEvent inside {@link onEcho} looks suspicious, since I'd\n     * think we probably mean {@link replyToEvent} there - we are trying not to\n     * echo a duplicate event, and we probably want that behaviour even after\n     * initialEventsFetched has become true.\n     *\n     * -- andyb\n     */\n    private lastEvent: MatrixEvent | undefined;\n\n    private replyCount = 0;\n    private lastPendingEvent: MatrixEvent | undefined;\n    private pendingReplyCount = 0;\n\n    public readonly room: Room;\n    public readonly client: MatrixClient;\n    private readonly pendingEventOrdering: PendingEventOrdering;\n    private processRootEventPromise?: Promise<void>;\n\n    /**\n     * Whether or not we need to fetch the initial set of events for the thread. We can\n     * only do this if the server has support for it, so if it doesn't we just pretend\n     * that we've already fetched them.\n     */\n    public initialEventsFetched = !Thread.hasServerSideSupport;\n    private initalEventFetchProm: Promise<boolean> | undefined;\n\n    /**\n     * An array of events to add to the timeline once the thread has been initialised\n     * with server suppport.\n     */\n    public replayEvents: MatrixEvent[] | null = [];\n\n    public constructor(\n        public readonly id: string,\n        public rootEvent: MatrixEvent | undefined,\n        opts: IThreadOpts,\n    ) {\n        super();\n\n        // each Event in the thread adds a reemitter, so we could hit the listener limit.\n        this.setMaxListeners(1000);\n\n        if (!opts?.room) {\n            // Logging/debugging for https://github.com/vector-im/element-web/issues/22141\n            // Hope is that we end up with a more obvious stack trace.\n            throw new Error(\"element-web#22141: A thread requires a room in order to function\");\n        }\n\n        this.room = opts.room;\n        this.client = opts.client;\n        this.pendingEventOrdering = opts.pendingEventOrdering ?? PendingEventOrdering.Chronological;\n        this.timelineSet = new EventTimelineSet(\n            this.room,\n            {\n                timelineSupport: true,\n                pendingEvents: true,\n            },\n            this.client,\n            this,\n        );\n        this.reEmitter = new TypedReEmitter(this);\n\n        this.reEmitter.reEmit(this.timelineSet, [RoomEvent.Timeline, RoomEvent.TimelineReset]);\n\n        this.room.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);\n        this.room.on(RoomEvent.Redaction, this.onRedaction);\n        this.room.on(RoomEvent.LocalEchoUpdated, this.onLocalEcho);\n        this.room.on(RoomEvent.TimelineReset, this.onTimelineReset);\n        this.timelineSet.on(RoomEvent.Timeline, this.onTimelineEvent);\n\n        this.processReceipts(opts.receipts);\n\n        // even if this thread is thought to be originating from this client, we initialise it as we may be in a\n        // gappy sync and a thread around this event may already exist.\n        this.updateThreadMetadata();\n        this.setEventMetadata(this.rootEvent);\n    }\n\n    private onTimelineReset = async (): Promise<void> => {\n        // We hit a gappy sync, ask the server for an update\n        await this.processRootEventPromise;\n        this.processRootEventPromise = undefined;\n    };\n\n    private async fetchRootEvent(): Promise<void> {\n        // Always fetch the root event, even if we already have it, so we can get the latest\n        // state (via unsigned).\n        try {\n            const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);\n            const mapper = this.client.getEventMapper();\n            this.rootEvent = mapper(eventData); // will merge with existing event object if such is known\n        } catch (e) {\n            logger.error(\"Failed to fetch thread root to construct thread with\", e);\n        }\n        await this.processEvent(this.rootEvent);\n    }\n\n    public static setServerSideSupport(status: FeatureSupport): void {\n        Thread.hasServerSideSupport = status;\n        // XXX: This global latching behaviour is really unexpected and means that you can't undo when moving to a server without support\n        if (status !== FeatureSupport.Stable) {\n            FILTER_RELATED_BY_SENDERS.setPreferUnstable(true);\n            FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(true);\n            THREAD_RELATION_TYPE.setPreferUnstable(true);\n        }\n    }\n\n    public static setServerSideListSupport(status: FeatureSupport): void {\n        Thread.hasServerSideListSupport = status;\n    }\n\n    public static setServerSideFwdPaginationSupport(status: FeatureSupport): void {\n        Thread.hasServerSideFwdPaginationSupport = status;\n    }\n\n    private onBeforeRedaction = (event: MatrixEvent, redaction: MatrixEvent): void => {\n        if (\n            event?.isRelation(THREAD_RELATION_TYPE.name) &&\n            this.room.eventShouldLiveIn(event).threadId === this.id &&\n            event.getId() !== this.id && // the root event isn't counted in the length so ignore this redaction\n            !redaction.status // only respect it when it succeeds\n        ) {\n            this.replyCount--;\n            this.updatePendingReplyCount();\n            this.emit(ThreadEvent.Update, this);\n        }\n    };\n\n    private onRedaction = async (event: MatrixEvent, room: Room, threadRootId?: string): Promise<void> => {\n        if (threadRootId !== this.id) return; // ignore redactions for other timelines\n        if (this.replyCount <= 0) {\n            for (const threadEvent of this.timeline) {\n                this.clearEventMetadata(threadEvent);\n            }\n            this.lastEvent = this.rootEvent;\n            this._currentUserParticipated = false;\n            this.emit(ThreadEvent.Delete, this);\n        } else {\n            if (this.lastEvent?.getId() === event.getAssociatedId()) {\n                // XXX: If our last event got redacted we query the server for the last event once again\n                await this.processRootEventPromise;\n                this.processRootEventPromise = undefined;\n            }\n            await this.updateThreadMetadata();\n        }\n    };\n\n    private onTimelineEvent = (\n        event: MatrixEvent,\n        room: Room | undefined,\n        toStartOfTimeline: boolean | undefined,\n    ): void => {\n        // Add a synthesized receipt when paginating forward in the timeline\n        if (!toStartOfTimeline) {\n            const sender = event.getSender();\n            if (sender && room && this.shouldSendLocalEchoReceipt(sender, event)) {\n                room.addLocalEchoReceipt(sender, event, ReceiptType.Read);\n            }\n            if (event.getId() !== this.id && event.isRelation(THREAD_RELATION_TYPE.name)) {\n                this.replyCount++;\n            }\n        }\n        this.onEcho(event, toStartOfTimeline ?? false);\n    };\n\n    private shouldSendLocalEchoReceipt(sender: string, event: MatrixEvent): boolean {\n        const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;\n\n        if (recursionSupport === ServerSupport.Unsupported) {\n            // Normally we add a local receipt, but if we don't have\n            // recursion support, then events may arrive out of order, so we\n            // only create a receipt if it's after our existing receipt.\n            const oldReceiptEventId = this.getReadReceiptForUserId(sender)?.eventId;\n            if (oldReceiptEventId) {\n                const receiptEvent = this.findEventById(oldReceiptEventId);\n                if (receiptEvent && receiptEvent.getTs() > event.getTs()) {\n                    return false;\n                }\n            }\n        }\n\n        return true;\n    }\n\n    private onLocalEcho = (event: MatrixEvent): void => {\n        this.onEcho(event, false);\n    };\n\n    private onEcho = async (event: MatrixEvent, toStartOfTimeline: boolean): Promise<void> => {\n        if (event.threadRootId !== this.id) return; // ignore echoes for other timelines\n        if (this.lastEvent === event) return; // ignore duplicate events\n        await this.updateThreadMetadata();\n        if (!event.isRelation(THREAD_RELATION_TYPE.name)) return; // don't send a new reply event for reactions or edits\n        if (toStartOfTimeline) return; // ignore messages added to the start of the timeline\n        // Clear the lastEvent and instead start tracking locally using lastReply\n        this.lastEvent = undefined;\n        this.emit(ThreadEvent.NewReply, this, event);\n    };\n\n    public get roomState(): RoomState {\n        return this.room.getLiveTimeline().getState(EventTimeline.FORWARDS)!;\n    }\n\n    private addEventToTimeline(event: MatrixEvent, toStartOfTimeline: boolean): void {\n        if (!this.findEventById(event.getId()!)) {\n            this.timelineSet.addEventToTimeline(event, this.liveTimeline, {\n                toStartOfTimeline,\n                fromCache: false,\n                roomState: this.roomState,\n                addToState: false,\n            });\n        }\n    }\n\n    /**\n     * TEMPORARY. Only call this when MSC3981 is not available, and we have some\n     * late-arriving events to insert, because we recursively found them as part\n     * of populating a thread. When we have MSC3981 we won't need it, because\n     * they will all be supplied by the homeserver in one request, and they will\n     * already be in the right order in that response.\n     * This is a copy of addEventToTimeline above, modified to call\n     * insertEventIntoTimeline so this event is inserted into our best guess of\n     * the right place based on timestamp. (We should be using Sync Order but we\n     * don't have it.)\n     *\n     * @internal\n     */\n    public insertEventIntoTimeline(event: MatrixEvent): void {\n        const eventId = event.getId();\n        if (!eventId) {\n            return;\n        }\n        // If the event is already in this thread, bail out\n        if (this.findEventById(eventId)) {\n            return;\n        }\n        this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState, false);\n    }\n\n    public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {\n        events.forEach((ev) => this.addEvent(ev, toStartOfTimeline, false));\n        this.updateThreadMetadata();\n    }\n\n    /**\n     * Add an event to the thread and updates\n     * the tail/root references if needed\n     * Will fire \"Thread.update\"\n     * @param event - The event to add\n     * @param toStartOfTimeline - whether the event is being added\n     * to the start (and not the end) of the timeline.\n     * @param emit - whether to emit the Update event if the thread was updated or not.\n     */\n    public addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): void {\n        // Modify this event to point at our room's state, and mark its thread\n        // as this.\n        this.setEventMetadata(event);\n\n        // Decide whether this event is going to be added at the end of the timeline.\n        const lastReply = this.lastReply();\n        const isNewestReply = !lastReply || event.localTimestamp >= lastReply!.localTimestamp;\n\n        if (!Thread.hasServerSideSupport) {\n            // When there's no server-side support, just add it to the end of the timeline.\n            this.addEventToTimeline(event, toStartOfTimeline);\n            this.client.decryptEventIfNeeded(event);\n        } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {\n            this.addRelatedThreadEvent(event, toStartOfTimeline);\n            return;\n        } else if (!toStartOfTimeline && isNewestReply) {\n            // When we've asked for the event to be added to the end,\n            // and this event belongs at the end, add it.\n            this.addEventToTimeline(event, false);\n            this.fetchEditsWhereNeeded(event);\n        } else {\n            // Otherwise, we should add it, but we suspect it is out of order.\n            // This may be because we've just created the thread object and are\n            // still fetching events, in which case add it where we think is sensible\n            // and it will be removed and replaced with the events from the pagination\n            // request once that completes.\n            if (toStartOfTimeline) {\n                // If we're adding at the start of the timeline, it doesn't\n                // matter that it's out of order.\n                this.addEventToTimeline(event, toStartOfTimeline);\n            } else {\n                // We think this event might be out of order, because isNewestReply\n                // is false (otherwise we would have gone into the earlier if\n                // clause), so try to insert it in the right place based on\n                // timestamp.\n                this.insertEventIntoTimeline(event);\n            }\n        }\n\n        if (\n            event.getId() !== this.id &&\n            event.isRelation(THREAD_RELATION_TYPE.name) &&\n            !toStartOfTimeline &&\n            isNewestReply\n        ) {\n            // Clear the last event as we have the latest end of the timeline\n            this.lastEvent = undefined;\n        }\n\n        if (emit) {\n            this.emit(ThreadEvent.NewReply, this, event);\n            this.updateThreadMetadata();\n        }\n    }\n\n    private addRelatedThreadEvent(event: MatrixEvent, toStartOfTimeline: boolean): void {\n        // If this event is not a direct member of the thread, but is a\n        // reference to something that is, then we have two cases:\n\n        if (!this.initialEventsFetched) {\n            // Case 1: we haven't yet fetched events from the server. In\n            // this case, when we do, the events we get back might only be\n            // the first-order ones, so this event (which is second-order -\n            // a reference to something directly in the thread) needs to be\n            // kept so we can replay it when the first-order ones turn up.\n\n            /**\n             * A thread can be fully discovered via a single sync response\n             * And when that's the case we still ask the server to do an initialisation\n             * as it's the safest to ensure we have everything.\n             * However when we are in that scenario we might loose annotation or edits\n             *\n             * This fix keeps a reference to those events and replay them once the thread\n             * has been initialised properly.\n             */\n            this.replayEvents?.push(event);\n\n            // For annotations (reactions), aggregate immediately (pre-init) to keep\n            // reaction counts/summary visible while the thread is still initialising.\n            // Only aggregate as child: parent aggregation is unnecessary here.\n            if (event.isRelation(RelationType.Annotation)) {\n                this.timelineSet.relations?.aggregateChildEvent(event, this.timelineSet);\n            }\n        } else {\n            // Case 2: this is happening later, and we have a timeline. In\n            // this case, these events might be out-of order.\n            //\n            // Specifically, if the server doesn't support recursion, so we\n            // only get these events through sync, they might be coming\n            // later than the first-order ones, so we insert them based on\n            // timestamp (despite the problems with this documented in\n            // #3325).\n            //\n            // If the server does support recursion, we should have got all\n            // the interspersed events from the server when we fetched the\n            // initial events, so if they are coming via sync they should be\n            // the latest ones, so we can add them as normal.\n            //\n            // (Note that both insertEventIntoTimeline and addEventToTimeline\n            // do nothing if we have seen this event before.)\n\n            const recursionSupport =\n                this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;\n\n            if (recursionSupport === ServerSupport.Unsupported) {\n                this.insertEventIntoTimeline(event);\n            } else {\n                this.addEventToTimeline(event, toStartOfTimeline);\n            }\n            // Aggregation is handled by EventTimelineSet when inserting/adding.\n        }\n    }\n\n    public async processEvent(event: MatrixEvent | null | undefined): Promise<void> {\n        if (event) {\n            this.setEventMetadata(event);\n            await this.fetchEditsWhereNeeded(event);\n        }\n    }\n\n    /**\n     * Processes the receipts that were caught during initial sync\n     * When clients become aware of a thread, they try to retrieve those read receipts\n     * and apply them to the current thread\n     * @param receipts - A collection of the receipts cached from initial sync\n     */\n    private processReceipts(receipts: CachedReceiptStructure[] = []): void {\n        for (const { eventId, receiptType, userId, receipt, synthetic } of receipts) {\n            this.addReceiptToStructure(eventId, receiptType as ReceiptType, userId, receipt, synthetic);\n        }\n    }\n\n    private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship | undefined {\n        return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);\n    }\n\n    private async processRootEvent(): Promise<void> {\n        const bundledRelationship = this.getRootEventBundledRelationship();\n        if (Thread.hasServerSideSupport && bundledRelationship) {\n            this.replyCount = bundledRelationship.count;\n            this._currentUserParticipated = !!bundledRelationship.current_user_participated;\n\n            const mapper = this.client.getEventMapper();\n            // re-insert roomId\n            this.lastEvent = mapper({\n                ...bundledRelationship.latest_event,\n                room_id: this.roomId,\n            });\n            this.updatePendingReplyCount();\n            await this.processEvent(this.lastEvent);\n        }\n    }\n\n    private updatePendingReplyCount(): void {\n        const unfilteredPendingEvents =\n            this.pendingEventOrdering === PendingEventOrdering.Detached ? this.room.getPendingEvents() : this.events;\n        const pendingEvents = unfilteredPendingEvents.filter(\n            (ev) =>\n                ev.threadRootId === this.id &&\n                ev.isRelation(THREAD_RELATION_TYPE.name) &&\n                ev.status !== null &&\n                ev.getId() !== this.lastEvent?.getId(),\n        );\n        this.lastPendingEvent = pendingEvents.length ? pendingEvents[pendingEvents.length - 1] : undefined;\n        this.pendingReplyCount = pendingEvents.length;\n    }\n\n    /**\n     * Reset the live timeline of all timelineSets, and start new ones.\n     *\n     * <p>This is used when /sync returns a 'limited' timeline. 'Limited' means that there's a gap between the messages\n     * /sync returned, and the last known message in our timeline. In such a case, our live timeline isn't live anymore\n     * and has to be replaced by a new one. To make sure we can continue paginating our timelines correctly, we have to\n     * set new pagination tokens on the old and the new timeline.\n     *\n     * @param backPaginationToken -   token for back-paginating the new timeline\n     * @param forwardPaginationToken - token for forward-paginating the old live timeline,\n     * if absent or null, all timelines are reset, removing old ones (including the previous live\n     * timeline which would otherwise be unable to paginate forwards without this token).\n     * Removing just the old live timeline whilst preserving previous ones is not supported.\n     */\n    public async resetLiveTimeline(\n        backPaginationToken?: string | null,\n        forwardPaginationToken?: string | null,\n    ): Promise<void> {\n        const oldLive = this.liveTimeline;\n        this.timelineSet.resetLiveTimeline(backPaginationToken ?? undefined, forwardPaginationToken ?? undefined);\n        const newLive = this.liveTimeline;\n\n        // FIXME: Remove the following as soon as https://github.com/matrix-org/synapse/issues/14830 is resolved.\n        //\n        // The pagination API for thread timelines currently can't handle the type of pagination tokens returned by sync\n        //\n        // To make this work anyway, we'll have to transform them into one of the types that the API can handle.\n        // One option is passing the tokens to /messages, which can handle sync tokens, and returns the right format.\n        // /messages does not return new tokens on requests with a limit of 0.\n        // This means our timelines might overlap a slight bit, but that's not an issue, as we deduplicate messages\n        // anyway.\n\n        let newBackward: string | undefined;\n        let oldForward: string | undefined;\n        if (backPaginationToken) {\n            const res = await convertThreadResetToken(\n                this.client,\n                this.roomId,\n                backPaginationToken,\n                Direction.Forward,\n            );\n            newBackward = res.end;\n        }\n        if (forwardPaginationToken) {\n            const res = await convertThreadResetToken(\n                this.client,\n                this.roomId,\n                forwardPaginationToken,\n                Direction.Backward,\n            );\n            oldForward = res.start;\n        }\n        // Only replace the token if we don't have paginated away from this position already. This situation doesn't\n        // occur today, but if the above issue is resolved, we'd have to go down this path.\n        if (forwardPaginationToken && oldLive.getPaginationToken(Direction.Forward) === forwardPaginationToken) {\n            oldLive.setPaginationToken(oldForward ?? null, Direction.Forward);\n        }\n        if (backPaginationToken && newLive.getPaginationToken(Direction.Backward) === backPaginationToken) {\n            newLive.setPaginationToken(newBackward ?? null, Direction.Backward);\n        }\n    }\n\n    private async updateThreadFromRootEvent(): Promise<void> {\n        if (Thread.hasServerSideSupport) {\n            // Ensure we show *something* as soon as possible, we'll update it as soon as we get better data, but we\n            // don't want the thread preview to be empty if we can avoid it\n            if (!this.initialEventsFetched && !this.lastEvent) {\n                await this.processRootEvent();\n            }\n            await this.fetchRootEvent();\n        }\n        await this.processRootEvent();\n    }\n\n    private async updateThreadMetadata(): Promise<void> {\n        this.updatePendingReplyCount();\n\n        if (!this.processRootEventPromise) {\n            // We only want to do this once otherwise we end up rolling back to the last unsigned summary we have for the thread\n            this.processRootEventPromise = this.updateThreadFromRootEvent();\n        }\n        await this.processRootEventPromise;\n\n        if (!this.initialEventsFetched) {\n            if (this.initalEventFetchProm) {\n                await this.initalEventFetchProm;\n            } else {\n                // fetch initial events to allow proper pagination\n                try {\n                    // clear out any events that were added before the pagination request\n                    // completed (eg. from sync). They'll be replaced by those from the pagination.\n                    // Really, we should do this after the pagination request completes, but\n                    // paginateEventTimeline does the request and adds the events in one go, so\n                    // this would need a refactor in order to do. It's therefore possible there's\n                    // a remaining race where an event comes in while the pagination request is\n                    // happening.\n                    this.timelineSet.resetLiveTimeline();\n                    // if the thread has regular events, this will just load the last reply.\n                    // if the thread is newly created, this will load the root event.\n                    if (this.replyCount === 0 && this.rootEvent) {\n                        this.timelineSet.addEventsToTimeline([this.rootEvent], true, false, this.liveTimeline, null);\n                        this.liveTimeline.setPaginationToken(null, Direction.Backward);\n                    } else {\n                        this.initalEventFetchProm = this.client.paginateEventTimeline(this.liveTimeline, {\n                            backwards: true,\n                        });\n                        await this.initalEventFetchProm;\n                    }\n                    // We have now fetched the initial events, so set the flag. We need to do this before\n                    // we actually add the events, so `this.addEvents` knows that it can now safely add\n                    // them rather than buffer them in the pending event list. The main thing is that this\n                    // must remain false while the async fetch happens, so we don't try to add events before\n                    // the pagination has finished. The important thing is that we're not await-ing anything\n                    // else between setting this and adding events, so no races.\n                    this.initialEventsFetched = true;\n                    for (const event of this.replayEvents!) {\n                        this.addEvent(event, false);\n                    }\n                    this.replayEvents = null;\n                    // just to make sure that, if we've created a timeline window for this thread before the thread itself\n                    // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.\n                    this.emit(RoomEvent.TimelineReset, this.room, this.timelineSet, true);\n                } catch (e) {\n                    logger.error(\"Failed to load start of newly created thread: \", e);\n                    this.initialEventsFetched = false;\n                }\n            }\n        }\n\n        this.emit(ThreadEvent.Update, this);\n    }\n\n    // XXX: Workaround for https://github.com/matrix-org/matrix-spec-proposals/pull/2676/files#r827240084\n    private async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {\n        const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;\n        if (recursionSupport === ServerSupport.Unsupported) {\n            return Promise.all(\n                events.filter(isAnEncryptedThreadMessage).map(async (event: MatrixEvent) => {\n                    try {\n                        const relations = await this.client.relations(\n                            this.roomId,\n                            event.getId()!,\n                            RelationType.Replace,\n                            event.getType(),\n                            {\n                                limit: 1,\n                            },\n                        );\n                        if (relations.events.length) {\n                            const editEvent = relations.events[0];\n                            event.makeReplaced(editEvent);\n                            this.insertEventIntoTimeline(editEvent);\n                        }\n                    } catch (e) {\n                        logger.error(\"Failed to load edits for encrypted thread event\", e);\n                    }\n                }),\n            );\n        }\n    }\n\n    public setEventMetadata(event: MatrixEvent | null | undefined): void {\n        if (event) {\n            EventTimeline.setEventMetadata(event, this.roomState, false);\n            event.setThread(this);\n        }\n    }\n\n    public clearEventMetadata(event: MatrixEvent | null | undefined): void {\n        if (event) {\n            event.setThread(undefined);\n            delete event.event?.unsigned?.[\"m.relations\"]?.[THREAD_RELATION_TYPE.name];\n        }\n    }\n\n    /**\n     * Finds an event by ID in the current thread\n     */\n    public findEventById(eventId: string): MatrixEvent | undefined {\n        return this.timelineSet.findEventById(eventId);\n    }\n\n    /**\n     * Return last reply to the thread, if known.\n     */\n    public lastReply(\n        matches: (ev: MatrixEvent) => boolean = (ev): boolean => ev.isRelation(THREAD_RELATION_TYPE.name),\n    ): MatrixEvent | null {\n        for (let i = this.timeline.length - 1; i >= 0; i--) {\n            const event = this.timeline[i];\n            if (matches(event)) {\n                return event;\n            }\n        }\n        return null;\n    }\n\n    public get roomId(): string {\n        return this.room.roomId;\n    }\n\n    /**\n     * The number of messages in the thread\n     * Only count rel_type=m.thread as we want to\n     * exclude annotations from that number\n     */\n    public get length(): number {\n        return this.replyCount + this.pendingReplyCount;\n    }\n\n    /**\n     * A getter for the last event of the thread.\n     * This might be a synthesized event, if so, it will not emit any events to listeners.\n     */\n    public get replyToEvent(): MatrixEvent | null {\n        return this.lastPendingEvent ?? this.lastEvent ?? this.lastReply();\n    }\n\n    /**\n     * The live event timeline for this thread.\n     * @deprecated Present for backwards compatibility.\n     *             Use this.events instead\n     * @returns The live event timeline for this thread.\n     */\n    public get timeline(): MatrixEvent[] {\n        return this.events;\n    }\n\n    public get events(): MatrixEvent[] {\n        return this.liveTimeline.getEvents();\n    }\n\n    public has(eventId: string): boolean {\n        return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;\n    }\n\n    public get hasCurrentUserParticipated(): boolean {\n        return this._currentUserParticipated;\n    }\n\n    public get liveTimeline(): EventTimeline {\n        return this.timelineSet.getLiveTimeline();\n    }\n\n    public getUnfilteredTimelineSet(): EventTimelineSet {\n        return this.timelineSet;\n    }\n\n    public addReceipt(event: MatrixEvent, synthetic: boolean): void {\n        throw new Error(\"Unsupported function on the thread model\");\n    }\n\n    /**\n     * Get the ID of the event that a given user has read up to within this thread,\n     * or null if we have received no read receipt (at all) from them.\n     * @param userId - The user ID to get read receipt event ID for\n     * @param ignoreSynthesized - If true, return only receipts that have been\n     *                            sent by the server, not implicit ones generated\n     *                            by the JS SDK.\n     * @returns ID of the latest event that the given user has read, or null.\n     */\n    public getEventReadUpTo(userId: string, ignoreSynthesized?: boolean): string | null {\n        // TODO: we think the implementation here is not right. Here is a sketch\n        // of the right answer:\n        //\n        // for event in timeline.events.reversed():\n        //     if room.hasUserReadEvent(event):\n        //         return event\n        // return null\n        //\n        // If this is too slow, we might be able to improve it by trying walking\n        // forward from the threaded receipt in this thread. We could alternate\n        // between backwards-from-front and forwards-from-threaded-receipt to\n        // improve our chances of hitting the right answer sooner.\n        //\n        // Either way, it's still fundamentally slow because we have to walk\n        // events.\n        //\n        // We also might just want to limit the time we spend on this by giving\n        // up after, say, 100 events.\n        //\n        // --- andyb\n\n        const isCurrentUser = userId === this.client.getUserId();\n        const lastReply = this.timeline[this.timeline.length - 1];\n        if (isCurrentUser && lastReply) {\n            // If the last activity in a thread is prior to the first threaded read receipt\n            // sent in the room (suggesting that it was sent before the user started\n            // using a client that supported threaded read receipts), we want to\n            // consider this thread as read.\n            const beforeFirstThreadedReceipt = lastReply.getTs() < this.room.getOldestThreadedReceiptTs();\n            const lastReplyId = lastReply.getId();\n            // Some unsent events do not have an ID, we do not want to consider them read\n            if (beforeFirstThreadedReceipt && lastReplyId) {\n                return lastReplyId;\n            }\n        }\n\n        const readUpToId = super.getEventReadUpTo(userId, ignoreSynthesized);\n\n        // Check whether the unthreaded read receipt for that user is more recent\n        // than the read receipt inside that thread.\n        if (lastReply) {\n            const unthreadedReceipt = this.room.getLastUnthreadedReceiptFor(userId);\n            if (!unthreadedReceipt) {\n                return readUpToId;\n            }\n\n            for (let i = this.timeline?.length - 1; i >= 0; --i) {\n                const ev = this.timeline[i];\n                // If we encounter the `readUpToId` we do not need to look further\n                // there is no \"more recent\" unthreaded read receipt\n                if (ev.getId() === readUpToId) return readUpToId;\n\n                // Inspecting events from most recent to oldest, we're checking\n                // whether an unthreaded read receipt is more recent that the current event.\n                // We usually prefer relying on the order of the DAG but in this scenario\n                // it is not possible and we have to rely on timestamp\n                if (ev.getTs() < unthreadedReceipt.ts) return ev.getId() ?? readUpToId;\n            }\n        }\n\n        return readUpToId;\n    }\n\n    /**\n     * Determine if the given user has read a particular event.\n     *\n     * It is invalid to call this method with an event that is not part of this thread.\n     *\n     * This is not a definitive check as it only checks the events that have been\n     * loaded client-side at the time of execution.\n     * @param userId - The user ID to check the read state of.\n     * @param eventId - The event ID to check if the user read.\n     * @returns True if the user has read the event, false otherwise.\n     */\n    public hasUserReadEvent(userId: string, eventId: string): boolean {\n        if (userId === this.client.getUserId()) {\n            // Consider an event read if it's part of a thread that is before the\n            // first threaded receipt sent in that room. It is likely that it is\n            // part of a thread that was created before MSC3771 was implemented.\n            // Or before the last unthreaded receipt for the logged in user\n            const beforeFirstThreadedReceipt =\n                (this.lastReply()?.getTs() ?? 0) < this.room.getOldestThreadedReceiptTs();\n            const unthreadedReceiptTs = this.room.getLastUnthreadedReceiptFor(userId)?.ts ?? 0;\n            const beforeLastUnthreadedReceipt = (this?.lastReply()?.getTs() ?? 0) < unthreadedReceiptTs;\n            if (beforeFirstThreadedReceipt || beforeLastUnthreadedReceipt) {\n                return true;\n            }\n        }\n\n        return this.room.hasUserReadEvent(userId, eventId);\n    }\n\n    public setUnread(type: NotificationCountType, count: number): void {\n        return this.room.setThreadUnreadNotificationCount(this.id, type, count);\n    }\n\n    /**\n     * Returns the most recent unthreaded receipt for a given user\n     * @param userId - the MxID of the User\n     * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled\n     * or a user chooses to use private read receipts (or we have simply not received\n     * a receipt from this user yet).\n     */\n    public getLastUnthreadedReceiptFor(userId: string): Receipt | undefined {\n        return this.room.getLastUnthreadedReceiptFor(userId);\n    }\n}\n\n/**\n * Decide whether an event deserves to have its potential edits fetched.\n *\n * @returns true if this event is encrypted and is a message that is part of a\n * thread - either inside it, or a root.\n */\nfunction isAnEncryptedThreadMessage(event: MatrixEvent): boolean {\n    return event.isEncrypted() && (event.isRelation(THREAD_RELATION_TYPE.name) || event.isThreadRoot);\n}\n\nexport const FILTER_RELATED_BY_SENDERS = new ServerControlledNamespacedValue(\n    \"related_by_senders\",\n    \"io.element.relation_senders\",\n);\nexport const FILTER_RELATED_BY_REL_TYPES = new ServerControlledNamespacedValue(\n    \"related_by_rel_types\",\n    \"io.element.relation_types\",\n);\nexport const THREAD_RELATION_TYPE = new ServerControlledNamespacedValue(\"m.thread\", \"io.element.thread\");\n\nexport enum ThreadFilterType {\n    \"My\",\n    \"All\",\n}\n\nexport function threadFilterTypeToFilter(type: ThreadFilterType | null): \"all\" | \"participated\" {\n    switch (type) {\n        case ThreadFilterType.My:\n            return \"participated\";\n        default:\n            return \"all\";\n    }\n}\n"],"mappings":"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","ignoreList":[]}
 \ No newline at end of file
 diff --git a/node_modules/matrix-js-sdk/src/models/thread.ts b/node_modules/matrix-js-sdk/src/models/thread.ts
-index 871875d..ab1179c 100644
+index 871875d..496dbcf 100644
 --- a/node_modules/matrix-js-sdk/src/models/thread.ts
 +++ b/node_modules/matrix-js-sdk/src/models/thread.ts
 @@ -68,7 +68,54 @@ export function determineFeatureSupport(stable: boolean, unstable: boolean): Fea
@@ -1026,7 +1086,7 @@ index 871875d..ab1179c 100644
      public static hasServerSideSupport = FeatureSupport.None;
      public static hasServerSideListSupport = FeatureSupport.None;
      public static hasServerSideFwdPaginationSupport = FeatureSupport.None;
-@@ -133,6 +180,14 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+@@ -133,11 +180,24 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      public initialEventsFetched = !Thread.hasServerSideSupport;
      private initalEventFetchProm: Promise<boolean> | undefined;
  
@@ -1041,7 +1101,17 @@ index 871875d..ab1179c 100644
      /**
       * An array of events to add to the timeline once the thread has been initialised
       * with server suppport.
-@@ -157,6 +212,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+      */
+     public replayEvents: MatrixEvent[] | null = [];
++    /**
++     * MindRoom: set while events the thread lacked are added, which are not announced as live (`data.liveEvent`
++     * stays false). A replay of buffered relations also skips this thread's own per-event handling.
++     */
++    private addingHistory?: "fetched" | "replayed";
+ 
+     public constructor(
+         public readonly id: string,
+@@ -157,6 +217,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
  
          this.room = opts.room;
          this.client = opts.client;
@@ -1049,7 +1119,7 @@ index 871875d..ab1179c 100644
          this.pendingEventOrdering = opts.pendingEventOrdering ?? PendingEventOrdering.Chronological;
          this.timelineSet = new EventTimelineSet(
              this.room,
-@@ -185,7 +241,10 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+@@ -185,7 +246,10 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
          this.setEventMetadata(this.rootEvent);
      }
  
@@ -1061,15 +1131,30 @@ index 871875d..ab1179c 100644
          // We hit a gappy sync, ask the server for an update
          await this.processRootEventPromise;
          this.processRootEventPromise = undefined;
-@@ -312,6 +371,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+@@ -259,6 +323,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+         room: Room | undefined,
+         toStartOfTimeline: boolean | undefined,
+     ): void => {
++        // MindRoom: a replayed relation is history the first page lacked; the replay's TimelineReset and Update
++        // cover it once.
++        if (this.addingHistory === "replayed") return;
+         // Add a synthesized receipt when paginating forward in the timeline
+         if (!toStartOfTimeline) {
+             const sender = event.getSender();
+@@ -312,9 +379,11 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
  
      private addEventToTimeline(event: MatrixEvent, toStartOfTimeline: boolean): void {
          if (!this.findEventById(event.getId()!)) {
 +            this.flushPendingTimelineReset();
              this.timelineSet.addEventToTimeline(event, this.liveTimeline, {
                  toStartOfTimeline,
-                 fromCache: false,
-@@ -343,6 +403,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+-                fromCache: false,
++                // MindRoom: history the thread lacked is not live.
++                fromCache: this.addingHistory !== undefined,
+                 roomState: this.roomState,
+                 addToState: false,
+             });
+@@ -343,6 +412,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
          if (this.findEventById(eventId)) {
              return;
          }
@@ -1077,7 +1162,7 @@ index 871875d..ab1179c 100644
          this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState, false);
      }
  
-@@ -436,6 +497,18 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+@@ -436,6 +506,18 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
               * This fix keeps a reference to those events and replay them once the thread
               * has been initialised properly.
               */
@@ -1096,7 +1181,7 @@ index 871875d..ab1179c 100644
              this.replayEvents?.push(event);
  
              // For annotations (reactions), aggregate immediately (pre-init) to keep
-@@ -499,7 +572,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+@@ -499,7 +581,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
  
      private async processRootEvent(): Promise<void> {
          const bundledRelationship = this.getRootEventBundledRelationship();
@@ -1105,7 +1190,7 @@ index 871875d..ab1179c 100644
              this.replyCount = bundledRelationship.count;
              this._currentUserParticipated = !!bundledRelationship.current_user_participated;
  
-@@ -528,6 +601,58 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+@@ -528,6 +610,58 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
          this.pendingReplyCount = pendingEvents.length;
      }
  
@@ -1164,7 +1249,7 @@ index 871875d..ab1179c 100644
      /**
       * Reset the live timeline of all timelineSets, and start new ones.
       *
-@@ -542,47 +667,40 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+@@ -542,47 +676,40 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
       * timeline which would otherwise be unable to paginate forwards without this token).
       * Removing just the old live timeline whilst preserving previous ones is not supported.
       */
@@ -1242,9 +1327,40 @@ index 871875d..ab1179c 100644
      }
  
      private async updateThreadFromRootEvent(): Promise<void> {
-@@ -598,8 +716,28 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+@@ -597,9 +724,56 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+         await this.processRootEvent();
      }
  
++    /**
++     * MindRoom: append events the thread lacked, such as a fetched page of its history, without announcing them as
++     * live. Announced as live events, each was saved to the cache and re-rendered on its own, which froze the app
++     * for seconds on a long thread. Replies still count and announce {@link ThreadEvent.NewReply}.
++     */
++    public addEventsAsHistory(events: MatrixEvent[]): void {
++        this.addingHistory = "fetched";
++        try {
++            this.addEvents(events, false);
++        } finally {
++            this.addingHistory = undefined;
++        }
++    }
++
++    /**
++     * MindRoom: an unopened thread buffers every reaction and the newest edit of each reply from the saved sync and
++     * live sync until it is shown or opened, often hundreds; replay them as history.
++     */
++    private replayBufferedEvents(): void {
++        this.addingHistory = "replayed";
++        try {
++            for (const event of this.replayEvents ?? []) {
++                this.addEvent(event, false);
++            }
++        } finally {
++            this.addingHistory = undefined;
++        }
++        this.replayEvents = null;
++    }
++
      private async updateThreadMetadata(): Promise<void> {
 +        if (this.client.threadSupportPending) {
 +            // The stored bundle is usable before discovery; network initialization is not.
@@ -1253,10 +1369,7 @@ index 871875d..ab1179c 100644
 +            if (!this.client.clientRunning) return;
 +            if (!Thread.hasServerSideSupport) {
 +                this.initialEventsFetched = true;
-+                for (const event of this.replayEvents ?? []) {
-+                    this.addEvent(event, false);
-+                }
-+                this.replayEvents = null;
++                this.replayBufferedEvents();
 +            }
 +        }
          this.updatePendingReplyCount();
@@ -1271,7 +1384,7 @@ index 871875d..ab1179c 100644
          if (!this.processRootEventPromise) {
              // We only want to do this once otherwise we end up rolling back to the last unsigned summary we have for the thread
              this.processRootEventPromise = this.updateThreadFromRootEvent();
-@@ -608,7 +746,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+@@ -608,7 +782,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
  
          if (!this.initialEventsFetched) {
              if (this.initalEventFetchProm) {
@@ -1281,7 +1394,18 @@ index 871875d..ab1179c 100644
              } else {
                  // fetch initial events to allow proper pagination
                  try {
-@@ -648,6 +787,10 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+@@ -638,16 +813,17 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+                     // the pagination has finished. The important thing is that we're not await-ing anything
+                     // else between setting this and adding events, so no races.
+                     this.initialEventsFetched = true;
+-                    for (const event of this.replayEvents!) {
+-                        this.addEvent(event, false);
+-                    }
+-                    this.replayEvents = null;
++                    this.replayBufferedEvents();
+                     // just to make sure that, if we've created a timeline window for this thread before the thread itself
+                     // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.
+                     this.emit(RoomEvent.TimelineReset, this.room, this.timelineSet, true);
                  } catch (e) {
                      logger.error("Failed to load start of newly created thread: ", e);
                      this.initialEventsFetched = false;
@@ -1292,7 +1416,7 @@ index 871875d..ab1179c 100644
                  }
              }
          }
-@@ -655,8 +798,53 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
+@@ -655,8 +831,53 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
          this.emit(ThreadEvent.Update, this);
      }
  
@@ -1347,7 +1471,7 @@ index 871875d..ab1179c 100644
          if (recursionSupport === ServerSupport.Unsupported) {
              return Promise.all(
 diff --git a/node_modules/matrix-js-sdk/lib/rust-crypto/rust-crypto.js b/node_modules/matrix-js-sdk/lib/rust-crypto/rust-crypto.js
-index 217e159..3462ca3 100644
+index 217e159..c5bc3dd 100644
 --- a/node_modules/matrix-js-sdk/lib/rust-crypto/rust-crypto.js
 +++ b/node_modules/matrix-js-sdk/lib/rust-crypto/rust-crypto.js
 @@ -31,7 +31,7 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.js";
@@ -1428,8 +1552,44 @@ index 217e159..3462ca3 100644
                  // Only accept the key bundle if we joined the room less than 24 hours ago.
                  if (!pendingDetails) {
                    _this60.logger.debug("Not yet accepting key bundle for room where we are not awaiting a bundle: ".concat(roomId));
+@@ -2128,6 +2144,13 @@ export class RustCrypto extends TypedEventEmitter {
+     })();
+   }
+ }
++// MindRoom: MindRoom Chat decrypts live reply frames, which are ephemeral and never retried, as
++// synthetic events whose ids start with `$io.mindroom.live.`. A frame without its key is dropped,
++// so it must neither wait in the pending-key list nor queue a key-backup download.
++var isMindroomLiveFrameEvent = event => {
++  var _event$getId;
++  return ((_event$getId = event.getId()) === null || _event$getId === void 0 ? void 0 : _event$getId.startsWith("$io.mindroom.live.")) === true;
++};
+ class EventDecryptor {
+   constructor(logger, olmMachine, perSessionBackupDownloader) {
+     this.logger = logger;
+@@ -2147,7 +2170,9 @@ class EventDecryptor {
+       // then, if the key turns up while decryption is in progress (and
+       // decryption fails), we will schedule a retry.
+       // (fixes https://github.com/vector-im/element-web/issues/5001)
+-      _this76.addEventToPendingList(event);
++      if (!isMindroomLiveFrameEvent(event)) {
++        _this76.addEventToPendingList(event);
++      }
+       var trustRequirement;
+       switch (isolationMode.kind) {
+         case DeviceIsolationModeKind.AllDevicesIsolationMode:
+@@ -2199,7 +2224,9 @@ class EventDecryptor {
+ 
+     // If the error looks like it might be recoverable from backup, queue up a request to try that.
+     if (err.code === RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey || err.code === RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex) {
+-      this.perSessionBackupDownloader.onDecryptionKeyMissingError(event.getRoomId(), content.session_id);
++      if (!isMindroomLiveFrameEvent(event)) {
++        this.perSessionBackupDownloader.onDecryptionKeyMissingError(event.getRoomId(), content.session_id);
++      }
+ 
+       // If the server is telling us our membership at the time the event
+       // was sent, and it isn't "join", we use a different error code.
 diff --git a/node_modules/matrix-js-sdk/src/rust-crypto/rust-crypto.ts b/node_modules/matrix-js-sdk/src/rust-crypto/rust-crypto.ts
-index fa3b8f0..48b7a85 100644
+index fa3b8f0..a0a5f11 100644
 --- a/node_modules/matrix-js-sdk/src/rust-crypto/rust-crypto.ts
 +++ b/node_modules/matrix-js-sdk/src/rust-crypto/rust-crypto.ts
 @@ -72,7 +72,7 @@ import {
@@ -1514,6 +1674,41 @@ index fa3b8f0..48b7a85 100644
                          // Only accept the key bundle if we joined the room less than 24 hours ago.
                          if (!pendingDetails) {
                              this.logger.debug(
+@@ -2270,6 +2292,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
+     }
+ }
+ 
++// MindRoom: MindRoom Chat decrypts live reply frames, which are ephemeral and never retried, as
++// synthetic events whose ids start with `$io.mindroom.live.`. A frame without its key is dropped,
++// so it must neither wait in the pending-key list nor queue a key-backup download.
++const isMindroomLiveFrameEvent = (event: MatrixEvent): boolean =>
++    event.getId()?.startsWith("$io.mindroom.live.") === true;
++
+ class EventDecryptor {
+     /**
+      * Events which we couldn't decrypt due to unknown sessions / indexes.
+@@ -2294,7 +2322,9 @@ class EventDecryptor {
+         // then, if the key turns up while decryption is in progress (and
+         // decryption fails), we will schedule a retry.
+         // (fixes https://github.com/vector-im/element-web/issues/5001)
+-        this.addEventToPendingList(event);
++        if (!isMindroomLiveFrameEvent(event)) {
++            this.addEventToPendingList(event);
++        }
+ 
+         let trustRequirement;
+ 
+@@ -2356,7 +2386,9 @@ class EventDecryptor {
+             err.code === RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey ||
+             err.code === RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex
+         ) {
+-            this.perSessionBackupDownloader.onDecryptionKeyMissingError(event.getRoomId()!, content.session_id!);
++            if (!isMindroomLiveFrameEvent(event)) {
++                this.perSessionBackupDownloader.onDecryptionKeyMissingError(event.getRoomId()!, content.session_id!);
++            }
+ 
+             // If the server is telling us our membership at the time the event
+             // was sent, and it isn't "join", we use a different error code.
 diff --git a/node_modules/matrix-js-sdk/src/@types/requests.ts b/node_modules/matrix-js-sdk/src/@types/requests.ts
 --- a/node_modules/matrix-js-sdk/src/@types/requests.ts
 +++ b/node_modules/matrix-js-sdk/src/@types/requests.ts
@@ -1959,10 +2154,10 @@ diff --git a/node_modules/matrix-js-sdk/lib/http-api/fetch.js b/node_modules/mat
      })();
    }
 diff --git a/node_modules/matrix-js-sdk/lib/models/thread.d.ts b/node_modules/matrix-js-sdk/lib/models/thread.d.ts
-index 6933b26..9c1d8a5 100644
+index 6933b26..726cbe8 100644
 --- a/node_modules/matrix-js-sdk/lib/models/thread.d.ts
 +++ b/node_modules/matrix-js-sdk/lib/models/thread.d.ts
-@@ -92,6 +92,13 @@ export declare class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEvent
+@@ -92,11 +92,23 @@ export declare class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEvent
       */
      initialEventsFetched: boolean;
      private initalEventFetchProm;
@@ -1976,7 +2171,17 @@ index 6933b26..9c1d8a5 100644
      /**
       * An array of events to add to the timeline once the thread has been initialised
       * with server suppport.
-@@ -162,9 +169,26 @@ export declare class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEvent
+      */
+     replayEvents: MatrixEvent[] | null;
++    /**
++     * MindRoom: set while events the thread lacked are added, which are not announced as live (`data.liveEvent`
++     * stays false). A replay of buffered relations also skips this thread's own per-event handling.
++     */
++    private addingHistory?;
+     constructor(id: string, rootEvent: MatrixEvent | undefined, opts: IThreadOpts);
+     private onTimelineReset;
+     private fetchRootEvent;
+@@ -162,9 +174,37 @@ export declare class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEvent
       * timeline which would otherwise be unable to paginate forwards without this token).
       * Removing just the old live timeline whilst preserving previous ones is not supported.
       */
@@ -1988,6 +2193,17 @@ index 6933b26..9c1d8a5 100644
 +    private applyTimelineReset;
      resetLiveTimeline(backPaginationToken?: string | null, forwardPaginationToken?: string | null): Promise<void>;
      private updateThreadFromRootEvent;
++    /**
++     * MindRoom: append events the thread lacked, such as a fetched page of its history, without announcing them as
++     * live. Announced as live events, each was saved to the cache and re-rendered on its own, which froze the app
++     * for seconds on a long thread. Replies still count and announce {@link ThreadEvent.NewReply}.
++     */
++    addEventsAsHistory(events: MatrixEvent[]): void;
++    /**
++     * MindRoom: an unopened thread buffers every reaction and the newest edit of each reply from the saved sync and
++     * live sync until it is shown or opened, often hundreds; replay them as history.
++     */
++    private replayBufferedEvents;
      private updateThreadMetadata;
 +    /**
 +     * MindRoom: run the network initialization an unopened thread skipped: refresh the root and load the latest
@@ -2078,7 +2294,7 @@ index 2dd8c1f..540c1ab 100644
       * Process data returned from a sync response and propagate it
       * into the model objects
 diff --git a/node_modules/matrix-js-sdk/lib/sync.js b/node_modules/matrix-js-sdk/lib/sync.js
-index 2741877..559b77b 100644
+index 2741877..35e1885 100644
 --- a/node_modules/matrix-js-sdk/lib/sync.js
 +++ b/node_modules/matrix-js-sdk/lib/sync.js
 @@ -30,7 +30,7 @@ limitations under the License.
@@ -2264,14 +2480,25 @@ index 2741877..559b77b 100644
          processToDeviceMessages(receivedToDeviceMessages, client);
        } else {
          // no more to-device events: we can stop polling with a short timeout.
-@@ -1812,4 +1860,3 @@ export function processToDeviceMessages(toDeviceMessages, client) {
+@@ -1138,7 +1186,9 @@ export class SyncApi {
+           // room::decryptCriticalEvent is in charge of decrypting all the events
+           // required for a client to function properly
+           var timelineEvents = _this9.mapSyncEventsFormat(joinObj.timeline, room, false);
+-          var ephemeralEvents = _this9.mapSyncEventsFormat(joinObj.ephemeral);
++          // MindRoom: give ephemeral events their room, so custom types such as live reply frames
++          // know which room they belong to.
++          var ephemeralEvents = _this9.mapSyncEventsFormat(joinObj.ephemeral, room);
+           var accountDataEvents = _this9.mapSyncEventsFormat(joinObj.account_data);
+           var stickyEvents = _this9.mapSyncEventsFormat(joinObj.msc4354_sticky);
+ 
+@@ -1812,4 +1862,3 @@ export function processToDeviceMessages(toDeviceMessages, client) {
      client.emit(ClientEvent.ReceivedToDeviceMessage, processedEvent);
    });
  }
 -//# sourceMappingURL=sync.js.map
 \ No newline at end of file
 diff --git a/node_modules/matrix-js-sdk/src/sync.ts b/node_modules/matrix-js-sdk/src/sync.ts
-index e731161..f463d1a 100644
+index e731161..4dadd8f 100644
 --- a/node_modules/matrix-js-sdk/src/sync.ts
 +++ b/node_modules/matrix-js-sdk/src/sync.ts
 @@ -26,7 +26,7 @@ limitations under the License.
@@ -2467,6 +2694,17 @@ index e731161..f463d1a 100644
              processToDeviceMessages(receivedToDeviceMessages, client);
          } else {
              // no more to-device events: we can stop polling with a short timeout.
+@@ -1268,7 +1316,9 @@ export class SyncApi {
+                 // room::decryptCriticalEvent is in charge of decrypting all the events
+                 // required for a client to function properly
+                 const timelineEvents = this.mapSyncEventsFormat(joinObj.timeline, room, false);
+-                const ephemeralEvents = this.mapSyncEventsFormat(joinObj.ephemeral);
++                // MindRoom: give ephemeral events their room, so custom types such as live reply frames
++                // know which room they belong to.
++                const ephemeralEvents = this.mapSyncEventsFormat(joinObj.ephemeral, room);
+                 const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
+                 const stickyEvents = this.mapSyncEventsFormat(joinObj.msc4354_sticky);
+ 
 diff --git a/node_modules/matrix-js-sdk/src/rust-crypto/index.ts b/node_modules/matrix-js-sdk/src/rust-crypto/index.ts
 index cf0686a..32a3d9b 100644
 --- a/node_modules/matrix-js-sdk/src/rust-crypto/index.ts

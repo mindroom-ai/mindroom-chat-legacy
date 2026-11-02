@@ -21,10 +21,14 @@ import {
 
 export const MINDROOM_AUTH_BRANDING = {
   appName: MINDROOM_APP_NAME,
-  chatSourceUrl: MINDROOM_CHAT_SOURCE_URL,
   deviceDisplayName: MINDROOM_DEVICE_DISPLAY_NAME,
   logoAlt: MINDROOM_LOGO_ALT,
   logoSrc: MINDROOM_LOGO_SRC,
+  poweredBy: [
+    { label: MINDROOM_APP_NAME, url: MINDROOM_CHAT_SOURCE_URL },
+    { label: 'Matrix', url: 'https://matrix.org' },
+    { label: 'Cinny', url: 'https://github.com/ajbura/cinny' },
+  ],
 } as const;
 
 export const getMindroomAuthSsoRedirectUrl = (webRedirectUrl: string): string =>

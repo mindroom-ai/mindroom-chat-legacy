@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Avatar, AvatarImage, Box, Button, Text } from 'folds';
 import { IIdentityProvider, SSOAction } from 'matrix-js-sdk';
 import React, { useMemo, useRef } from 'react';
-import { createMatrixClient } from '../../mindroom/matrix/matrixClientFactory';
+import { createMatrixClient, createMatrixFetchFn } from '../../mindroom/matrix/matrixClientFactory';
 import { useAutoDiscoveryInfo } from '../../hooks/useAutoDiscoveryInfo';
 import {
   getSSOProviderButtonTitle,
@@ -23,6 +23,7 @@ import {
   openNativeSsoBrowser,
   signInWithNativeApple,
 } from '../../mindroom/auth/authUi';
+import { hasCloudflareAccess } from '../../mindroom/native/cloudflareAccess';
 
 type SSOLoginProps = {
   providers?: IIdentityProvider[];
@@ -58,11 +59,17 @@ export function SSOLogin({ providers, redirectUrl, action, saveScreenSpace }: SS
         ) {
           await signInWithNativeApple({
             baseUrl,
+            ssoUrl: url,
+            ephemeral: hasCloudflareAccess(baseUrl),
             providerId: provider.id,
             redirectUrl,
+            // Carries the Cloudflare Access token of a server behind Access.
+            request: createMatrixFetchFn(),
           });
         } else {
-          await openNativeSsoBrowser(url);
+          // The SSO redirect of a server behind Access also logs in to Access, which fails in
+          // Safari's shared cookies, so it runs in an ephemeral session too.
+          await openNativeSsoBrowser(url, hasCloudflareAccess(baseUrl));
         }
       } catch (error) {
         console.error('[SSO] Failed to open native browser', error);

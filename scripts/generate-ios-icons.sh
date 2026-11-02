@@ -47,4 +47,22 @@ resize 76 "Icon-App-76x76@1x~ipad.png"
 resize 152 "Icon-App-76x76@2x~ipad.png"
 resize 167 "Icon-App-83.5x83.5@2x~ipad.png"
 
-echo "Generated iOS AppIcon assets in $ICON_DIR"
+# Mac Catalyst. macOS draws app icons unmasked, so follow its icon grid:
+# an 824-pixel rounded square centered on a transparent 1024-pixel canvas.
+MAC_DIR="$(mktemp -d)"
+trap 'rm -rf "$MAC_DIR"' EXIT
+MAC_SRC="$MAC_DIR/AppIcon-mac.png"
+"${CONVERT[@]}" "$SRC" -resize 824x824 -alpha set \
+  \( -size 824x824 xc:none -fill white -draw 'roundrectangle 0,0 823,823 185,185' \) \
+  -compose DstIn -composite \
+  -compose Over -background none -gravity center -extent 1024x1024 "$MAC_SRC"
+for size in 16 32 128 256 512; do
+  for scale in 1 2; do
+    pixels=$((size * scale))
+    # PNG32 keeps the alpha channel ImageMagick would otherwise palette-encode.
+    "${CONVERT[@]}" "$MAC_SRC" -resize "${pixels}x${pixels}" \
+      "PNG32:$ICON_DIR/Icon-Mac-${size}x${size}@${scale}x.png"
+  done
+done
+
+echo "Generated iOS and Mac AppIcon assets in $ICON_DIR"

@@ -18,7 +18,6 @@ import { EncryptedAttachmentInfo } from 'browser-encrypt-attachment';
 import type { EventAttachmentOwner } from '../../mindroom/messages/eventAttachments';
 import { mimeTypeToExt } from '../../utils/mimeTypes';
 import { useMatrixClient } from '../../hooks/useMatrixClient';
-import { useMediaAuthentication } from '../../hooks/useMediaAuthentication';
 import { AsyncStatus, useAsyncCallback } from '../../hooks/useAsyncCallback';
 import { saveFile } from '../../mindroom/native/nativeFileSave';
 import { downloadCachedAttachment } from '../../mindroom/messages/attachmentRepository';
@@ -87,7 +86,6 @@ export function FileDownloadButton({
 }: FileDownloadButtonProps) {
   const { t } = useTranslation();
   const mx = useMatrixClient();
-  const useAuthentication = useMediaAuthentication();
   const downloadedFileRef = useRef<{
     url: string;
     mimeType: string;
@@ -107,16 +105,12 @@ export function FileDownloadButton({
           ? cachedFile.blob
           : undefined;
       if (!fileContent) {
-        fileContent = await downloadCachedAttachment(
-          mx,
-          {
-            owner,
-            mxcUri: url,
-            mimeType,
-            encryptedFile: encInfo ? { ...encInfo, url } : undefined,
-          },
-          useAuthentication
-        );
+        fileContent = await downloadCachedAttachment(mx, {
+          owner,
+          mxcUri: url,
+          mimeType,
+          encryptedFile: encInfo ? { ...encInfo, url } : undefined,
+        });
         downloadedFileRef.current = {
           url,
           mimeType,
@@ -127,7 +121,7 @@ export function FileDownloadButton({
       }
 
       await saveFile(fileContent, filename);
-    }, [owner, mx, url, useAuthentication, mimeType, encInfo, filename])
+    }, [owner, mx, url, mimeType, encInfo, filename])
   );
   const handleDownload = () => {
     void download().catch(() => undefined);

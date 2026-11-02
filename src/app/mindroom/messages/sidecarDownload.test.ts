@@ -19,7 +19,7 @@ describe('sidecar download boundary', () => {
         )
     );
     await expect(
-      downloadMindroomSidecarBlob(mx, { mxcUri: 'mxc://example.org/args' }, true)
+      downloadMindroomSidecarBlob(mx, { mxcUri: 'mxc://example.org/args' })
     ).rejects.toThrow('403');
   });
 });

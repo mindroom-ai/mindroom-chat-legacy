@@ -3,6 +3,7 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import type { IPusherRequest, MatrixClient } from 'matrix-js-sdk';
 import { ClientConfig } from '../../hooks/useClientConfig';
 import { getActiveSession, getSessionScopedStorageKey } from '../../state/sessions';
+import { hasCloudflareAccess } from './cloudflareAccess';
 
 type IOSPushDefaultPayload = {
   aps: {
@@ -19,7 +20,7 @@ type MatrixPusherRequest = Omit<IPusherRequest, 'data'> & {
     default_payload: IOSPushDefaultPayload;
   };
 };
-type MatrixPusherClient = Pick<MatrixClient, 'setPusher'>;
+type MatrixPusherClient = Pick<MatrixClient, 'setPusher' | 'getHomeserverUrl'>;
 
 export type NativePushPermission = 'prompt' | 'granted' | 'denied';
 
@@ -326,7 +327,9 @@ export const upsertIOSPushPusher = async (
     await disablePusherByToken(mx, pushConfig.appId, previousToken);
   }
 
-  await mx.setPusher(buildIOSPushPusherRequest(normalizedToken, pushConfig));
+  // A private server's pushes carry only event and room IDs past the public gateway.
+  const format = hasCloudflareAccess(mx.getHomeserverUrl()) ? 'event_id_only' : pushConfig.format;
+  await mx.setPusher(buildIOSPushPusherRequest(normalizedToken, { ...pushConfig, format }));
   setStoredIOSPushToken(normalizedToken, sessionId);
 };
 

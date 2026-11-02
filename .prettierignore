@@ -9,3 +9,12 @@ src/app/mindroom/threads/__tests__/traces/
 
 # Preserve the generated MindRoom artwork from its source export.
 src/app/mindroom/messages/thinking-mark.svg
+src/app/mindroom/messages/thinking-mark-base.svg
+src/app/mindroom/messages/thinking-mark-core.svg
+
+# Xcode owns asset catalog formatting and rewrites it on every edit.
+ios/App/App/Assets.xcassets/**/Contents.json
+
+# Shared with the MindRoom runtime, which pins the frame fixture byte for byte.
+# The Markdown parity fixture is generated from the runtime's renderer and pinned by the runtime's test `tests/live_frames/test_markdown_parity.py` in mindroom-ai/mindroom#3443.
+src/app/mindroom/live/__fixtures__/

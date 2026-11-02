@@ -76,6 +76,7 @@ const {
   isMembershipChangedMock: vi.fn(() => false),
   matrixClientMock: {
     fetchRelations: vi.fn(),
+    fetchRoomEvent: vi.fn(),
     getEventMapper: vi.fn(() => (rawEvent: unknown) => rawEvent),
     getEventTimeline: vi.fn(),
     getHomeserverUrl: vi.fn(() => 'https://example.org'),
@@ -1611,6 +1612,8 @@ beforeEach(() => {
   navigateRoomMock.mockReset();
   navigateRoomThreadMock.mockReset();
   matrixClientMock.getEventTimeline.mockResolvedValue(undefined);
+  matrixClientMock.fetchRoomEvent.mockReset();
+  matrixClientMock.fetchRoomEvent.mockResolvedValue({});
   matrixClientMock.getSyncState.mockReturnValue('SYNCING');
   matrixClientMock.getThreadTimeline.mockResolvedValue(undefined);
   matrixClientMock.on.mockReset();

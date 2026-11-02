@@ -10,6 +10,10 @@ import {
 } from '../computer/computerServiceSettings';
 import { MindroomComputerSettings } from './MindroomComputerSettings';
 
+const discovery = vi.hoisted(() => ({ urls: [] as string[] }));
+vi.mock('../server/useMindroomServers', () => ({
+  useMindroomServerUrls: () => discovery.urls,
+}));
 vi.mock('folds', () => ({
   Box: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Text: ({ children, role }: { children?: React.ReactNode; role?: string }) => (
@@ -53,6 +57,7 @@ const click = (label: string) => act(() => button(label).props.onClick());
 beforeEach(() => {
   localStorage.clear();
   store = createStore();
+  discovery.urls = [];
 });
 afterEach(() => {
   act(() => renderer?.unmount());
@@ -78,6 +83,16 @@ describe('computer service settings', () => {
     expect(
       renderer.root.findAllByType('button').map((node) => node.findByType('span').children.join(''))
     ).toEqual(['Save computer service', 'Use app default']);
+  });
+
+  it('shows the server found from the agents while the setting follows the default', () => {
+    discovery.urls = ['http://localhost:8765'];
+    render();
+    expect(input().props.value).toBe('');
+    expect(input().props.placeholder).toBe('http://localhost:8765');
+    act(() => renderer.unmount());
+    render('https://computer.example.org');
+    expect(input().props.placeholder).toBeUndefined();
   });
 
   it('keeps a service the user previously saved', () => {

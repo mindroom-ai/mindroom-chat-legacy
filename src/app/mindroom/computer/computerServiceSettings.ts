@@ -8,8 +8,8 @@ import { resolveComputerApiUrl } from './api';
 
 export const COMPUTER_SERVICE_STORAGE_KEY = 'mindroomComputerService.v1';
 
-// null follows the deployment, an empty string disables computers, and an origin overrides it.
-// Keep this preference on this device, rather than accepting endpoints from Matrix account data.
+// null follows the deployment, or the server agents publish, an empty string disables computers, and an
+// origin overrides it. Keep this preference on this device, rather than accepting endpoints from account data.
 export type ComputerServicePreference = string | null;
 
 export const loadComputerServicePreference = (

@@ -14,6 +14,16 @@ vi.mock('../../styles/ContainerColor.css', () => ({
   ContainerColor: () => 'container-color',
 }));
 
+const access = vi.hoisted(() => ({ signInRequired: false }));
+
+vi.mock('../../mindroom/native/cloudflareAccess', () => ({
+  discoverCloudflareAccess: vi.fn(),
+  isCloudflareAccessSupported: () => true,
+  signInToCloudflareAccess: vi.fn(),
+  useCloudflareAccessSignInRequired: (baseUrl: string) =>
+    access.signInRequired && baseUrl === 'https://matrix.example',
+}));
+
 const textOf = (node: ReactTestRendererJSON | ReactTestRendererJSON[] | string | null): string => {
   if (node === null) return '';
   if (typeof node === 'string') return node;
@@ -22,7 +32,9 @@ const textOf = (node: ReactTestRendererJSON | ReactTestRendererJSON[] | string |
 };
 
 const createClient = () => {
-  const mx = new EventEmitter() as unknown as MatrixClient;
+  const mx = Object.assign(new EventEmitter(), {
+    getHomeserverUrl: () => 'https://matrix.example',
+  }) as unknown as MatrixClient;
   let online = false;
   const reachability = createHomeserverReachability(async () => {
     if (!online) throw new TypeError('Load failed');
@@ -74,6 +86,25 @@ describe('SyncStatus', () => {
 
     await request({ reachable: true });
     expect(text()).toBe('');
+  });
+
+  it('asks for the organization sign-in instead of a lost connection once the Access token expired', async () => {
+    access.signInRequired = true;
+    try {
+      const { mx, emitSync } = createClient();
+      const text = render(mx);
+
+      // A server that left Access keeps syncing; the stale record then prompts nothing.
+      emitSync(SyncState.Syncing, SyncState.Prepared);
+      expect(text()).not.toContain('requires your organization');
+
+      emitSync(SyncState.Error, SyncState.Syncing);
+
+      expect(text()).toContain("matrix.example requires your organization's sign-in.");
+      expect(text()).not.toContain('Connection Lost!');
+    } finally {
+      access.signInRequired = false;
+    }
   });
 
   it('shows the lost connection instead of catching up', async () => {

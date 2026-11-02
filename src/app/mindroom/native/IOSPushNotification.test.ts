@@ -8,6 +8,7 @@ import en from '../../locales/en.json';
 const nativeState = vi.hoisted(() => ({
   native: false,
   failed: false,
+  pushAllowed: true,
   toggle: vi.fn<(enabled: boolean) => Promise<void>>(),
 }));
 
@@ -26,7 +27,11 @@ vi.mock('../../features/settings/styles.css', () => ({
 }));
 
 vi.mock('../../hooks/useMatrixClient', () => ({
-  useMatrixClient: () => ({}),
+  useMatrixClient: () => ({ getHomeserverUrl: () => 'https://hs.example' }),
+}));
+
+vi.mock('./cloudflareAccess', () => ({
+  cloudflareAccessAllowsPush: () => nativeState.pushAllowed,
 }));
 
 vi.mock('../../hooks/useClientConfig', () => ({
@@ -74,6 +79,22 @@ describe('IOSPushNotification', () => {
     expect(renderer.toJSON()).toBeNull();
 
     renderer.unmount();
+  });
+
+  it('does not render for a server that turns push off', async () => {
+    const { IOSPushNotification } = await import('./IOSPushNotification');
+    nativeState.native = true;
+    nativeState.pushAllowed = false;
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+      renderer = create(React.createElement(IOSPushNotification));
+
+      expect(renderer.toJSON()).toBeNull();
+    } finally {
+      act(() => renderer?.unmount());
+      nativeState.native = false;
+      nativeState.pushAllowed = true;
+    }
   });
 });
 

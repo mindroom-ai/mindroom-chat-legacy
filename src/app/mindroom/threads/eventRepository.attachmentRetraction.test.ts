@@ -89,7 +89,7 @@ it('restores a server-supplied surviving edit after latest-edit retraction and c
   );
   for (const chunk of [[root, earlier], [latest]]) {
     const saved = await persist(chunk);
-    await prefetchEventAttachments(client.mx, saved!.events, false);
+    await prefetchEventAttachments(client.mx, saved!.events);
   }
   expect(await loadCachedAttachment(sessionId, 'mxc://test/latest')).toBeDefined();
   expect(await loadCachedAttachment(sessionId, 'mxc://test/earlier')).toBeUndefined();
@@ -105,7 +105,7 @@ it('restores a server-supplied surviving edit after latest-edit retraction and c
   ]);
   const survivor = repaired!.events.find((event) => event.getId() === '$root')!;
   expect(survivor.replacingEvent()?.getId()).toBe('$earlier');
-  await prefetchEventAttachments(client.mx, repaired!.events, false);
+  await prefetchEventAttachments(client.mx, repaired!.events);
   expect((await getCachedAttachmentMetadata(sessionId, 'mxc://test/earlier'))?.references).toEqual([
     expect.objectContaining({
       eventId: '$root',
@@ -116,7 +116,7 @@ it('restores a server-supplied surviving edit after latest-edit retraction and c
   expect(await loadCachedAttachment(sessionId, 'mxc://test/latest')).toBeUndefined();
 
   const stale = await persist([latest]);
-  await prefetchEventAttachments(client.mx, stale!.events, false);
+  await prefetchEventAttachments(client.mx, stale!.events);
   expect(await loadCachedAttachment(sessionId, 'mxc://test/latest')).toBeUndefined();
   expect(
     (await loadCachedRoomEvent(sessionId, roomId, '$root'))?.unsigned?.['m.relations']?.[
@@ -134,14 +134,10 @@ it('restores a server-supplied surviving edit after latest-edit retraction and c
   const cold = new MatrixEvent(cachedRoot!);
   hydrateCachedEvents({ room: reopened.room, events: [cold] });
   expect(
-    await hydrateCachedMindroomLongText(
-      reopened.mx,
-      {
-        ...getMindroomLongTextSource(cold.getContent())!,
-        owner: getEventAttachmentOwner(cold),
-      },
-      false
-    )
+    await hydrateCachedMindroomLongText(reopened.mx, {
+      ...getMindroomLongTextSource(cold.getContent())!,
+      owner: getEventAttachmentOwner(cold),
+    })
   ).toMatchObject({ body: 'complete earlier' });
   expect(offlineFetch).not.toHaveBeenCalled();
 });

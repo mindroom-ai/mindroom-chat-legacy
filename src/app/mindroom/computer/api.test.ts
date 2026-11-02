@@ -137,4 +137,31 @@ describe('computer session client', () => {
       });
     }
   );
+
+  it('reports control only after this client took it', async () => {
+    const controlStatus = {
+      session_id: 'session-1',
+      state: 'ready',
+      mode: 'control',
+      expires_at: 1,
+    };
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(response(200, { ...controlStatus, session_token: 'session-secret' }))
+      .mockResolvedValue(response(200, controlStatus));
+    const client = await createComputerSession({
+      apiUrl: 'https://computer.example.org',
+      agentUserId: '@mindroom_helper:example.org',
+      openIdToken,
+      request: request as unknown as typeof fetch,
+      roomId: '!room:example.org',
+    });
+
+    expect(client.status.mode).toBe('view');
+    expect((await client.refreshStatus()).mode).toBe('view');
+    expect((await client.control('take')).mode).toBe('control');
+    expect((await client.refreshStatus()).mode).toBe('control');
+    expect((await client.control('release')).mode).toBe('view');
+    expect(client.status.mode).toBe('view');
+  });
 });

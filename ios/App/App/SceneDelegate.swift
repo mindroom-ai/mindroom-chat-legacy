@@ -11,6 +11,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window = UIWindow(windowScene: windowScene)
         window?.rootViewController = MindRoomBridgeViewController()
         window?.makeKeyAndVisible()
+#if targetEnvironment(macCatalyst)
+        windowScene.sizeRestrictions?.minimumSize = CGSize(width: 400, height: 500)
+#endif
 
         // Capacitor defers cold-start links until the bridge plugins are ready.
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)

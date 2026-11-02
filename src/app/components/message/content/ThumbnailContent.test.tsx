@@ -26,10 +26,6 @@ vi.mock('../../../hooks/useMatrixClient', () => ({
   useMatrixClient: () => mocks.matrixClient,
 }));
 
-vi.mock('../../../hooks/useMediaAuthentication', () => ({
-  useMediaAuthentication: () => false,
-}));
-
 vi.mock('../../../mindroom/messages/attachmentRepository', () => ({
   downloadCachedAttachment: mocks.downloadEncryptedMedia,
 }));
@@ -122,8 +118,7 @@ describe('ThumbnailContent blob URL ownership', () => {
 
     expect(mocks.downloadEncryptedMedia).toHaveBeenCalledWith(
       mocks.matrixClient,
-      expect.objectContaining({ mimeType: 'application/octet-stream' }),
-      false
+      expect.objectContaining({ mimeType: 'application/octet-stream' })
     );
   });
 });

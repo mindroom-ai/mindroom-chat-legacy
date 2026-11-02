@@ -4,7 +4,7 @@
   "allowCustomHomeservers": true,
 
   "messageRendering": {
-    "additionalAllowedUriSchemes": ["obsidian"]
+    "additionalAllowedUriSchemes": ["obsidian", "readdlespark"]
   },
 
   "featuredCommunities": {

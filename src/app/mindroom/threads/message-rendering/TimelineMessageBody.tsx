@@ -28,6 +28,7 @@ import {
   shouldForceCollapsibleMessageOverflow,
 } from '../threadCollapsibleMessages';
 import { getMindroomRoomTimelineApprovalContentIfSupported } from '../roomTimelineMessageExtensions';
+import { LiveReplyMessageContent } from './LiveReplyMessageContent';
 import type { TimelineMessageData, TimelineMessageKind, TimelineMessageRow } from './types';
 import type { useTimelineMessageExpansion } from './useTimelineMessageExpansion';
 
@@ -144,7 +145,7 @@ export function TimelineMessageBody({
         );
       const expansion = getExpansion(eventId, content, isMindroomAgentUserId(senderId));
       const renderMessage = (loadFullContent = true) => (
-        <RenderMessageContent
+        <LiveReplyMessageContent
           {...common}
           eventId={eventId}
           msgType={msgType ?? ''}

@@ -12,8 +12,11 @@ import {
   isTimelineAtLiveEndMock,
   makeEvent,
   makeRoom,
+  makeTimeline,
+  matrixClientMock,
   navigateRoomThreadMock,
   roomTimelineVirtualizerState,
+  roomThreadListThreadsMock,
   roomThreadOverviewType,
   scrollType,
   setThreadAwareTimelineRefreshHook,
@@ -261,6 +264,118 @@ describe('RoomTimeline', () => {
           undefined,
           { replace: true }
         );
+      });
+
+      it('redirects a permalink to a thread reply the client has not loaded into its thread', async () => {
+        const { RoomTimeline } = await import('../../../features/room/RoomTimeline');
+        const ControlledRoomTimeline = createControlledRoomTimelineHarness(RoomTimeline as never);
+        const threadRoot = makeEvent('$thread-root', { isThreadRoot: true });
+        const room = makeRoom({ liveEvents: [threadRoot] });
+        // An active thread keeps the compact list from emptying while the event loads.
+        roomThreadListThreadsMock.push({
+          id: threadRoot.getId(),
+          rootEvent: threadRoot,
+          length: 2,
+        } as never);
+        matrixClientMock.fetchRoomEvent.mockResolvedValue({
+          content: { 'm.relates_to': { rel_type: 'm.thread', event_id: threadRoot.getId() } },
+        });
+
+        await act(async () => {
+          create(
+            React.createElement(ControlledRoomTimeline, {
+              room,
+              eventId: '$unloaded-reply',
+              initialViewMode: 'compact',
+            })
+          );
+          await flushAsyncWork();
+        });
+
+        expect(matrixClientMock.fetchRoomEvent).toHaveBeenCalledWith(
+          room.roomId,
+          '$unloaded-reply'
+        );
+        expect(navigateRoomThreadMock).toHaveBeenCalledWith(
+          room.roomId,
+          threadRoot.getId(),
+          '$unloaded-reply',
+          { replace: true }
+        );
+      });
+
+      const threadAnswer = {
+        content: { 'm.relates_to': { rel_type: 'm.thread', event_id: '$thread-root' } },
+      };
+      it.each([
+        ['moves on to another event', ['$later-message'], threadAnswer],
+        ['drops its event', [undefined], threadAnswer],
+        // The open that came back already handled the event; the first answer must not redo it.
+        ['drops its event and comes back', [undefined, '$unloaded-reply'], {}],
+      ])('drops a late lookup when the route %s', async (_case, nextEventIds, lateAnswer) => {
+        const { RoomTimeline } = await import('../../../features/room/RoomTimeline');
+        const ControlledRoomTimeline = createControlledRoomTimelineHarness(RoomTimeline as never);
+        const threadRoot = makeEvent('$thread-root', { isThreadRoot: true });
+        const laterMessage = makeEvent('$later-message');
+        const laterTimeline = makeTimeline([laterMessage]);
+        const room = makeRoom({ liveEvents: [threadRoot] });
+        roomThreadListThreadsMock.push({
+          id: threadRoot.getId(),
+          rootEvent: threadRoot,
+          length: 2,
+        } as never);
+        // Only the first lookup is held back; a later one for the same event answers at once.
+        let resolveFetch: (event: unknown) => void = () => undefined;
+        matrixClientMock.fetchRoomEvent.mockReturnValueOnce(
+          new Promise((resolve) => {
+            resolveFetch = resolve;
+          })
+        );
+        matrixClientMock.getEventTimeline.mockImplementation(async (_timelineSet, eventId) =>
+          eventId === laterMessage.getId() ? laterTimeline : null
+        );
+        const getItemKeys = () => {
+          const options = roomTimelineVirtualizerState.lastOptions;
+          return Array.from({ length: options?.count ?? 0 }, (_, index) =>
+            options?.getItemKey?.(index)
+          );
+        };
+        let renderer: ReturnType<typeof create> | undefined;
+
+        await act(async () => {
+          renderer = create(
+            React.createElement(ControlledRoomTimeline, {
+              room,
+              eventId: '$unloaded-reply',
+              initialViewMode: 'compact',
+            })
+          );
+          await flushAsyncWork();
+        });
+        for (const nextEventId of nextEventIds) {
+          await act(async () => {
+            renderer?.update(
+              React.createElement(ControlledRoomTimeline, {
+                room,
+                eventId: nextEventId,
+                initialViewMode: 'compact',
+              })
+            );
+            await flushAsyncWork();
+          });
+        }
+        const itemKeys = getItemKeys();
+        const loadCount = matrixClientMock.getEventTimeline.mock.calls.length;
+
+        await act(async () => {
+          resolveFetch(lateAnswer);
+          await flushAsyncWork();
+        });
+
+        // The late answer neither redirects, nor loads, nor replaces the newer route's timeline.
+        expect(navigateRoomThreadMock).not.toHaveBeenCalled();
+        expect(matrixClientMock.getEventTimeline).toHaveBeenCalledTimes(loadCount);
+        expect(getItemKeys()).toEqual(itemKeys);
       });
 
       it('keeps synthetic room-focus permalinks in compact room view', async () => {

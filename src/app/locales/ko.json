@@ -589,7 +589,14 @@
       "searchResults": "검색 결과",
       "noResultsFound": "검색 결과 없음",
       "personalPack": "개인 팩",
-      "unknown": "알 수 없음"
+      "unknown": "알 수 없음",
+      "addCustomEmoji": "사용자 지정 이모지 추가",
+      "addCustomEmojiDescription": "개인 팩에 저장되어 모든 방에서 사용할 수 있습니다.",
+      "addCustomEmojiServerDescription": "{{server}}의 모든 사용자가 모든 방에서 사용할 수 있습니다.",
+      "addCustomEmojiFailed": "이모지를 추가하지 못했습니다. 다시 시도하세요.",
+      "addCustomEmojiNameTaken": "이미 사용 중인 이름입니다. 다른 이름을 선택하세요.",
+      "addCustomEmojiTooLarge": "움직이는 GIF는 {{limit}} 미만이어야 합니다.",
+      "add": "추가"
     },
     "noStickerPacks": {
       "noStickerPacks": "스티커 팩이 없습니다!",
@@ -1246,7 +1253,7 @@
       "support": "지원",
       "privacy": "개인정보 보호",
       "terms": "약관",
-      "poweredBy": "<app>{{appName}}</app>, <matrix>Matrix</matrix>, <cinny>Cinny</cinny> 기반"
+      "poweredBy": "<links /> 기반"
     },
     "router": {
       "join": "참여",
@@ -2109,6 +2116,11 @@
           "defaultPack": "기본 팩",
           "view": "보기",
           "unknown": "알 수 없음"
+        },
+        "serverPack": {
+          "title": "서버 이모지",
+          "description": "{{server}}의 모든 사용자가 사용할 수 있습니다.",
+          "permissions": "권한"
         }
       },
       "notifications": {
@@ -2332,11 +2344,15 @@
         "list_schedules": "예약된 모든 작업을 표시합니다.",
         "cancel_schedule": "ID로 특정 예약을 취소하거나 모든 예약을 취소합니다.",
         "edit_schedule": "기존 예약 작업을 업데이트합니다.",
+        "jobs": "여기에서 실행 중인 백그라운드 작업을 나열합니다.",
+        "cancel_job": "ID로 백그라운드 작업 하나를 취소하거나 여기의 모든 작업을 취소합니다.",
         "config": "MindRoom 설정을 관리합니다 (관리자 전용).",
         "desktop": "데스크톱 연결 대상을 관리합니다.",
+        "mode": "에이전트 하나를 표준 도구와 Bash 전용 인터페이스 사이에서 전환합니다.",
         "model": "현재 스레드에서 사용하는 모델을 표시하거나 변경합니다.",
         "room_model": "방의 기본 모델을 표시하거나 변경합니다 (설정/초기화에는 방 관리자 권한이 필요합니다).",
         "thread_mode": "현재 방에서 사용하는 스레드 모드를 표시하거나 변경합니다 (방 관리자 전용).",
+        "auto_approve": "이 스레드에서 내 도구 호출을 한동안 승인 없이 실행하거나, 그 기간을 표시하거나 종료합니다.",
         "encrypt": "현재 방의 종단간 암호화를 확인하거나 활성화합니다.",
         "e2ee": "현재 방의 암호화 진단 정보를 표시합니다.",
         "hi": "환영 정보를 표시합니다."
@@ -2605,26 +2621,11 @@
         "moreOptions": "추가 옵션"
       },
       "mindroomMessageControls": {
-        "requestContextWindow": "요청 컨텍스트 창",
-        "aiRunMetadata": "AI 실행 메타데이터",
         "close": "닫기",
-        "status": "상태",
-        "model": "모델",
-        "tokens": "토큰",
-        "runCache": "실행 캐시",
-        "requestContext": "요청 컨텍스트",
-        "requestCache": "요청 캐시",
-        "tools": "도구",
-        "ttft": "TTFT",
-        "run": "실행",
-        "session": "세션",
-        "openAiRunMetadata": "AI 실행 메타데이터 열기",
-        "tokenUsage": "토큰 사용량",
         "downloadingOriginal": "원본 다운로드 중...",
         "retryDownloadOriginal": "원본 다운로드 재시도",
         "downloadOriginal": "원본 다운로드",
-        "segmentTokenCount_one": "{{label}}: {{formattedCount}}토큰",
-        "segmentTokenCount_other": "{{label}}: {{formattedCount}}토큰"
+        "replyDetails": "답장 세부 정보"
       },
       "mindroomMessageExtras": {
         "messageExtras": "메시지 부가 정보"
@@ -2648,6 +2649,10 @@
       "mindroomThinkingPlaceholder": {
         "aiIsResponding": "AI가 응답 중입니다",
         "thinking": "생각하는 중…"
+      },
+      "mindroomReasoning": {
+        "thinking": "생각 중",
+        "thoughtFor_other": "{{count}}초 동안 생각함"
       },
       "mindroomThreadSummaryCard": {
         "aiThreadSummary": "AI 스레드 요약"
@@ -2756,28 +2761,37 @@
         "retry": "다시 시도",
         "delete": "삭제"
       },
-      "aiRunDisplay": {
-        "inputTokens": "입력 {{formattedCount}}",
-        "outputTokens": "출력 {{formattedCount}}",
-        "totalTokens": "합계 {{formattedCount}}",
-        "readTokens": "읽기 {{formattedCount}}",
-        "writeTokens": "쓰기 {{formattedCount}}",
-        "notReadTokens": "읽지 않음 {{formattedCount}}",
-        "contextUsage": "{{input}} / {{window}} ({{percentage}}%)",
-        "contextBarTitle_one": "{{label}}: {{formattedCount}}토큰 (컨텍스트 창의 {{percentage}}%)",
-        "contextBarTitle_other": "{{label}}: {{formattedCount}}토큰 (컨텍스트 창의 {{percentage}}%)",
-        "contextBarTitleWithSuffix_one": "{{label}}: {{formattedCount}}토큰 (컨텍스트 창의 {{percentage}}%); {{suffix}}",
-        "contextBarTitleWithSuffix_other": "{{label}}: {{formattedCount}}토큰 (컨텍스트 창의 {{percentage}}%); {{suffix}}",
-        "reportedCacheRead_one": "보고된 캐시 읽기: {{formattedCount}}토큰",
-        "reportedCacheRead_other": "보고된 캐시 읽기: {{formattedCount}}토큰",
-        "cacheWrite_one": "캐시 쓰기: {{formattedCount}}토큰",
-        "cacheWrite_other": "캐시 쓰기: {{formattedCount}}토큰",
-        "cacheRead": "캐시 읽기",
-        "newInput": "새 입력",
-        "reserve": "예비"
-      },
       "mindroomModelBadge": {
         "model": "모델: {{model}}"
+      },
+      "mindroomReplyDetails": {
+        "tokens": "토큰",
+        "cost": "비용",
+        "conversationSoFar": "지금까지의 대화",
+        "failed": "실패",
+        "stopped": "중지됨",
+        "thisReply": "이 답장",
+        "input": "입력",
+        "fromCache": "캐시에서",
+        "output": "출력",
+        "contextWindow": "컨텍스트 창",
+        "contextWindowUsage": "{{window}} 중 {{input}} · {{percentage}}",
+        "timeToFirstToken": "첫 토큰",
+        "technicalDetails": "기술 세부 정보",
+        "configuredModel": "구성된 모델",
+        "runId": "실행 ID",
+        "sessionId": "세션 ID",
+        "newInput": "새 입력",
+        "replyCount_one": "답장 {{count}}개",
+        "replyCount_other": "답장 {{count}}개",
+        "loadedReplyCount_one": "불러온 답장 {{count}}개",
+        "loadedReplyCount_other": "불러온 답장 {{count}}개",
+        "atLeastCost": "≥ {{cost}}",
+        "costHistory": "이 대화의 답장별 비용",
+        "costHistoryBar": "답장 {{index}}: {{cost}}",
+        "costHistoryPosition": "이 답장 · {{count}}개 중 {{index}}번째",
+        "toolCallCount_one": "도구 호출 {{count}}회",
+        "toolCallCount_other": "도구 호출 {{count}}회"
       }
     },
     "native": {
@@ -2791,6 +2805,11 @@
         "enable": "사용",
         "iosPushNotifications": "iOS 푸시 알림",
         "permissionDenied": "알림 권한이 거부되었습니다. iOS 설정에서 {{appName}}의 알림을 활성화하세요."
+      },
+      "cloudflareAccess": {
+        "signInRequired": "{{value1}}에 접속하려면 조직 로그인이 필요합니다.",
+        "continue": "계속",
+        "signInFailed": "로그인이 완료되지 않았습니다. 다시 시도하세요."
       }
     },
     "notifications": {
@@ -3066,6 +3085,21 @@
       "stopFailed": "{{tool}}을(를) 중지하지 못했습니다. 다시 시도하세요.",
       "stopAllFailed": "백그라운드 작업을 중지하지 못했습니다. 다시 시도하세요.",
       "inRoom": "백그라운드 작업 실행 중"
+    },
+    "autoApprove": {
+      "label": "자동 승인",
+      "labelOne": "자동 승인: {{name}}",
+      "labelMany": "자동 승인: {{name}} +{{count}}",
+      "title": "자동 승인",
+      "intro": "이 스레드에서는 이 사람들이 요청한 도구 호출이 승인 카드 없이 실행됩니다.",
+      "you": "나",
+      "until": "{{time}}까지",
+      "ownUntil": "{{time}}까지. 끝내려면 !auto_approve off를 보내세요."
+    },
+    "notices": {
+      "dismiss": "공지 닫기",
+      "showMore": "더 보기",
+      "showLess": "간단히 보기"
     }
   },
   "roomSchedules": {

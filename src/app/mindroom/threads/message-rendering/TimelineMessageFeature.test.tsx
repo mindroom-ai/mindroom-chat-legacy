@@ -19,6 +19,7 @@ import {
 } from '../test-utils/RoomTimeline.test.shared';
 import { MessageLayout, MessageSpacing } from '../../../state/settings';
 import { MessageEvent } from '../../../../types/matrix/room';
+import { RenderMessageContent } from '../../../components/RenderMessageContent';
 import { MINDROOM_ROOM_TIMELINE_APPROVAL_EVENT } from '../roomTimelineMessageExtensions';
 import type { ThreadRecord } from '../types';
 import type { TimelineMessageRow } from './types';
@@ -50,7 +51,9 @@ const summaryEvent = (id: string) =>
 const summaryMarkers = (renderer: ReturnType<typeof create>) =>
   renderer.root.findAll((node) => (node.type as unknown) === 'summary-marker');
 const renderedContent = (renderer: ReturnType<typeof create>) =>
-  renderer.root.findAll((node) => typeof node.props.msgType === 'string');
+  renderer.root.findAll(
+    (node) => node.type === RenderMessageContent && typeof node.props.msgType === 'string'
+  );
 
 const rowFor = (event: MatrixEvent, index = 0, previousEventId?: string): TimelineMessageRow => ({
   eventId: event.getId()!,

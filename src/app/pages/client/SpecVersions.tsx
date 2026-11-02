@@ -59,13 +59,17 @@ export function SpecVersions({
       ),
     [accessToken]
   );
+  // Re-read when cached content becomes allowed: after a fresh login the loader has just cached
+  // the versions it loaded, and the client must not switch to unknown versions (legacy media URLs).
   const cachedVersions = React.useMemo(
     () => (userId ? readCachedSpecVersions(baseUrl, userId) : undefined),
-    [baseUrl, userId]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseUrl, userId, allowCachedContent]
   );
   const [clearing, setClearing] = React.useState(false);
   const [refreshedVersions, setRefreshedVersions] = React.useState<SpecVersionsResponse>();
-  const canRenderCachedContent = Boolean(cachedVersions) || allowCachedContent;
+  const hasCachedVersions = cachedVersions !== undefined;
+  const canRenderCachedContent = hasCachedVersions || allowCachedContent;
 
   React.useEffect(() => {
     if (!canRenderCachedContent || !userId) return undefined;
@@ -75,13 +79,13 @@ export function SpecVersions({
       .then((versions) => {
         if (disposed || versions.versions.length === 0) return;
         writeCachedSpecVersions(baseUrl, userId, versions);
-        if (!cachedVersions) setRefreshedVersions(versions);
+        if (!hasCachedVersions) setRefreshedVersions(versions);
       })
       .catch(() => undefined);
     return () => {
       disposed = true;
     };
-  }, [baseUrl, cachedVersions, canRenderCachedContent, request, userId]);
+  }, [baseUrl, canRenderCachedContent, hasCachedVersions, request, userId]);
 
   const handleClearCache = async () => {
     if (clearing) return;

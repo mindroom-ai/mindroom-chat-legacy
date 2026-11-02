@@ -863,6 +863,11 @@
           "defaultPack": "ডিফল্ট প্যাক",
           "unknown": "অজানা",
           "view": "দেখুন"
+        },
+        "serverPack": {
+          "title": "সার্ভার ইমোজি",
+          "description": "{{server}} সার্ভারে থাকা সবাই এগুলো ব্যবহার করতে পারেন।",
+          "permissions": "অনুমতি"
         }
       },
       "notifications": {
@@ -1015,6 +1020,8 @@
     },
     "commands": {
       "descriptions": {
+        "auto_approve": "কিছু সময়ের জন্য এই থ্রেডে আপনার টুল কল অনুমোদন ছাড়াই চালান, অথবা সেই সময়সীমা দেখান বা শেষ করুন।",
+        "cancel_job": "ID দিয়ে একটি ব্যাকগ্রাউন্ড কাজ বা এখানকার সবগুলো বাতিল করুন।",
         "cancel_schedule": "ID দিয়ে একটি নির্ধারিত কাজ বা সব নির্ধারিত কাজ বাতিল করুন।",
         "config": "MindRoom কনফিগারেশন পরিচালনা করুন (শুধু অ্যাডমিন)।",
         "desktop": "আপনার ডেস্কটপ লক্ষ্য পরিচালনা করুন.",
@@ -1023,7 +1030,9 @@
         "encrypt": "বর্তমান রুমের জন্য এন্ড-টু-এন্ড এনক্রিপশন পর্যালোচনা বা সক্ষম করুন।",
         "help": "উপলব্ধ ক্ষমতা বা একটি নির্দিষ্ট বিষয় সম্পর্কে সাহায্য পান.",
         "hi": "স্বাগত সংক্রান্ত তথ্য দেখান।",
+        "jobs": "এখানে চলমান ব্যাকগ্রাউন্ড কাজগুলোর তালিকা দেখান।",
         "list_schedules": "সমস্ত নির্ধারিত কাজের তালিকা করুন।",
+        "mode": "একটি এজেন্টকে স্ট্যান্ডার্ড টুল এবং শুধু Bash ইন্টারফেসের মধ্যে বদলান।",
         "model": "বর্তমান থ্রেডে ব্যবহৃত মডেলটি দেখান বা স্যুইচ করুন।",
         "reload-plugins": "কনফিগার করা প্লাগইনগুলি পুনরায় লোড করুন (শুধুমাত্র প্রশাসক)।",
         "room_model": "রুমের ডিফল্ট মডেল দেখুন বা বদলান (সেট/রিসেট করতে রুমের প্রশাসক হতে হবে)।",
@@ -1144,26 +1153,6 @@
       }
     },
     "messages": {
-      "aiRunDisplay": {
-        "cacheRead": "ক্যাশে থেকে পড়া",
-        "cacheWrite_one": "ক্যাশেতে লেখা হয়েছে: {{formattedCount}} টোকেন",
-        "cacheWrite_other": "ক্যাশেতে লেখা হয়েছে: {{formattedCount}} টোকেন",
-        "contextBarTitle_one": "{{label}}: {{formattedCount}} টোকেন (উইন্ডোর {{percentage}}%)",
-        "contextBarTitle_other": "{{label}}: {{formattedCount}} টোকেন (উইন্ডোর {{percentage}}%)",
-        "contextBarTitleWithSuffix_one": "{{label}}: {{formattedCount}} টোকেন (উইন্ডোর {{percentage}}%); {{suffix}}",
-        "contextBarTitleWithSuffix_other": "{{label}}: {{formattedCount}} টোকেন (উইন্ডোর {{percentage}}%); {{suffix}}",
-        "contextUsage": "{{input}} / {{window}} ({{percentage}}%)",
-        "inputTokens": "ইনপুট {{formattedCount}}",
-        "newInput": "নতুন ইনপুট",
-        "notReadTokens": "পড়া হয়নি {{formattedCount}}",
-        "outputTokens": "আউটপুট {{formattedCount}}",
-        "readTokens": "পড়া হয়েছে {{formattedCount}}",
-        "reportedCacheRead_one": "রিপোর্ট করা ক্যাশে রিড: {{formattedCount}} টোকেন",
-        "reportedCacheRead_other": "রিপোর্ট করা ক্যাশে রিড: {{formattedCount}} টোকেন",
-        "reserve": "সংরক্ষিত",
-        "totalTokens": "মোট {{formattedCount}}",
-        "writeTokens": "লেখা হয়েছে {{formattedCount}}"
-      },
       "approvalArguments": {
         "arguments": "আর্গুমেন্ট",
         "loadFailed": "সম্পূর্ণ আর্গুমেন্ট লোড করা যায়নি।",
@@ -1327,26 +1316,11 @@
         "replyInThread": "থ্রেডে উত্তর দিন"
       },
       "mindroomMessageControls": {
-        "aiRunMetadata": "এআই রান মেটাডেটা",
         "close": "বন্ধ করুন",
         "downloadingOriginal": "আসল ডাউনলোড হচ্ছে...",
         "downloadOriginal": "অরিজিনাল ডাউনলোড করুন",
-        "model": "মডেল",
-        "openAiRunMetadata": "AI রান মেটাডেটা খুলুন",
-        "requestCache": "অনুরোধের ক্যাশে",
-        "requestContext": "অনুরোধের প্রসঙ্গ",
-        "requestContextWindow": "অনুরোধের কনটেক্সট উইন্ডো",
         "retryDownloadOriginal": "মূল ফাইল আবার ডাউনলোড করুন",
-        "run": "রান",
-        "runCache": "রানের ক্যাশে",
-        "segmentTokenCount_one": "{{label}}: {{formattedCount}} টোকেন",
-        "segmentTokenCount_other": "{{label}}: {{formattedCount}} টোকেন",
-        "session": "অধিবেশন",
-        "status": "স্ট্যাটাস",
-        "tokens": "টোকেন",
-        "tokenUsage": "টোকেন ব্যবহার",
-        "tools": "টুল",
-        "ttft": "প্রথম টোকেন আসার সময়"
+        "replyDetails": "উত্তরের বিবরণ"
       },
       "mindroomMessageExtras": {
         "messageExtras": "বার্তার অতিরিক্ত তথ্য"
@@ -1373,6 +1347,11 @@
       "mindroomThinkingPlaceholder": {
         "aiIsResponding": "এআই সাড়া দিচ্ছে",
         "thinking": "ভাবছে…"
+      },
+      "mindroomReasoning": {
+        "thinking": "ভাবছে",
+        "thoughtFor_one": "{{count}} সেকেন্ড ভেবেছে",
+        "thoughtFor_other": "{{count}} সেকেন্ড ভেবেছে"
       },
       "mindroomThreadSummaryCard": {
         "aiThreadSummary": "এআই থ্রেড সারাংশ"
@@ -1482,6 +1461,35 @@
         "waitingForApproval": "অনুমোদনের অপেক্ষায়",
         "waitingForYou": "আপনার অপেক্ষায়",
         "you": "আপনি"
+      },
+      "mindroomReplyDetails": {
+        "tokens": "টোকেন",
+        "cost": "খরচ",
+        "conversationSoFar": "এখন পর্যন্ত কথোপকথন",
+        "failed": "ব্যর্থ",
+        "stopped": "থামানো হয়েছে",
+        "thisReply": "এই উত্তর",
+        "input": "ইনপুট",
+        "fromCache": "ক্যাশে থেকে",
+        "output": "আউটপুট",
+        "contextWindow": "প্রসঙ্গ উইন্ডো",
+        "contextWindowUsage": "{{window}}টির মধ্যে {{input}} · {{percentage}}",
+        "timeToFirstToken": "প্রথম টোকেন",
+        "technicalDetails": "প্রযুক্তিগত বিবরণ",
+        "configuredModel": "কনফিগার করা মডেল",
+        "runId": "রান ID",
+        "sessionId": "অধিবেশন ID",
+        "newInput": "নতুন ইনপুট",
+        "replyCount_one": "{{count}}টি উত্তর",
+        "replyCount_other": "{{count}}টি উত্তর",
+        "loadedReplyCount_one": "লোড হওয়া {{count}}টি উত্তর",
+        "loadedReplyCount_other": "লোড হওয়া {{count}}টি উত্তর",
+        "atLeastCost": "≥ {{cost}}",
+        "costHistory": "এই কথোপকথনের প্রতিটি উত্তরের খরচ",
+        "costHistoryBar": "উত্তর {{index}}: {{cost}}",
+        "costHistoryPosition": "এই উত্তর · {{count}}টির মধ্যে {{index}}",
+        "toolCallCount_one": "{{count}}টি টুল কল",
+        "toolCallCount_other": "{{count}}টি টুল কল"
       }
     },
     "native": {
@@ -1495,6 +1503,11 @@
         "nativeIosPushIsNotConfiguredByTheDeploymentAdd": "এই ডিপ্লয়মেন্টে নেটিভ iOS পুশ কনফিগার করা নেই। `config.json`-এ `push.ios` সেটিংস যোগ করুন।",
         "permissionDenied": "বিজ্ঞপ্তি অনুমতি অস্বীকার করা হয়. iOS সেটিংসে {{appName}}-এর জন্য বিজ্ঞপ্তিগুলি সক্ষম করুন৷",
         "unavailable": "অনুপলব্ধ"
+      },
+      "cloudflareAccess": {
+        "signInRequired": "{{value1}}-এর জন্য আপনার প্রতিষ্ঠানের সাইন-ইন প্রয়োজন।",
+        "continue": "চালিয়ে যান",
+        "signInFailed": "সাইন-ইন শেষ হয়নি। আবার চেষ্টা করুন।"
       }
     },
     "notifications": {
@@ -1807,6 +1820,21 @@
       "stopFailed": "{{tool}} থামানো যায়নি। আবার চেষ্টা করুন।",
       "stopAllFailed": "ব্যাকগ্রাউন্ড কাজগুলো থামানো যায়নি। আবার চেষ্টা করুন।",
       "inRoom": "ব্যাকগ্রাউন্ড কাজ চলছে"
+    },
+    "autoApprove": {
+      "label": "স্বয়ংক্রিয় অনুমোদন",
+      "labelOne": "স্বয়ংক্রিয় অনুমোদন: {{name}}",
+      "labelMany": "স্বয়ংক্রিয় অনুমোদন: {{name}} +{{count}}",
+      "title": "স্বয়ংক্রিয় অনুমোদন",
+      "intro": "এই থ্রেডে, এই লোকেদের অনুরোধ করা টুল কল অনুমোদন কার্ড ছাড়াই চলে।",
+      "you": "আপনি",
+      "until": "{{time}} পর্যন্ত",
+      "ownUntil": "{{time}} পর্যন্ত। শেষ করতে !auto_approve off পাঠান।"
+    },
+    "notices": {
+      "dismiss": "বিজ্ঞপ্তি খারিজ করুন",
+      "showMore": "আরও দেখুন",
+      "showLess": "কম দেখুন"
     }
   },
   "nav": {
@@ -2010,7 +2038,7 @@
       "retry": "আবার চেষ্টা করুন"
     },
     "authFooter": {
-      "poweredBy": "<app>{{appName}}</app>, <matrix>Matrix</matrix>, <cinny>Cinny</cinny> দ্বারা চালিত",
+      "poweredBy": "<links /> দ্বারা চালিত",
       "privacy": "গোপনীয়তা",
       "support": "সহায়তা",
       "terms": "শর্তাবলী"
@@ -2212,7 +2240,14 @@
       "recent": "সাম্প্রতিক",
       "searchResults": "অনুসন্ধান ফলাফল",
       "unknown": "অজানা",
-      "unknownPack": "অজানা প্যাক"
+      "unknownPack": "অজানা প্যাক",
+      "addCustomEmoji": "কাস্টম ইমোজি যোগ করুন",
+      "addCustomEmojiDescription": "এটি আপনার ব্যক্তিগত প্যাকে সংরক্ষিত হয়, তাই প্রতিটি রুমে ব্যবহার করতে পারবেন।",
+      "addCustomEmojiServerDescription": "{{server}} সার্ভারে থাকা সবাই প্রতিটি রুমে এটি ব্যবহার করতে পারেন।",
+      "addCustomEmojiFailed": "ইমোজি যোগ করা যায়নি। আবার চেষ্টা করুন।",
+      "addCustomEmojiNameTaken": "এই নামটি আগেই নেওয়া হয়েছে। অন্য একটি বেছে নিন।",
+      "addCustomEmojiTooLarge": "অ্যানিমেটেড GIF-এর আকার {{limit}}-এর কম হতে হবে।",
+      "add": "যোগ করুন"
     },
     "emojiGroups": {
       "activity": "কার্যকলাপ",

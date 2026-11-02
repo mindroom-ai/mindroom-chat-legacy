@@ -1,8 +1,9 @@
 import type { MatrixEvent, MatrixClient } from 'matrix-js-sdk';
 import type { IEncryptedFile } from '../../../types/matrix/common';
+import { readClientCachedSpecVersions } from '../../state/cachedSpecVersions';
 import { createSessionId } from '../../state/sessions';
-import { validMediaRequest } from '../../../swMediaAuth';
 import { decryptFile, mxcUrlToHttp } from '../../utils/matrix';
+import { authenticatedMediaRequestInit, supportsAuthenticatedMedia } from '../../utils/mediaUrl';
 import {
   captureCacheStoreWriteLease,
   getCachedAttachmentMetadata,
@@ -65,8 +66,8 @@ const inflightDownloads = new Map<string, SharedAttachmentOperation>();
 const getSessionId = (mx: MatrixClient): string =>
   createSessionId(mx.getHomeserverUrl(), mx.getSafeUserId());
 
-const getInflightKey = (sessionId: string, mxcUri: string, useAuthentication: boolean): string =>
-  JSON.stringify([sessionId, mxcUri, useAuthentication]);
+const getInflightKey = (sessionId: string, mxcUri: string): string =>
+  JSON.stringify([sessionId, mxcUri]);
 
 const abortError = (): DOMException => new DOMException('The operation was aborted', 'AbortError');
 
@@ -102,17 +103,23 @@ const hasCachedReference = (
 const fetchRawAttachment = async (
   mx: MatrixClient,
   source: CachedAttachmentSource,
-  useAuthentication: boolean,
   getLimit: () => number,
   signal: AbortSignal
 ): Promise<RawAttachment> => {
-  const url = mxcUrlToHttp(mx, source.mxcUri, useAuthentication);
+  // This request sends the access token itself, so unlike media URLs the browser loads, it does
+  // not need the service worker to use the authenticated endpoints. Before startup seeds the SDK with
+  // the cached /versions, or after the SDK's own request failed, getVersions asks the homeserver
+  // again; if that fails, the versions the client last cached decide.
+  const authenticated = await mx
+    .getVersions()
+    .then(supportsAuthenticatedMedia)
+    .catch(() => {
+      const cached = readClientCachedSpecVersions(mx);
+      return cached ? supportsAuthenticatedMedia(cached) : false;
+    });
+  const url = mxcUrlToHttp(mx, source.mxcUri, authenticated);
   if (!url) throw new Error('Unable to resolve sidecar URL');
-  const token = useAuthentication ? mx.getAccessToken() : undefined;
-  const requestInit =
-    token && validMediaRequest(url, mx.getHomeserverUrl())
-      ? { headers: { Authorization: `Bearer ${token}` } }
-      : undefined;
+  const requestInit = authenticated ? authenticatedMediaRequestInit(mx, url) : undefined;
   const response = await fetch(url, { ...requestInit, method: 'GET', signal });
   if (!response.ok) throw new Error(`Unable to download media (${response.status})`);
   const reader = response.body?.getReader();
@@ -154,10 +161,9 @@ const acquireAttachment = (
   mx: MatrixClient,
   sessionId: string,
   source: CachedAttachmentSource,
-  useAuthentication: boolean,
   maxBytes?: number
 ): { promise: Promise<RawAttachment>; release: () => void } => {
-  const key = getInflightKey(sessionId, source.mxcUri, useAuthentication);
+  const key = getInflightKey(sessionId, source.mxcUri);
   let operation = inflightDownloads.get(key);
   if (!operation) {
     let created: SharedAttachmentOperation | undefined;
@@ -167,7 +173,6 @@ const acquireAttachment = (
       return fetchRawAttachment(
         mx,
         source,
-        useAuthentication,
         () => Math.max(0, ...(created?.limits.values() ?? [])),
         created.controller.signal
       );
@@ -225,14 +230,13 @@ const toConsumerBlob = async (
 export const downloadCachedAttachment = async (
   mx: MatrixClient,
   source: CachedAttachmentSource,
-  useAuthentication: boolean,
   options: CachedAttachmentDownloadOptions = {}
 ): Promise<Blob> => {
   if (options.signal?.aborted) throw abortError();
   options = { ...source.owner, ...options };
   const sessionId = getSessionId(mx);
   const writeLease = options.writeLease ?? captureCacheStoreWriteLease(sessionId, options.roomId);
-  const attachment = acquireAttachment(mx, sessionId, source, useAuthentication, options.maxBytes);
+  const attachment = acquireAttachment(mx, sessionId, source, options.maxBytes);
   try {
     const raw = await awaitWithSignal(attachment.promise, options.signal);
     enforceMaxBytes(raw.bytes.byteLength, options.maxBytes);
@@ -293,7 +297,6 @@ export type PrefetchEventAttachmentsOptions = {
 export const prefetchEventAttachments = async (
   mx: MatrixClient,
   events: readonly MatrixEvent[],
-  useAuthentication: boolean,
   options: PrefetchEventAttachmentsOptions = {}
 ): Promise<void> => {
   const sessionId = getSessionId(mx);
@@ -318,7 +321,7 @@ export const prefetchEventAttachments = async (
       ) {
         try {
           // eslint-disable-next-line no-await-in-loop
-          await downloadCachedAttachment(mx, attachment, useAuthentication, {
+          await downloadCachedAttachment(mx, attachment, {
             roomId: message.roomId,
             eventId: message.eventId,
             revisionTs: message.revisionTs,
@@ -344,8 +347,7 @@ export const prefetchEventAttachments = async (
 /** Each owner validates the shared raw payload before claiming readable coverage. */
 export const hydrateCachedMindroomLongText = async (
   mx: MatrixClient,
-  source: MindroomLongTextSource,
-  useAuthentication: boolean
+  source: MindroomLongTextSource
 ): Promise<Record<string, unknown>> => {
   const owner = source.owner;
   const sessionId = getSessionId(mx);
@@ -355,7 +357,6 @@ export const hydrateCachedMindroomLongText = async (
     const blob = await downloadCachedAttachment(
       mx,
       { ...nextSource, mimeType: 'application/json' },
-      useAuthentication,
       { ...owner, essential: true, maxBytes: ESSENTIAL_BODY_MAX_BYTES, writeLease }
     );
     return blob.text();

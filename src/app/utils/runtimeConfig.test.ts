@@ -82,7 +82,10 @@ describe('MindRoom runtime client config defaults', () => {
     expect(mindroomConfig.welcome?.sourceUrl).toBe('https://github.com/mindroom-ai/mindroom-chat');
     expect(mindroomConfig.splash?.loadingMessages).toContain('Loading MindRoom Chat');
     expect(mindroomConfig.mindroom?.thinkingPlaceholderMessages).toContain('Thinking');
-    expect(mindroomConfig.messageRendering?.additionalAllowedUriSchemes).toContain('obsidian');
+    expect(mindroomConfig.messageRendering?.additionalAllowedUriSchemes).toEqual([
+      'obsidian',
+      'readdlespark',
+    ]);
     expect(mindroomConfig.push?.ios?.appId).toBe('chat.mindroom.app');
     expect(mindroomConfig.push?.ios?.format).toBe('full');
 

@@ -307,19 +307,32 @@ const formatMarkdownPreviewSegment = (body: string, allowRichMarkers: boolean): 
 };
 
 export const formatMindroomMarkdownTextBodyAsHtml = (body: string): string => {
+  const normalizedBody = body.replace(/\r\n?/g, '\n');
+  // Standalone tool markers become HTML without the parser, so a reply with
+  // many tool calls must not spend the parser's budget on them.
+  const textWithoutToolMarkers = normalizedBody
+    .split('\n')
+    .filter((line) => line !== line.trim() || !parseMindroomToolRefText(line))
+    .join('\n');
   const blockLineCount = body.match(MARKDOWN_PREVIEW_BLOCK_LINE_REG)?.length ?? 0;
-  if (blockLineCount > MAX_MARKDOWN_PREVIEW_BLOCK_LINES || exceedsInlineMarkerBudget(body)) {
+  if (
+    blockLineCount > MAX_MARKDOWN_PREVIEW_BLOCK_LINES ||
+    exceedsInlineMarkerBudget(textWithoutToolMarkers)
+  ) {
     return '';
   }
 
   try {
-    const normalizedBody = body.replace(/\r\n?/g, '\n');
     const unprotected = mapMarkdownOutsideParserBlocks(
       normalizedBody,
       (text) => text,
       () => '\n'
     );
     const allowRichMarkers = !hasAmbiguousMarkdownMarkerContext(unprotected.split('\n'));
+    // Without rich markers the tool marker lines reach the parser too.
+    if (!allowRichMarkers && exceedsInlineMarkerBudget(normalizedBody)) {
+      return '';
+    }
     // Use the parser's own block boundaries so code/math examples stay literal,
     // without disabling real tool markers elsewhere in the preview.
     return mapMarkdownOutsideParserBlocks(

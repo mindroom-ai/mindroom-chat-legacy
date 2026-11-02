@@ -38,13 +38,11 @@ const getLongTextMimeType = (content: Record<string, unknown>): string => {
 export const downloadMindroomLongTextSidecarBlob = async (
   mx: MatrixClient,
   source: MindroomLongTextSource,
-  useAuthentication: boolean,
   originalFile = false
 ): Promise<Blob> => {
   return downloadMindroomSidecarBlob(
     mx,
     source,
-    useAuthentication,
     getLongTextMimeType(source.previewContent),
     originalFile ? {} : { essential: true, maxBytes: ESSENTIAL_BODY_MAX_BYTES }
   );
@@ -52,9 +50,8 @@ export const downloadMindroomLongTextSidecarBlob = async (
 
 export const downloadMindroomLongTextSidecarText = async (
   mx: MatrixClient,
-  source: MindroomLongTextSource,
-  useAuthentication: boolean
+  source: MindroomLongTextSource
 ): Promise<string> => {
-  const blob = await downloadMindroomLongTextSidecarBlob(mx, source, useAuthentication);
+  const blob = await downloadMindroomLongTextSidecarBlob(mx, source);
   return blob.text();
 };

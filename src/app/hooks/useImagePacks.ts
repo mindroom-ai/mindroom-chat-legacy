@@ -120,7 +120,7 @@ export const useRoomImagePacks = (room: Room): ImagePack[] => {
 
 export const useRoomsImagePacks = (rooms: Room[]) => {
   const mx = useMatrixClient();
-  const [roomPacks, setRoomPacks] = useState(() => rooms.flatMap(getRoomImagePacks));
+  const [packEvents, setPackEvents] = useState(0);
 
   useStateEventCallback(
     mx,
@@ -130,14 +130,18 @@ export const useRoomsImagePacks = (rooms: Room[]) => {
           rooms.find((room) => room.roomId === mEvent.getRoomId()) &&
           mEvent.getType() === StateEvent.PoniesRoomEmotes
         ) {
-          setRoomPacks(rooms.flatMap(getRoomImagePacks));
+          setPackEvents((count) => count + 1);
         }
       },
       [rooms]
     )
   );
 
-  return roomPacks;
+  // Keyed by room IDs, so a room joined later (the server emoji room) is read at once,
+  // while callers that pass a new array of the same rooms keep the same packs.
+  const roomIds = rooms.map((room) => room.roomId).join(' ');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => rooms.flatMap(getRoomImagePacks), [roomIds, packEvents]);
 };
 
 export const useRelevantImagePacks = (usage: ImageUsage, rooms: Room[]): ImagePack[] => {

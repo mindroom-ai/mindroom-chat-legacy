@@ -1,5 +1,9 @@
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Match a whole setting name, so PRODUCT_BUNDLE_IDENTIFIER does not match the
+// end of DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER.
+const settingNamePattern = (settingName) => `(?<!\\w)${escapeRegExp(settingName)}`;
+
 const getSection = (xcodeProject, sectionName) => {
   const begin = `/* Begin ${sectionName} section */`;
   const end = `/* End ${sectionName} section */`;
@@ -29,8 +33,7 @@ const getObjectBlock = (xcodeProject, sectionName, objectId) => {
 
 export const getAppTargetBuildConfigurationIds = (xcodeProject) => {
   const targetSection = getSection(xcodeProject, 'PBXNativeTarget');
-  const targetPattern =
-    /\n\t\t([0-9A-F]+) \/\* App \*\/ = \{[\s\S]*?\n\t\t\};/g;
+  const targetPattern = /\n\t\t([0-9A-F]+) \/\* App \*\/ = \{[\s\S]*?\n\t\t\};/g;
   const appTargets = [...targetSection.matchAll(targetPattern)].filter((match) => {
     const block = match[0];
     return (
@@ -51,9 +54,9 @@ export const getAppTargetBuildConfigurationIds = (xcodeProject) => {
   }
 
   const listBlock = getObjectBlock(xcodeProject, 'XCConfigurationList', buildConfigurationListId);
-  const configurationIds = [
-    ...listBlock.matchAll(/\n\t\t\t\t([0-9A-F]+) \/\* [^*]+ \*\//g),
-  ].map((match) => match[1]);
+  const configurationIds = [...listBlock.matchAll(/\n\t\t\t\t([0-9A-F]+) \/\* [^*]+ \*\//g)].map(
+    (match) => match[1]
+  );
 
   if (configurationIds.length === 0) {
     throw new Error('could not find App target build configurations');
@@ -64,8 +67,12 @@ export const getAppTargetBuildConfigurationIds = (xcodeProject) => {
 
 export const getAppTargetBuildSettingValues = (xcodeProject, settingName) =>
   getAppTargetBuildConfigurationIds(xcodeProject).map((configurationId) => {
-    const configurationBlock = getObjectBlock(xcodeProject, 'XCBuildConfiguration', configurationId);
-    const settingPattern = new RegExp(`${escapeRegExp(settingName)} = ([^;]+);`);
+    const configurationBlock = getObjectBlock(
+      xcodeProject,
+      'XCBuildConfiguration',
+      configurationId
+    );
+    const settingPattern = new RegExp(`${settingNamePattern(settingName)} = ([^;]+);`);
     const settingValue = configurationBlock.match(settingPattern)?.[1]?.trim();
 
     if (!settingValue) {
@@ -96,7 +103,7 @@ export const replaceAppTargetBuildSetting = (xcodeProject, settingName, settingV
 
   getAppTargetBuildConfigurationIds(xcodeProject).forEach((configurationId) => {
     const originalBlock = getObjectBlock(updated, 'XCBuildConfiguration', configurationId);
-    const settingPattern = new RegExp(`(${escapeRegExp(settingName)} = )[^;]+;`);
+    const settingPattern = new RegExp(`(${settingNamePattern(settingName)} = )[^;]+;`);
 
     if (!settingPattern.test(originalBlock)) {
       throw new Error(`missing ${settingName} in App build configuration ${configurationId}`);

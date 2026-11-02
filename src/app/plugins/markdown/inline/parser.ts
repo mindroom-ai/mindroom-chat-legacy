@@ -11,7 +11,7 @@ import {
   UnderlineRule,
 } from './rules';
 import { runInlineRules } from './runner';
-import { InlineMDParser } from './type';
+import { InlineMDParser, InlineMDRule } from './type';
 
 const LeveledRules = [
   InlineMathRule,
@@ -26,12 +26,10 @@ const LeveledRules = [
 ];
 
 /**
- * Parses inline markdown text into HTML using defined rules.
- *
- * @param text - The markdown text to be parsed.
- * @returns The parsed HTML or the original text if no markdown was found.
+ * Parses inline markdown text into HTML using only the given rules, in priority order.
+ * Code spans are always parsed first, as in `parseInlineMD`.
  */
-export const parseInlineMD: InlineMDParser = (text) => {
+export const parseInlineMDWithRules = (text: string, rules: InlineMDRule[]): string => {
   if (text === '') return text;
   // Protect code contents without splitting the emphasis that surrounds them.
   // Choose a delimiter absent from the input so literal text cannot forge tokens.
@@ -62,9 +60,17 @@ export const parseInlineMD: InlineMDParser = (text) => {
   const restore = (value: string, kind: 'raw' | 'html') =>
     value.replace(token, (original, index: string) => codeSpans[Number(index)]?.[kind] ?? original);
   const parse: InlineMDParser = (value) =>
-    runInlineRules(value, LeveledRules, parse) ?? restore(value, 'html');
+    runInlineRules(value, rules, parse) ?? restore(value, 'html');
 
   // Rules such as links and math bypass parse for attributes and literal text.
   // Restore raw backticks there, never code HTML inside an attribute.
   return restore(parse(protectedText), 'raw');
 };
+
+/**
+ * Parses inline markdown text into HTML using defined rules.
+ *
+ * @param text - The markdown text to be parsed.
+ * @returns The parsed HTML or the original text if no markdown was found.
+ */
+export const parseInlineMD: InlineMDParser = (text) => parseInlineMDWithRules(text, LeveledRules);

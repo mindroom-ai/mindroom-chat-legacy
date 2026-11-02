@@ -31,7 +31,6 @@ import {
 } from '../../../utils/mimeTypes';
 import { stopPropagation } from '../../../utils/keyboard';
 import { downloadCachedAttachment } from '../../../mindroom/messages/attachmentRepository';
-import { useMediaAuthentication } from '../../../hooks/useMediaAuthentication';
 import { saveFile } from '../../../mindroom/native/nativeFileSave';
 import { ModalWide } from '../../../styles/Modal.css';
 import { FileIconButton } from '../FileHeader';
@@ -99,26 +98,21 @@ export function ReadTextFile({
   const { t } = useTranslation();
   const resolvedButtonText = buttonText ?? t('sharedUi.fileContent.openFile');
   const mx = useMatrixClient();
-  const useAuthentication = useMediaAuthentication();
   const [textViewer, setTextViewer] = useState(false);
 
   const [textState, loadText] = useAsyncCallback(
     useCallback(async () => {
-      const fileContent = await downloadCachedAttachment(
-        mx,
-        {
-          owner,
-          mxcUri: url,
-          mimeType,
-          encryptedFile: encInfo ? { ...encInfo, url } : undefined,
-        },
-        useAuthentication
-      );
+      const fileContent = await downloadCachedAttachment(mx, {
+        owner,
+        mxcUri: url,
+        mimeType,
+        encryptedFile: encInfo ? { ...encInfo, url } : undefined,
+      });
 
       const text = fileContent.text();
       setTextViewer(true);
       return text;
-    }, [owner, mx, useAuthentication, mimeType, encInfo, url])
+    }, [owner, mx, mimeType, encInfo, url])
   );
 
   return (
@@ -225,24 +219,19 @@ export function ReadPdfFile({
 }: ReadPdfFileProps) {
   const { t } = useTranslation();
   const mx = useMatrixClient();
-  const useAuthentication = useMediaAuthentication();
   const [pdfViewer, setPdfViewer] = useState(false);
 
   const [pdfState, loadPdf] = useAsyncCallback(
     useCallback(async () => {
-      const fileContent = await downloadCachedAttachment(
-        mx,
-        {
-          owner,
-          mxcUri: url,
-          mimeType,
-          encryptedFile: encInfo ? { ...encInfo, url } : undefined,
-        },
-        useAuthentication
-      );
+      const fileContent = await downloadCachedAttachment(mx, {
+        owner,
+        mxcUri: url,
+        mimeType,
+        encryptedFile: encInfo ? { ...encInfo, url } : undefined,
+      });
       setPdfViewer(true);
       return URL.createObjectURL(fileContent);
-    }, [owner, mx, url, useAuthentication, mimeType, encInfo]),
+    }, [owner, mx, url, mimeType, encInfo]),
     revokeBlobUrl
   );
   useBlobUrlCleanup(pdfState);
@@ -341,7 +330,6 @@ export function DownloadFile({
 }: DownloadFileProps) {
   const { t } = useTranslation();
   const mx = useMatrixClient();
-  const useAuthentication = useMediaAuthentication();
   const downloadedFileRef = useRef<{
     url: string;
     mimeType: string;
@@ -361,16 +349,12 @@ export function DownloadFile({
           ? cachedFile.blob
           : undefined;
       if (!fileContent) {
-        fileContent = await downloadCachedAttachment(
-          mx,
-          {
-            owner,
-            mxcUri: url,
-            mimeType,
-            encryptedFile: encInfo ? { ...encInfo, url } : undefined,
-          },
-          useAuthentication
-        );
+        fileContent = await downloadCachedAttachment(mx, {
+          owner,
+          mxcUri: url,
+          mimeType,
+          encryptedFile: encInfo ? { ...encInfo, url } : undefined,
+        });
         downloadedFileRef.current = {
           url,
           mimeType,
@@ -382,7 +366,7 @@ export function DownloadFile({
 
       await saveFile(fileContent, body);
       return fileContent;
-    }, [owner, mx, url, useAuthentication, mimeType, encInfo, body])
+    }, [owner, mx, url, mimeType, encInfo, body])
   );
   const handleDownload = () => {
     void download().catch(() => undefined);

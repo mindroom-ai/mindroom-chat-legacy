@@ -46,7 +46,7 @@ import {
 } from './ApprovalSection';
 import * as css from './ThreadApprovals.css';
 
-function ApprovalDialog({
+export function ApprovalDialog({
   title,
   subtitle,
   leading,
@@ -583,7 +583,13 @@ export function ThreadApprovalPermissions() {
   if (!open && grants.length === 0) return null;
   return (
     <>
-      <button ref={trigger} className={css.Chip} type="button" onClick={() => setOpen(true)}>
+      <button
+        ref={trigger}
+        className={css.HeaderChip}
+        type="button"
+        data-thread-status-chip=""
+        onClick={() => setOpen(true)}
+      >
         {t('mindroomUi.messages.threadApprovalControls.activePermissionCount', {
           count: grants.length,
         })}

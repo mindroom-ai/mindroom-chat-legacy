@@ -12,7 +12,6 @@ import { type CanvasPage, useCanvasPage } from './useCanvasPage';
 
 const download = vi.hoisted(() => vi.fn());
 vi.mock('../messages/attachmentRepository', () => ({ downloadCachedAttachment: download }));
-vi.mock('../../hooks/useMediaAuthentication', () => ({ useMediaAuthentication: () => true }));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -64,7 +63,6 @@ describe('useCanvasPage', () => {
     expect(download).toHaveBeenCalledWith(
       mx,
       { mxcUri: 'mxc://example.org/enc', encryptedFile, mimeType: 'text/html' },
-      true,
       expect.objectContaining({
         roomId: '!room:example.org',
         eventId: '$canvas',
@@ -103,6 +101,6 @@ describe('useCanvasPage', () => {
     await render({ title: 'T', document: { mxcUrl: 'mxc://example.org/two', size: 10 } });
     await act(async () => finishFirst({ text: async () => '<p>first</p>' }));
     expect(page).toEqual({ status: 'ready', html: '<p>second</p>' });
-    expect(download.mock.calls[0][3].signal.aborted).toBe(true);
+    expect(download.mock.calls[0][2].signal.aborted).toBe(true);
   });
 });

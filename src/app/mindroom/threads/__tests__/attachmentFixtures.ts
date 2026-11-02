@@ -1,10 +1,24 @@
-import { Room, type MatrixClient, type MatrixEvent, type IEvent } from 'matrix-js-sdk';
+import {
+  createClient,
+  Room,
+  type ICreateClientOpts,
+  type MatrixClient,
+  type MatrixEvent,
+  type IEvent,
+} from 'matrix-js-sdk';
 import { loadCachedEventAcrossRoomScopes } from '../cacheStore/cacheStoreEvents';
 
 import { createSessionId } from '../../../state/sessions';
 import { persistRoomChunkWithPreferLive } from '../eventRepository';
 import { saveRoomEventsToCacheCommitted, type CacheStoreWriteLease } from '../cacheStore';
 import type { EventAttachment } from '../../messages/eventAttachments';
+
+/** A client of a homeserver without authenticated media, so each download is one request. */
+export const createLegacyMediaClient = (opts: ICreateClientOpts): MatrixClient => {
+  const mx = createClient(opts);
+  mx.getVersions = async () => ({ versions: [], unstable_features: {} });
+  return mx;
+};
 
 /** Seed the real canonical transaction without transport or renderer side effects. */
 export const saveAttachmentOwner = async (

@@ -1,5 +1,4 @@
 import type { MatrixClient, MatrixEvent } from 'matrix-js-sdk';
-import { supportsAuthenticatedMedia } from '../../utils/mediaUrl';
 import { prefetchEventAttachments } from '../messages/attachmentRepository';
 import { collectEventAttachments } from '../messages/eventAttachments';
 import { isCacheWritable } from '../threads/cacheHealth';
@@ -257,10 +256,6 @@ export const createRoomOfflineController = ({
       })
       .sort((a, b) => Number(essential.has(b.getId()!)) - Number(essential.has(a.getId()!)));
     if (!ordered.length) return;
-    const auth = await mx
-      .getVersions()
-      .then(supportsAuthenticatedMedia)
-      .catch(() => false);
     for (const event of ordered) {
       if (paused() || !isCacheStoreWriteLeaseCurrent(lease)) return;
       // The scheduler retains one replacement behind a draining job with the same key.
@@ -274,7 +269,7 @@ export const createRoomOfflineController = ({
           priority: 4,
           execute: async (signal) => {
             if (paused() || !isCacheStoreWriteLeaseCurrent(lease)) return;
-            await prefetchEventAttachments(mx, [event], auth, {
+            await prefetchEventAttachments(mx, [event], {
               signal,
               writeLease: lease,
               includeAllMedia: state(roomId).includeAllMedia,

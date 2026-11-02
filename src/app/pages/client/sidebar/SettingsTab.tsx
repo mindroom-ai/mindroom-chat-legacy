@@ -7,6 +7,7 @@ import { SidebarItem, SidebarItemTooltip, SidebarAvatar } from '../../../compone
 import { UserAvatar } from '../../../components/user-avatar';
 import { useMatrixClient } from '../../../hooks/useMatrixClient';
 import { getMxIdLocalPart, mxcUrlToHttp } from '../../../utils/matrix';
+import { authenticatedMediaRequestInit } from '../../../utils/mediaUrl';
 import { nameInitials } from '../../../utils/common';
 import { useMediaAuthentication } from '../../../hooks/useMediaAuthentication';
 import { useUserProfile } from '../../../hooks/useUserProfile';
@@ -20,7 +21,6 @@ import { removeStoredSession } from '../../../../client/initMatrix';
 import { AccountSwitcher, AccountSwitcherItem } from './AccountSwitcher';
 import { resolveSessionRestorePath } from '../sessionRouteRestore';
 import { useSimpleMode } from '../../../mindroom/settings/useMindroomAccountSettings';
-import { validMediaRequest } from '../../../../swMediaAuth';
 
 const blobToDataUrl = async (blob: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -124,13 +124,9 @@ export function SettingsTab() {
 
     const abortController = new AbortController();
 
-    const accessToken =
-      useAuthentication && validMediaRequest(avatarFetchUrl, mx.getHomeserverUrl())
-        ? mx.getAccessToken()
-        : undefined;
     fetch(avatarFetchUrl, {
       signal: abortController.signal,
-      ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
+      ...(useAuthentication ? authenticatedMediaRequestInit(mx, avatarFetchUrl) : undefined),
     })
       .then(async (response) => {
         if (!response.ok) return undefined;

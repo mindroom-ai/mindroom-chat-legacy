@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mxcUrlToHttp } from './mediaUrl';
+import { createClient } from 'matrix-js-sdk';
+import { authenticatedMediaRequestInit, mxcUrlToHttp } from './mediaUrl';
 
 describe('mxcUrlToHttp', () => {
   const originalWindow = globalThis.window;
@@ -194,5 +195,26 @@ describe('mxcUrlToHttp', () => {
     expect(mxcUrlToHttp(mx, 'mxc://example.test/media-id', true)).toBe(
       'https://example.test/mindroom/_matrix/client/v1/media/download/example.test/media-id?allow_redirect=true'
     );
+  });
+});
+
+describe('authenticatedMediaRequestInit', () => {
+  const mx = createClient({
+    baseUrl: 'https://matrix.example.org',
+    userId: '@alice:example.org',
+    accessToken: 'test-token',
+  });
+  const mediaUrl = 'https://matrix.example.org/_matrix/client/v1/media/download/example.org/media';
+
+  it('sends the access token in a header to the homeserver media URL', () => {
+    expect(authenticatedMediaRequestInit(mx, mediaUrl)).toEqual({
+      headers: { Authorization: 'Bearer test-token' },
+    });
+  });
+
+  it('adds no header to a URL that already carries the access token', () => {
+    expect(
+      authenticatedMediaRequestInit(mx, `${mediaUrl}?access_token=test-token`)
+    ).toBeUndefined();
   });
 });

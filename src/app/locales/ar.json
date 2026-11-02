@@ -601,7 +601,14 @@
       "searchResults": "نتائج البحث",
       "noResultsFound": "لم يتم العثور على نتائج",
       "personalPack": "الحزمة الشخصية",
-      "unknown": "غير معروف"
+      "unknown": "غير معروف",
+      "addCustomEmoji": "إضافة رمز تعبيري مخصص",
+      "addCustomEmojiDescription": "يُحفظ في حزمتك الشخصية، لتستخدمه في كل غرفة.",
+      "addCustomEmojiServerDescription": "يمكن لجميع المستخدمين على ⁨{{server}}⁩ استخدامه في كل غرفة.",
+      "addCustomEmojiFailed": "تعذّرت إضافة الرمز التعبيري. حاول مرة أخرى.",
+      "addCustomEmojiNameTaken": "هذا الاسم مستخدم بالفعل. اختر اسمًا آخر.",
+      "addCustomEmojiTooLarge": "يجب أن يكون حجم صور GIF المتحركة أقل من ⁨{{limit}}⁩.",
+      "add": "إضافة"
     },
     "noStickerPacks": {
       "noStickerPacks": "لا توجد حزم ملصقات!",
@@ -1274,7 +1281,7 @@
       "support": "الدعم",
       "privacy": "الخصوصية",
       "terms": "الشروط",
-      "poweredBy": "مشغّل بواسطة <app>⁨{{appName}}⁩</app> و<matrix>Matrix</matrix> و<cinny>Cinny</cinny>"
+      "poweredBy": "مشغّل بواسطة <links />"
     },
     "router": {
       "join": "انضمام",
@@ -2221,6 +2228,11 @@
           "defaultPack": "الحزمة الافتراضية",
           "view": "عرض",
           "unknown": "غير معروف"
+        },
+        "serverPack": {
+          "title": "الرموز التعبيرية للخادم",
+          "description": "يمكن لجميع المستخدمين على ⁨{{server}}⁩ استخدامها.",
+          "permissions": "الأذونات"
         }
       },
       "notifications": {
@@ -2444,11 +2456,15 @@
         "list_schedules": "عرض كل المهام المجدولة.",
         "cancel_schedule": "إلغاء مهمة مجدولة حسب المعرّف أو إلغاء الكل.",
         "edit_schedule": "تحديث مهمة مجدولة موجودة.",
+        "jobs": "عرض المهام في الخلفية قيد التشغيل هنا.",
+        "cancel_job": "إلغاء مهمة في الخلفية حسب المعرّف أو كل المهام هنا.",
         "config": "إدارة إعداد MindRoom (للمشرف فقط).",
         "desktop": "إدارة هدف سطح المكتب.",
+        "mode": "تبديل وكيل واحد بين الأدوات القياسية وواجهة Bash فقط.",
         "model": "عرض النموذج المستخدم في سلسلة المحادثة الحالية أو تغييره.",
         "room_model": "عرض نموذج الغرفة الافتراضي أو تغييره (يتطلب التعيين وإعادة الضبط مشرف غرفة).",
         "thread_mode": "عرض وضع سلسلة المحادثة في الغرفة الحالية أو تغييره (لمشرف الغرفة فقط).",
+        "auto_approve": "تشغيل استدعاءات أدواتك في سلسلة المحادثة هذه دون موافقة لفترة، أو عرض هذه الفترة أو إنهاؤها.",
         "encrypt": "مراجعة التشفير التام بين الطرفين للغرفة الحالية أو تفعيله.",
         "e2ee": "عرض تشخيصات التشفير للغرفة الحالية.",
         "hi": "عرض معلومات الترحيب."
@@ -2771,30 +2787,11 @@
         "moreOptions": "المزيد من الخيارات"
       },
       "mindroomMessageControls": {
-        "requestContextWindow": "نافذة سياق الطلب",
-        "aiRunMetadata": "بيانات تشغيل الذكاء الاصطناعي",
         "close": "إغلاق",
-        "status": "الحالة",
-        "model": "النموذج",
-        "tokens": "الرموز المميزة",
-        "runCache": "ذاكرة التشغيل المؤقتة",
-        "requestContext": "سياق الطلب",
-        "requestCache": "ذاكرة الطلب المؤقتة",
-        "tools": "الأدوات",
-        "ttft": "TTFT",
-        "run": "التشغيل",
-        "session": "الجلسة",
-        "openAiRunMetadata": "فتح بيانات تشغيل الذكاء الاصطناعي",
-        "tokenUsage": "استخدام الرموز المميزة",
         "downloadingOriginal": "جارٍ تنزيل الملف الأصلي...",
         "retryDownloadOriginal": "إعادة محاولة تنزيل الملف الأصلي",
         "downloadOriginal": "تنزيل الملف الأصلي",
-        "segmentTokenCount_one": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ رمز مميز",
-        "segmentTokenCount_other": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ من الرموز المميزة",
-        "segmentTokenCount_few": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ الرموز المميزة",
-        "segmentTokenCount_many": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ رمزًا",
-        "segmentTokenCount_two": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ رمز مميز",
-        "segmentTokenCount_zero": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ الرموز"
+        "replyDetails": "تفاصيل الرد"
       },
       "mindroomMessageExtras": {
         "messageExtras": "ملحقات الرسالة"
@@ -2822,6 +2819,15 @@
       "mindroomThinkingPlaceholder": {
         "aiIsResponding": "الذكاء الاصطناعي يرد",
         "thinking": "جارٍ التفكير…"
+      },
+      "mindroomReasoning": {
+        "thinking": "يفكّر",
+        "thoughtFor_zero": "فكّر لمدة ⁨{{count}}⁩ ث",
+        "thoughtFor_one": "فكّر لمدة ⁨{{count}}⁩ ث",
+        "thoughtFor_two": "فكّر لمدة ⁨{{count}}⁩ ث",
+        "thoughtFor_few": "فكّر لمدة ⁨{{count}}⁩ ث",
+        "thoughtFor_many": "فكّر لمدة ⁨{{count}}⁩ ث",
+        "thoughtFor_other": "فكّر لمدة ⁨{{count}}⁩ ث"
       },
       "mindroomThreadSummaryCard": {
         "aiThreadSummary": "ملخص سلسلة المحادثة بالذكاء الاصطناعي"
@@ -2988,44 +2994,49 @@
         "retry": "إعادة المحاولة",
         "delete": "حذف"
       },
-      "aiRunDisplay": {
-        "inputTokens": "مدخلات ⁨{{formattedCount}}⁩",
-        "outputTokens": "مخرجات ⁨{{formattedCount}}⁩",
-        "totalTokens": "الإجمالي ⁨{{formattedCount}}⁩",
-        "readTokens": "قراءة ⁨{{formattedCount}}⁩",
-        "writeTokens": "كتابة ⁨{{formattedCount}}⁩",
-        "notReadTokens": "غير مقروء ⁨{{formattedCount}}⁩",
-        "contextUsage": "⁨{{input}}⁩ / ⁨{{window}}⁩ (⁨{{percentage}}⁩%)",
-        "contextBarTitle_one": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ رمز مميز (⁨{{percentage}}⁩% من النافذة)",
-        "contextBarTitle_other": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ من الرموز المميزة (⁨{{percentage}}⁩% من النافذة)",
-        "contextBarTitleWithSuffix_one": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ رمز مميز (⁨{{percentage}}⁩% من النافذة)؛ ⁨{{suffix}}⁩",
-        "contextBarTitleWithSuffix_other": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ من الرموز المميزة (⁨{{percentage}}⁩% من النافذة)؛ ⁨{{suffix}}⁩",
-        "reportedCacheRead_one": "قراءة ذاكرة مؤقتة مُبلغ عنها: ⁨{{formattedCount}}⁩ رمز مميز",
-        "reportedCacheRead_other": "قراءة ذاكرة مؤقتة مُبلغ عنها: ⁨{{formattedCount}}⁩ من الرموز المميزة",
-        "cacheWrite_one": "كتابة في الذاكرة المؤقتة: ⁨{{formattedCount}}⁩ رمز مميز",
-        "cacheWrite_other": "كتابة في الذاكرة المؤقتة: ⁨{{formattedCount}}⁩ من الرموز المميزة",
-        "cacheRead": "قراءة الذاكرة المؤقتة",
-        "newInput": "مدخلات جديدة",
-        "reserve": "احتياطي",
-        "cacheWrite_few": "كتابة في الذاكرة المؤقتة: ⁨{{formattedCount}}⁩ الرموز",
-        "cacheWrite_many": "كتابة في الذاكرة المؤقتة: ⁨{{formattedCount}}⁩ رمزًا",
-        "cacheWrite_two": "كتابة في الذاكرة المؤقتة: ⁨{{formattedCount}}⁩ الرموز المميزة",
-        "cacheWrite_zero": "كتابة في الذاكرة المؤقتة: ⁨{{formattedCount}}⁩ الرموز",
-        "contextBarTitle_few": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ الرموز المميزة (⁨{{percentage}}⁩% من النافذة)",
-        "contextBarTitle_many": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ رمزًا (⁨{{percentage}}⁩% من النافذة)",
-        "contextBarTitle_two": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ من الرموز المميزة (⁨{{percentage}}⁩% من النافذة)",
-        "contextBarTitle_zero": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ الرموز المميزة (⁨{{percentage}}⁩% من النافذة)",
-        "contextBarTitleWithSuffix_few": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ الرموز المميزة (⁨{{percentage}}⁩% من النافذة)؛ ⁨{{suffix}}⁩",
-        "contextBarTitleWithSuffix_many": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ رمزًا (⁨{{percentage}}⁩% من النافذة)؛ ⁨{{suffix}}⁩",
-        "contextBarTitleWithSuffix_two": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ رمز مميز (⁨{{percentage}}⁩% من النافذة)؛ ⁨{{suffix}}⁩",
-        "contextBarTitleWithSuffix_zero": "⁨{{label}}⁩: ⁨{{formattedCount}}⁩ الرموز المميزة (⁨{{percentage}}⁩% من النافذة)؛ ⁨{{suffix}}⁩",
-        "reportedCacheRead_few": "قراءة ذاكرة مؤقتة مُبلغ عنها: ⁨{{formattedCount}}⁩ الرموز المميزة",
-        "reportedCacheRead_many": "قراءة ذاكرة مؤقتة مُبلغ عنها: ⁨{{formattedCount}}⁩ رمزًا",
-        "reportedCacheRead_two": "قراءة ذاكرة مؤقتة مُبلغ عنها: الرموز المميزة ⁨{{formattedCount}}⁩",
-        "reportedCacheRead_zero": "قراءة ذاكرة مؤقتة مُبلغ عنها: ⁨{{formattedCount}}⁩ الرموز المميزة"
-      },
       "mindroomModelBadge": {
         "model": "النموذج: ⁨{{model}}⁩"
+      },
+      "mindroomReplyDetails": {
+        "tokens": "الرموز المميزة",
+        "cost": "التكلفة",
+        "conversationSoFar": "المحادثة حتى الآن",
+        "failed": "فشل",
+        "stopped": "متوقف",
+        "thisReply": "هذا الرد",
+        "input": "الإدخال",
+        "fromCache": "من الذاكرة المؤقتة",
+        "output": "الإخراج",
+        "contextWindow": "نافذة السياق",
+        "contextWindowUsage": "⁨{{input}}⁩ من ⁨{{window}}⁩ · ⁨{{percentage}}⁩",
+        "timeToFirstToken": "أول رمز مميز",
+        "technicalDetails": "التفاصيل التقنية",
+        "configuredModel": "النموذج المُعدّ",
+        "runId": "معرّف التشغيل",
+        "sessionId": "معرّف الجلسة",
+        "newInput": "مدخلات جديدة",
+        "replyCount_one": "⁨{{count}}⁩ رد",
+        "replyCount_other": "⁨{{count}}⁩ رد",
+        "replyCount_few": "⁨{{count}}⁩ ردود",
+        "replyCount_many": "⁨{{count}}⁩ ردًا",
+        "replyCount_two": "ردّان (⁨{{count}}⁩)",
+        "replyCount_zero": "⁨{{count}}⁩ رد",
+        "loadedReplyCount_one": "⁨{{count}}⁩ رد محمّل",
+        "loadedReplyCount_other": "⁨{{count}}⁩ رد محمّل",
+        "loadedReplyCount_few": "⁨{{count}}⁩ ردود محمّلة",
+        "loadedReplyCount_many": "⁨{{count}}⁩ ردًا محمّلًا",
+        "loadedReplyCount_two": "ردّان محمّلان (⁨{{count}}⁩)",
+        "loadedReplyCount_zero": "⁨{{count}}⁩ رد محمّل",
+        "atLeastCost": "≥ ⁨{{cost}}⁩",
+        "costHistory": "تكلفة كل رد في هذه المحادثة",
+        "costHistoryBar": "الرد ⁨{{index}}⁩: ⁨{{cost}}⁩",
+        "costHistoryPosition": "هذا الرد · ⁨{{index}}⁩ من ⁨{{count}}⁩",
+        "toolCallCount_one": "استدعاء أداة واحد (⁨{{count}}⁩)",
+        "toolCallCount_other": "⁨{{count}}⁩ استدعاء أداة",
+        "toolCallCount_few": "⁨{{count}}⁩ استدعاءات أدوات",
+        "toolCallCount_many": "⁨{{count}}⁩ استدعاءً للأدوات",
+        "toolCallCount_two": "استدعاءا أداة (⁨{{count}}⁩)",
+        "toolCallCount_zero": "⁨{{count}}⁩ استدعاء أداة"
       }
     },
     "native": {
@@ -3039,6 +3050,11 @@
         "enable": "تفعيل",
         "iosPushNotifications": "إشعارات iOS",
         "permissionDenied": "تم رفض إذن الإشعارات. فعّل إشعارات ⁨{{appName}}⁩ في إعدادات iOS."
+      },
+      "cloudflareAccess": {
+        "signInRequired": "يتطلب ⁨{{value1}}⁩ تسجيل الدخول عبر مؤسستك.",
+        "continue": "متابعة",
+        "signInFailed": "لم يكتمل تسجيل الدخول. حاول مرة أخرى."
       }
     },
     "notifications": {
@@ -3342,6 +3358,21 @@
       "stopFailed": "تعذّر إيقاف ⁨{{tool}}⁩. حاول مرة أخرى.",
       "stopAllFailed": "تعذّر إيقاف المهام في الخلفية. حاول مرة أخرى.",
       "inRoom": "مهام في الخلفية قيد التشغيل"
+    },
+    "autoApprove": {
+      "label": "موافقة تلقائية",
+      "labelOne": "موافقة تلقائية: ⁨{{name}}⁩",
+      "labelMany": "موافقة تلقائية: ⁨{{name}}⁩ +⁨{{count}}⁩",
+      "title": "موافقة تلقائية",
+      "intro": "في هذه السلسلة، تعمل استدعاءات الأدوات التي يطلبها هؤلاء الأشخاص دون بطاقات موافقة.",
+      "you": "أنت",
+      "until": "حتى ⁨{{time}}⁩",
+      "ownUntil": "حتى ⁨{{time}}⁩. أرسل ⁨!auto_approve off⁩ لإنهاء ذلك."
+    },
+    "notices": {
+      "dismiss": "إخفاء الإشعار",
+      "showMore": "عرض المزيد",
+      "showLess": "عرض أقل"
     }
   },
   "roomSchedules": {

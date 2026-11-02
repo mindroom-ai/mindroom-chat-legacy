@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import test from 'node:test';
 import { buildAuthenticationRecoveryAssets } from './authentication-recovery-assets.mjs';
 
 // Requires Docker and nginx:alpine. No application build or external login fixture needed.
-test('native recovery assets, probe, runtime URL serialization and pairing routes', async (t) => {
+test('native recovery assets, probe, runtime URL serialization, pairing routes and notices', async (t) => {
   const assets = await buildAuthenticationRecoveryAssets();
   mkdirSync('test-results', { recursive: true });
   const directory = mkdtempSync(resolve('test-results/authentication-recovery-nginx-'));
@@ -15,6 +15,16 @@ test('native recovery assets, probe, runtime URL serialization and pairing route
   for (const [name, source] of Object.entries(assets))
     writeFileSync(resolve(directory, name), source);
   const probe = '/authentication-recovery-probe?quoted="yes"&slash=\\value';
+  // A ConfigMap volume: notices.json -> ..data/notices.json, and the kubelet swaps ..data.
+  const notices = resolve(directory, 'notices');
+  const publishNotices = (version, body) => {
+    mkdirSync(resolve(notices, version), { recursive: true });
+    writeFileSync(resolve(notices, version, 'notices.json'), body);
+    symlinkSync(version, resolve(notices, '..data_tmp'));
+    renameSync(resolve(notices, '..data_tmp'), resolve(notices, '..data'));
+  };
+  publishNotices('..v1', '[{"id":"v1","text":"First","level":"info"}]');
+  symlinkSync('..data/notices.json', resolve(notices, 'notices.json'));
   const container = execFileSync(
     'docker',
     [
@@ -32,6 +42,8 @@ test('native recovery assets, probe, runtime URL serialization and pairing route
       )}:/usr/share/nginx/html/authentication-recovery.js:ro`,
       '-v',
       `${resolve(directory, 'runtime-config.js')}:/opt/mindroom/runtime-config.js:ro`,
+      '-v',
+      `${notices}:/opt/mindroom/notices:ro`,
       '-v',
       `${resolve('index.html')}:/usr/share/nginx/html/index.html:ro`,
       '-v',
@@ -119,7 +131,16 @@ test('native recovery assets, probe, runtime URL serialization and pairing route
         "frame-ancestors 'none'"
       );
       assert.equal(connectTrailing.headers.get('x-frame-options'), 'DENY');
+      const noticeFile = await fetch(`${origin}${prefix}/notices.json`);
+      assert.equal(noticeFile.status, 200);
+      assert.equal(noticeFile.headers.get('content-type'), 'application/json');
+      assert.equal(noticeFile.headers.get('cache-control'), 'no-store');
+      assert.deepEqual(await noticeFile.json(), [{ id: 'v1', text: 'First', level: 'info' }]);
     }
+    publishNotices('..v2', '[]');
+    assert.deepEqual(await (await fetch(`${origin}/notices.json`)).json(), []);
+    rmSync(resolve(notices, 'notices.json'));
+    assert.equal((await fetch(`${origin}/notices.json`)).status, 404);
     execFileSync('docker', [
       'exec',
       '-e',

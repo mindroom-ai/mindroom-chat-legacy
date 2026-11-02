@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import React, { ReactNode, useEffect, useRef, useState } from 'react';
 import { Box, Spinner, Text as FText, config } from 'folds';
 import { useMatrixClient } from '../../hooks/useMatrixClient';
-import { useMediaAuthentication } from '../../hooks/useMediaAuthentication';
 
 import { MEmote, MNotice, MText } from '../../components/message/MsgTypeRenderers';
 import {
@@ -107,7 +106,6 @@ export const useMindroomLongTextResolvedContent = (
   enabled: boolean
 ): Record<string, unknown> | undefined => {
   const mx = useMatrixClient();
-  const useAuthentication = useMediaAuthentication();
   const sourceIdentity = source ? getMindroomLongTextSourceIdentity(source) : undefined;
   const [resolvedEntry, setResolvedEntry] = useState<
     { sourceIdentity: string; content: Record<string, unknown> } | undefined
@@ -139,7 +137,7 @@ export const useMindroomLongTextResolvedContent = (
     let cancelled = false;
 
     void (async () => {
-      const nextContent = await hydrateCachedMindroomLongText(mx, source, useAuthentication);
+      const nextContent = await hydrateCachedMindroomLongText(mx, source);
 
       if (!cancelled) {
         setResolvedEntry({
@@ -152,7 +150,7 @@ export const useMindroomLongTextResolvedContent = (
     return () => {
       cancelled = true;
     };
-  }, [enabled, mx, source, sourceIdentity, useAuthentication]);
+  }, [enabled, mx, source, sourceIdentity]);
 
   if (sourceIdentity && resolvedEntry?.sourceIdentity === sourceIdentity) {
     return resolvedEntry.content;
@@ -175,7 +173,6 @@ export function MindroomLongTextText({
 }: MindroomLongTextTextProps) {
   const { t } = useTranslation();
   const mx = useMatrixClient();
-  const useAuthentication = useMediaAuthentication();
   const { encryptedFile, isV2ContentJson, mxcUri, owner } = longTextSource;
   const hydrationIdentity = getMindroomLongTextHydrationIdentity(content, longTextSource);
   const hydrationInputRef = useRef({
@@ -234,17 +231,13 @@ export function MindroomLongTextText({
           setResolvedContent(cachedContent);
           setLoading(false);
           if (currentOwner)
-            await hydrateCachedMindroomLongText(
-              mx,
-              {
-                previewContent: currentContent,
-                encryptedFile: currentEncryptedFile,
-                isV2ContentJson: currentIsV2ContentJson,
-                mxcUri: currentMxcUri,
-                owner: currentOwner,
-              },
-              useAuthentication
-            );
+            await hydrateCachedMindroomLongText(mx, {
+              previewContent: currentContent,
+              encryptedFile: currentEncryptedFile,
+              isV2ContentJson: currentIsV2ContentJson,
+              mxcUri: currentMxcUri,
+              owner: currentOwner,
+            });
           return;
         }
       }
@@ -261,17 +254,13 @@ export function MindroomLongTextText({
       }
 
       setLoading(true);
-      const nextContent = await hydrateCachedMindroomLongText(
-        mx,
-        {
-          previewContent: currentContent,
-          encryptedFile: currentEncryptedFile,
-          isV2ContentJson: currentIsV2ContentJson,
-          mxcUri: currentMxcUri,
-          owner: currentOwner,
-        },
-        useAuthentication
-      );
+      const nextContent = await hydrateCachedMindroomLongText(mx, {
+        previewContent: currentContent,
+        encryptedFile: currentEncryptedFile,
+        isV2ContentJson: currentIsV2ContentJson,
+        mxcUri: currentMxcUri,
+        owner: currentOwner,
+      });
 
       if (!cancelled) {
         setResolvedContent(nextContent);
@@ -285,7 +274,7 @@ export function MindroomLongTextText({
     return () => {
       cancelled = true;
     };
-  }, [hydrate, hydrationIdentity, mx, useAuthentication]);
+  }, [hydrate, hydrationIdentity, mx]);
 
   useEffect(() => {
     if (!loading) {

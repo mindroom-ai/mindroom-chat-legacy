@@ -32,10 +32,13 @@ export const useRoomMembers = (mx: MatrixClient, roomId: string): RoomMember[] =
 
     mx.on(RoomMemberEvent.Membership, updateMemberList);
     mx.on(RoomMemberEvent.PowerLevel, updateMemberList);
+    // The SDK renames a member in place and emits only Name, so lists showing names need it too.
+    mx.on(RoomMemberEvent.Name, updateMemberList);
     return () => {
       disposed = true;
       mx.removeListener(RoomMemberEvent.Membership, updateMemberList);
       mx.removeListener(RoomMemberEvent.PowerLevel, updateMemberList);
+      mx.removeListener(RoomMemberEvent.Name, updateMemberList);
     };
   }, [mx, roomId]);
 

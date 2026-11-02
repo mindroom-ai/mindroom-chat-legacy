@@ -33,17 +33,6 @@ export const Banner = style([
   glassFloating,
 ]);
 
-// "Thread View" is chrome, not content: it says the same thing on every
-// thread the user opens, so it shows only while the thread has no title. It
-// uses the same uppercase/12px/W500 treatment the sidebar category headers and
-// the SHOW MORE pill already use for that role.
-export const ViewLabel = style({
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  fontWeight: config.fontWeight.W500,
-  whiteSpace: 'nowrap',
-});
-
 // Back, title and actions; narrow screens add the tags as a second row.
 export const TitleRow = style({
   display: 'grid',
@@ -59,9 +48,26 @@ export const EyebrowRow = style({
   selectors: { '&:empty': { display: 'none' } },
   '@media': {
     [shortViewport]: {
+      // Beside the title, the status chips keep to the room left of the thread actions.
+      flexShrink: 1,
+      minWidth: 0,
       selectors: { [`&:not(:has(> :not(${CompactHidden})))`]: { display: 'none' } },
     },
+    // Phones show the tags in a row of their own, so here only status chips take another line.
+    '(max-width: 480px)': { flexWrap: 'wrap' },
   },
+});
+
+// "Thread View" is chrome, not content: it says the same thing on every
+// thread the user opens, so it shows only while the thread has no title and
+// gives way to a status chip. It uses the same uppercase/12px/W500 treatment
+// the sidebar category headers and the SHOW MORE pill already use for that role.
+export const ViewLabel = style({
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  fontWeight: config.fontWeight.W500,
+  whiteSpace: 'nowrap',
+  selectors: { [`${EyebrowRow}:has(> [data-thread-status-chip]) > &`]: { display: 'none' } },
 });
 
 // On short screens the approvals chip that stays in view sits beside the title.
@@ -76,8 +82,10 @@ export const TitleColumn = style({
   ...whenCompact({ flexDirection: 'row', alignItems: 'center', columnGap: config.space.S200 }),
 });
 
+// The tags take the room the status chips leave, clipped where they do not fit.
 export const TagsRow = style({
   display: 'inline-flex',
+  flex: '1 1 0',
   alignItems: 'center',
   gap: '0.3rem',
   flexWrap: 'nowrap',
@@ -96,7 +104,8 @@ export const DesktopOnlyTags = style({
   },
 });
 
-// On short screens the title and a scheduled task share one line and truncate together.
+// On short screens the title and a scheduled task share one line and truncate together; they take the room the
+// status chips leave, down to a short stub.
 export const SubtitleRow = style({
   display: 'flex',
   alignItems: 'center',
@@ -108,7 +117,7 @@ export const SubtitleRow = style({
     [`${EyebrowRow}:empty + &`]: { marginTop: 0 },
   },
   '@media': {
-    [shortViewport]: { marginTop: 0, flexWrap: 'nowrap' },
+    [shortViewport]: { marginTop: 0, flexWrap: 'nowrap', flex: '1 1 0', minWidth: '4rem' },
     // Narrow screens move the tags to their own row, which can leave the
     // eyebrow row with nothing showing.
     '(max-width: 480px)': {

@@ -12,10 +12,12 @@ const mocks = vi.hoisted(() => {
   return {
     isNativePlatform: vi.fn(),
     openConnectionsPortal: vi.fn(),
+    discoveredUrls: [] as string[],
     authedRequest,
     client: {
       clientRunning: true,
       getSafeUserId: () => '@alice:example.org',
+      getHomeserverUrl: () => 'https://example.org',
       http: { authedRequest },
     },
   };
@@ -30,12 +32,14 @@ vi.mock('folds', () => ({
     children,
     onClick,
     disabled,
+    'aria-label': ariaLabel,
   }: {
     children?: React.ReactNode;
     onClick?: () => void;
     disabled?: boolean;
+    'aria-label'?: string;
   }) => (
-    <button onClick={onClick} disabled={disabled}>
+    <button onClick={onClick} disabled={disabled} aria-label={ariaLabel}>
       {children}
     </button>
   ),
@@ -74,6 +78,9 @@ vi.mock('../../hooks/useMatrixClient', () => ({
 vi.mock('../connections/openConnections', () => ({
   openConnectionsPortal: mocks.openConnectionsPortal,
 }));
+vi.mock('../server/useMindroomServers', () => ({
+  useMindroomServerUrls: () => mocks.discoveredUrls,
+}));
 
 const OPEN_LABEL = 'Open Connections';
 const NO_BACKEND = 'Set your MindRoom server under Computers to use Connections.';
@@ -98,6 +105,7 @@ beforeEach(() => {
   mocks.openConnectionsPortal.mockReset().mockReturnValue('opened');
   mocks.authedRequest.mockReset();
   mocks.client.clientRunning = true;
+  mocks.discoveredUrls = [];
 });
 afterEach(() => {
   act(() => renderer?.unmount());
@@ -141,6 +149,90 @@ describe('connections settings', () => {
   it('treats a server the user turned off under Computers as not configured', () => {
     act(() => store.set(computerServicePreferenceAtom, ''));
     render('https://backend.example');
+    expect(openButton().props.disabled).toBe(true);
+    expect(texts()).toContain(NO_BACKEND);
+  });
+
+  it('opens the server the agents in the rooms publish when none is configured', () => {
+    mocks.discoveredUrls = ['http://localhost:8765'];
+    render('');
+    expect(openButton().props.disabled).toBeFalsy();
+    expect(texts()).not.toContain(NO_BACKEND);
+    // A found server is named, so a hostile agent cannot pass its portal off as the user's own.
+    expect(texts()).toContain('http://localhost:8765');
+    click();
+    expect(mocks.openConnectionsPortal.mock.calls[0][0].backendUrl).toBe('http://localhost:8765');
+  });
+
+  it.each([
+    [true, 1],
+    [false, 0],
+  ])(
+    'asks the homeserver afresh before a token for a found server (binds: %s)',
+    async (binds, requests) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          async () =>
+            new Response(
+              JSON.stringify({
+                versions: ['v1.11'],
+                unstable_features: { 'io.mindroom.openid_audience': binds },
+              }),
+              { status: 200 }
+            )
+        )
+      );
+      mocks.authedRequest.mockResolvedValue({ access_token: 'openid-token' });
+      mocks.discoveredUrls = ['http://localhost:8765'];
+      render('');
+      click();
+      const token =
+        mocks.openConnectionsPortal.mock.calls[0][0].getOpenIdToken('http://localhost:8765');
+      if (binds) await expect(token).resolves.toEqual({ access_token: 'openid-token' });
+      else await expect(token).rejects.toThrow('does not bind sign-in tokens');
+      expect(mocks.authedRequest).toHaveBeenCalledTimes(requests);
+      vi.unstubAllGlobals();
+    }
+  );
+
+  it('asks nothing extra before a token for a configured server', async () => {
+    const versions = vi.fn();
+    vi.stubGlobal('fetch', versions);
+    mocks.authedRequest.mockResolvedValue({ access_token: 'openid-token' });
+    render('https://backend.example');
+    click();
+    await mocks.openConnectionsPortal.mock.calls[0][0].getOpenIdToken('https://backend.example');
+    expect(versions).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('offers each published server by its address when the agents come from several', () => {
+    mocks.discoveredUrls = ['https://mind.example.org', 'http://localhost:8765'];
+    render('');
+    const buttons = renderer.root
+      .findAllByType('button')
+      .filter((node) => node.findByType('span').children.join('') === OPEN_LABEL);
+    expect(buttons).toHaveLength(2);
+    expect(buttons.map((button) => button.props['aria-label'])).toEqual([
+      'Open Connections https://mind.example.org',
+      'Open Connections http://localhost:8765',
+    ]);
+    expect(texts()).toEqual(
+      expect.arrayContaining(['https://mind.example.org', 'http://localhost:8765'])
+    );
+    act(() => buttons[1].props.onClick());
+    expect(mocks.openConnectionsPortal.mock.calls[0][0].backendUrl).toBe('http://localhost:8765');
+  });
+
+  it('prefers the configured server, and keeps a server the user turned off off', () => {
+    mocks.discoveredUrls = ['http://localhost:8765'];
+    render('https://backend.example');
+    click();
+    expect(mocks.openConnectionsPortal.mock.calls[0][0].backendUrl).toBe('https://backend.example');
+    act(() => renderer.unmount());
+    act(() => store.set(computerServicePreferenceAtom, ''));
+    render('');
     expect(openButton().props.disabled).toBe(true);
     expect(texts()).toContain(NO_BACKEND);
   });

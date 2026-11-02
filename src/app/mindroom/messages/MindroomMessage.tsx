@@ -470,6 +470,7 @@ export const Message = as<'div', MessageProps>(
                         <Menu>
                           {canSendReaction && serverEventActionsAllowed && (
                             <MessageQuickReactions
+                              imagePackRooms={imagePackRooms}
                               onReaction={(key, shortcode) => {
                                 onReactionToggle(mEvent.getId()!, key, shortcode);
                                 closeMenu();

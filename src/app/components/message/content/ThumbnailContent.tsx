@@ -5,7 +5,6 @@ import { useMatrixClient } from '../../../hooks/useMatrixClient';
 import { AsyncStatus, useAsyncCallback } from '../../../hooks/useAsyncCallback';
 import { revokeBlobUrl, useBlobUrlCleanup } from '../../../hooks/useBlobUrlCleanup';
 import { downloadCachedAttachment } from '../../../mindroom/messages/attachmentRepository';
-import { useMediaAuthentication } from '../../../hooks/useMediaAuthentication';
 import { getImageBlobSafeMimeType } from '../../../utils/mimeTypes';
 
 export type ThumbnailContentProps = {
@@ -15,7 +14,6 @@ export type ThumbnailContentProps = {
 };
 export function ThumbnailContent({ owner, info, renderImage }: ThumbnailContentProps) {
   const mx = useMatrixClient();
-  const useAuthentication = useMediaAuthentication();
 
   const [thumbSrcState, loadThumbSrc] = useAsyncCallback(
     useCallback(async () => {
@@ -26,18 +24,14 @@ export function ThumbnailContent({ owner, info, renderImage }: ThumbnailContentP
         throw new Error('Failed to load thumbnail');
       }
 
-      const fileContent = await downloadCachedAttachment(
-        mx,
-        {
-          owner,
-          mxcUri: thumbMxcUrl,
-          mimeType: getImageBlobSafeMimeType(thumbInfo.mimetype),
-          encryptedFile: encInfo ? { ...encInfo, url: thumbMxcUrl } : undefined,
-        },
-        useAuthentication
-      );
+      const fileContent = await downloadCachedAttachment(mx, {
+        owner,
+        mxcUri: thumbMxcUrl,
+        mimeType: getImageBlobSafeMimeType(thumbInfo.mimetype),
+        encryptedFile: encInfo ? { ...encInfo, url: thumbMxcUrl } : undefined,
+      });
       return URL.createObjectURL(fileContent);
-    }, [owner, mx, info, useAuthentication]),
+    }, [owner, mx, info]),
     revokeBlobUrl
   );
   useBlobUrlCleanup(thumbSrcState);

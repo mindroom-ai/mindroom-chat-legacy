@@ -48,6 +48,9 @@ describe('service worker app shell caching', () => {
     expect(swSource).toContain('/^\\/(?:[^/]+\\/)?\\.well-known(?:\\/|$)/');
     expect(swSource).toContain('readNavigationFallbackExcludePaths(self.location.href)');
     expect(swSource).toContain('navigationFallbackExcludePathPattern');
+    expect(swSource).toContain(
+      '...RUNTIME_NAVIGATION_PATHS.map(navigationFallbackExcludePathPattern)'
+    );
   });
 
   it('does not use the SPA fallback for path-based Matrix homeserver routes', () => {

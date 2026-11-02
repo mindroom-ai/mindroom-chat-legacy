@@ -15,6 +15,7 @@ import {
   navigationFallbackExcludePathPattern,
   NON_DISRUPTIVE_UPDATE_PARAM,
   readNavigationFallbackExcludePaths,
+  RUNTIME_NAVIGATION_PATHS,
 } from './serviceWorkerNavigation';
 
 export type {};
@@ -41,6 +42,7 @@ const navigationFallbackDenylist = [
   // the denylist against pathname + search, so "?" is a valid boundary too
   // (fragments never reach the service worker, so "#" is not).
   /^\/(?:[^/]+\/)?public(?:\/|\?|$)/,
+  ...RUNTIME_NAVIGATION_PATHS.map(navigationFallbackExcludePathPattern),
   ...readNavigationFallbackExcludePaths(self.location.href).map(
     navigationFallbackExcludePathPattern
   ),

@@ -1,3 +1,4 @@
+import type { MatrixClient } from 'matrix-js-sdk';
 import type { SpecVersions } from '../cs-api';
 import {
   getSafeLocalStorage,
@@ -45,6 +46,12 @@ export const readCachedSpecVersions = (
 
   removeStorageItemSafe(storage, key);
   return undefined;
+};
+
+/** The spec versions cached for the client's homeserver and user, if any. */
+export const readClientCachedSpecVersions = (mx: MatrixClient): SpecVersions | undefined => {
+  const userId = mx.getUserId();
+  return userId ? readCachedSpecVersions(mx.baseUrl, userId) : undefined;
 };
 
 export const writeCachedSpecVersions = (

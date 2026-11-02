@@ -25,8 +25,10 @@ test('room schedule list shows every destination and follows live state updates'
   await expect(
     dialog.getByText('Check the inbox.\nSummarize urgent messages.', { exact: true })
   ).toBeVisible();
-  await expect(dialog.getByText('At 09:30, Monday through Friday', { exact: true })).toBeVisible();
-  await expect(dialog.getByText('UTC', { exact: true })).toBeVisible();
+  await expect(
+    dialog.getByText('At 09:30, Monday through Friday (America/Los_Angeles)', { exact: true })
+  ).toBeVisible();
+  await expect(dialog.getByText('30 16 * * 1-5 (UTC)', { exact: true })).toBeVisible();
   await expect(dialog.getByText('Silent', { exact: true })).toBeVisible();
   await expect(dialog.getByText('Awaiting execution', { exact: true })).toBeVisible();
   await expect(dialog.getByText('New thread', { exact: true })).toBeVisible();

@@ -83,7 +83,7 @@ it.each(['room', 'thread', 'grouped'] as const)(
         : {}),
     });
     const saved = await persistRoomChunkWithPreferLive({ ...ctx, chunk: [initial] });
-    await prefetchEventAttachments(ctx.mx, saved!.events, false);
+    await prefetchEventAttachments(ctx.mx, saved!.events);
     const target = new MatrixEvent(initial);
     const inline = { msgtype: 'm.text', body: 'inline' };
     target.makeReplaced(
@@ -124,7 +124,7 @@ it('authoritative thread repair must allow original full-body ownership after ed
   current.makeReplaced(new MatrixEvent(edit));
   await persistThreadEventCacheSnapshotCommitted({ ...ctx, threadId: '$thread', events: [current] })
     .write;
-  await prefetchEventAttachments(ctx.mx, [current], false);
+  await prefetchEventAttachments(ctx.mx, [current]);
   const restored = new MatrixEvent(original);
   const redactedEdit = new MatrixEvent(edit);
   redactedEdit.makeRedacted(
@@ -143,7 +143,7 @@ it('authoritative thread repair must allow original full-body ownership after ed
     ...getMindroomLongTextSource(restored.getContent())!,
     owner: getEventAttachmentOwner(restored),
   };
-  expect(await hydrateCachedMindroomLongText(ctx.mx, source, false)).toMatchObject({
+  expect(await hydrateCachedMindroomLongText(ctx.mx, source)).toMatchObject({
     body: 'complete original',
   });
   expect(
@@ -166,7 +166,7 @@ it('ignores attachment candidates older than the accepted stored event revision'
   ]);
   const stale = new MatrixEvent(original);
   createEnginePersistFacade({ sessionId: ctx.sessionId }).persistRoomEventCache(ctx.room, [stale]);
-  await prefetchEventAttachments(ctx.mx, [stale], false);
+  await prefetchEventAttachments(ctx.mx, [stale]);
   expect(await loadCachedAttachment(ctx.sessionId, 'mxc://test/stale')).toBeUndefined();
 });
 
@@ -190,11 +190,11 @@ it('takes attachment content from the authoritative snapshot rather than older l
     authoritativeRawEvents: [authoritative],
   });
   expect(await snapshot.write).toBe(true);
-  await prefetchEventAttachments(ctx.mx, [stale], false);
+  await prefetchEventAttachments(ctx.mx, [stale]);
   expect(await loadCachedAttachment(ctx.sessionId, 'mxc://test/original')).toBeUndefined();
   const current = new MatrixEvent(original);
   current.makeReplaced(new MatrixEvent(edit));
-  await prefetchEventAttachments(ctx.mx, [current], false);
+  await prefetchEventAttachments(ctx.mx, [current]);
   expect(
     (await getCachedAttachmentMetadata(ctx.sessionId, 'mxc://test/latest'))?.references
   ).toEqual([
@@ -216,10 +216,10 @@ it('keeps newer attachment ownership when another scope first receives an older 
   );
   await persistThreadEventCacheSnapshotCommitted({ ...ctx, threadId: '$thread', events: [current] })
     .write;
-  await prefetchEventAttachments(ctx.mx, [current], false);
+  await prefetchEventAttachments(ctx.mx, [current]);
   const stale = new MatrixEvent(original);
   await persistRoomChunkWithPreferLive({ ...ctx, chunk: [original], mappedEvents: [stale] });
-  await prefetchEventAttachments(ctx.mx, [stale], false);
+  await prefetchEventAttachments(ctx.mx, [stale]);
   expect(await loadCachedAttachment(ctx.sessionId, 'mxc://test/old-scope')).toBeUndefined();
   expect(
     (await getCachedAttachmentMetadata(ctx.sessionId, 'mxc://test/new-scope'))?.references
@@ -239,7 +239,7 @@ it('admits attachment ownership for a metadata-only thread root', async () => {
       rootEvent: root,
     }).write
   ).toBe(true);
-  await prefetchEventAttachments(ctx.mx, [root], false);
+  await prefetchEventAttachments(ctx.mx, [root]);
   expect((await getCachedAttachmentMetadata(ctx.sessionId, 'mxc://test/root'))?.references).toEqual(
     [expect.objectContaining({ eventId: '$thread', status: 'cached' })]
   );

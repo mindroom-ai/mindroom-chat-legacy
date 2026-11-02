@@ -11,6 +11,9 @@ import {
 } from './messageExtrasData';
 import { MindroomMessageExtras } from './MindroomMessageExtras';
 
+vi.mock('./MindroomHtmlBlocks.css', () => ({}));
+vi.mock('./ApprovalArgumentFields.css', () => ({}));
+
 vi.mock('./MindroomMessageExtras.css.ts', () => ({
   Extras: 'Extras',
   Section: 'Section',
@@ -76,6 +79,7 @@ describe('MindroomMessageExtras', () => {
           section({ title: 'Second', content: 'two' }),
         ]),
         htmlReactParserOptions: {},
+        markerContent: {},
       })
     );
 
@@ -99,6 +103,7 @@ describe('MindroomMessageExtras', () => {
             section({ title: 'Open', collapsed: false }),
           ]),
           htmlReactParserOptions: {},
+          markerContent: {},
         })
       );
     });
@@ -122,6 +127,7 @@ describe('MindroomMessageExtras', () => {
       React.createElement(MindroomMessageExtras, {
         extras,
         htmlReactParserOptions: {},
+        markerContent: {},
       });
 
     act(() => {
@@ -159,6 +165,7 @@ describe('MindroomMessageExtras', () => {
       React.createElement(MindroomMessageExtras, {
         extras,
         htmlReactParserOptions: {},
+        markerContent: {},
       });
 
     act(() => {
@@ -222,6 +229,7 @@ describe('MindroomMessageExtras', () => {
           }),
         ]),
         htmlReactParserOptions: {},
+        markerContent: {},
       })
     );
 
@@ -243,6 +251,7 @@ describe('MindroomMessageExtras', () => {
           }),
         ]),
         htmlReactParserOptions: {},
+        markerContent: {},
       })
     );
 
@@ -266,6 +275,7 @@ describe('MindroomMessageExtras', () => {
           }),
         ]),
         htmlReactParserOptions: {},
+        markerContent: {},
       })
     );
 
@@ -286,6 +296,7 @@ describe('MindroomMessageExtras', () => {
           }),
         ]),
         htmlReactParserOptions: {},
+        markerContent: {},
       })
     );
 
@@ -309,6 +320,7 @@ describe('MindroomMessageExtras', () => {
           2
         ),
         htmlReactParserOptions: {},
+        markerContent: {},
       })
     );
 
@@ -341,6 +353,7 @@ describe('MindroomMessageExtras', () => {
           2
         ),
         htmlReactParserOptions: {},
+        markerContent: {},
       })
     );
 
@@ -369,6 +382,7 @@ describe('MindroomMessageExtras', () => {
           2
         ),
         htmlReactParserOptions: {},
+        markerContent: {},
       })
     );
 
@@ -399,6 +413,7 @@ describe('MindroomMessageExtras', () => {
           2
         ),
         htmlReactParserOptions: {},
+        markerContent: {},
       });
 
     act(() => {
@@ -441,6 +456,7 @@ describe('MindroomMessageExtras', () => {
           2
         ),
         htmlReactParserOptions: {},
+        markerContent: {},
       })
     );
 
@@ -479,6 +495,7 @@ describe('MindroomMessageExtras', () => {
             return undefined;
           },
         },
+        markerContent: {},
       })
     );
 
@@ -515,6 +532,7 @@ describe('MindroomMessageExtras', () => {
           2
         ),
         htmlReactParserOptions,
+        markerContent: {},
       });
 
     sanitizeCustomHtmlSpy.mockClear();
@@ -554,6 +572,7 @@ describe('MindroomMessageExtras', () => {
       React.createElement(MindroomMessageExtras, {
         extras: createExtras([section({ title: 'HTML', contentType: 'text/html', content })], 2),
         htmlReactParserOptions,
+        markerContent: {},
       });
 
     act(() => {

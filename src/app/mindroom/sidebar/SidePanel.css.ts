@@ -1,7 +1,7 @@
 import { style } from '@vanilla-extract/css';
 import { color, config, DefaultReset, toRem } from 'folds';
 
-/** Right-hand conversation panel: a fixed column on desktop, full screen on narrow viewports. */
+/** Right-hand conversation panel: fills its resizable column on desktop, full screen on narrow viewports. */
 export const Panel = style([
   DefaultReset,
   {
@@ -9,7 +9,8 @@ export const Panel = style([
     color: color.Surface.OnContainer,
     display: 'flex',
     flexDirection: 'column',
-    flex: '0 0 clamp(22rem, 42vw, 42rem)',
+    flex: '1 1 auto',
+    width: '100%',
     minWidth: 0,
     position: 'relative',
     '@media': {

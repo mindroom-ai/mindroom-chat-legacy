@@ -25,6 +25,7 @@ const state = vi.hoisted(() => ({
   members: [] as Array<{ userId: string; name: string; membership: string }>,
   callRoom: false,
   thread: null as { id: string; rootEvent: MatrixEvent; events: MatrixEvent[] } | null,
+  renders: 0,
 }));
 
 // A client that re-emits its users' events, as the SDK's User.createUser wires them up.
@@ -48,7 +49,11 @@ const setStatus = (userId: string, status: string) => {
 };
 
 vi.mock('./useStartAgentCall', () => ({
-  useStartAgentCall: () => ({ startAgentCall: state.startAgentCall, ...state.call }),
+  // Called once per render of the button.
+  useStartAgentCall: () => {
+    state.renders += 1;
+    return { startAgentCall: state.startAgentCall, ...state.call };
+  },
 }));
 
 vi.mock('../../hooks/useMatrixClient', () => ({ useMatrixClient: () => mx }));
@@ -255,6 +260,31 @@ describe('AgentCallHeaderButton', () => {
       expect(headerButton(renderer).props['aria-label']).toBe('Call Helper');
     }
   );
+
+  it('renders again only when a thread update changes who can be called', () => {
+    addVoiceAgent(HELPER);
+    addVoiceAgent(ANALYST);
+    const thread = replyInThread(HELPER.userId);
+    const renderer = render('$root');
+    const renders = state.renders;
+
+    // Each streamed edit of the agent's reply updates the thread twice.
+    act(() => {
+      const edit = message(HELPER.userId);
+      thread.events.push(edit);
+      room.emit(ThreadEvent.Update, thread);
+      room.emit(ThreadEvent.NewReply, thread, edit);
+    });
+    expect(state.renders).toBe(renders);
+    expect(headerButton(renderer).props['aria-label']).toBe('Call Helper');
+
+    act(() => {
+      const reply = message(ANALYST.userId);
+      thread.events.push(reply);
+      room.emit(ThreadEvent.NewReply, thread, reply);
+    });
+    expect(headerButton(renderer).props['aria-label']).toBe('Call an agent');
+  });
 
   it('stamps no thread while the thread root is still a local echo', async () => {
     addVoiceAgent(HELPER);

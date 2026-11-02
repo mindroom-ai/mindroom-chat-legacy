@@ -38,6 +38,16 @@ export const MINDROOM_COMMANDS: MindroomCommandItem[] = [
     description: 'Update an existing schedule task.',
   },
   {
+    name: 'jobs',
+    syntax: '!jobs',
+    description: 'List the background jobs running here.',
+  },
+  {
+    name: 'cancel_job',
+    syntax: '!cancel_job <id|all>',
+    description: 'Cancel one background job by id or all of them here.',
+  },
+  {
     name: 'config',
     syntax: '!config <operation>',
     description: 'Manage MindRoom configuration (admin only).',
@@ -46,6 +56,11 @@ export const MINDROOM_COMMANDS: MindroomCommandItem[] = [
     name: 'desktop',
     syntax: '!desktop [setup|status|confirm|rotate|disconnect]',
     description: 'Manage your Desktop target.',
+  },
+  {
+    name: 'mode',
+    syntax: '!mode <agent> minimal|standard|show|reset',
+    description: 'Switch one agent between standard tools and a Bash-only interface.',
   },
   {
     name: 'model',
@@ -61,6 +76,12 @@ export const MINDROOM_COMMANDS: MindroomCommandItem[] = [
     name: 'thread_mode',
     syntax: '!thread_mode [room|thread|reset|show]',
     description: 'Show or switch the thread mode used in the current room (room admin only).',
+  },
+  {
+    name: 'auto_approve',
+    syntax: '!auto_approve [<minutes>|<hours>h|off]',
+    description:
+      'Run your tool calls in this thread without approval for a while, or show or end that window.',
   },
   {
     name: 'encrypt',

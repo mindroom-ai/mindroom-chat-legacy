@@ -81,6 +81,11 @@ export type ClientConfig = {
     supportUrl?: string;
     privacyPolicyUrl?: string;
     termsUrl?: string;
+    /** Sign-in footer credits. Absent shows MindRoom Chat, Matrix, and Cinny; empty hides them. */
+    poweredBy?: {
+      label: string;
+      url: string;
+    }[];
   };
 
   createRoom?: {

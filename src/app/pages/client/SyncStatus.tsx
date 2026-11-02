@@ -8,6 +8,8 @@ import {
 } from '../../hooks/useInitialClientCatchup';
 import { ContainerColor } from '../../styles/ContainerColor.css';
 import { useHomeserverUnreachable } from '../../mindroom/matrix/homeserverReachability';
+import { useCloudflareAccessSignInRequired } from '../../mindroom/native/cloudflareAccess';
+import { CloudflareAccessSignIn } from '../../mindroom/native/CloudflareAccessGate';
 
 type SyncStatusProps = {
   mx: MatrixClient;
@@ -16,6 +18,28 @@ export function SyncStatus({ mx }: SyncStatusProps) {
   const { t } = useTranslation();
   const stateData = useClientSyncStateData(mx);
   const unreachable = useHomeserverUnreachable(mx);
+  const accessSignInRequired = useCloudflareAccessSignInRequired(mx.getHomeserverUrl());
+
+  // Requests to a server behind Cloudflare Access fail until the user signs in again.
+  if (
+    accessSignInRequired &&
+    (stateData.current === SyncState.Reconnecting ||
+      stateData.current === SyncState.Error ||
+      unreachable)
+  ) {
+    return (
+      <Box data-testid="client-sync-status" direction="Column" shrink="No">
+        <Box
+          className={ContainerColor({ variant: 'Critical' })}
+          style={{ padding: config.space.S200 }}
+          justifyContent="Center"
+        >
+          <CloudflareAccessSignIn baseUrl={mx.getHomeserverUrl()} />
+        </Box>
+        <Line variant="Critical" size="300" />
+      </Box>
+    );
+  }
 
   if (!unreachable && stateData.current != null && isInitialClientCatchupInProgress(stateData)) {
     return (

@@ -89,11 +89,19 @@ export const isSpace = (room: Room | null): boolean => {
   return event.getContent().type === RoomType.Space;
 };
 
+/** The room that holds a homeserver's shared emoji packs, which no room list or picker shows. */
+export const isMindroomEmojiRoom = (room: Room | null): boolean => {
+  if (!room) return false;
+  const event = getStateEvent(room, StateEvent.RoomCreate);
+  return event?.getContent().type === RoomType.MindroomEmoji;
+};
+
 export const isRoom = (room: Room | null): boolean => {
   if (!room) return false;
   const event = getStateEvent(room, StateEvent.RoomCreate);
   if (!event) return true;
-  return event.getContent().type !== RoomType.Space;
+  const { type } = event.getContent();
+  return type !== RoomType.Space && type !== RoomType.MindroomEmoji;
 };
 
 export const isUnsupportedRoom = (room: Room | null): boolean => {
@@ -261,16 +269,15 @@ export const roomHaveUnread = (mx: MatrixClient, room: Room) => {
     return false;
   }
 
-  let sawVisibleMainEvent = false;
+  // Only a message counts as unread, whether or not the read position is loaded.
   for (let i = liveEvents.length - 1; i >= 0; i -= 1) {
     const event = liveEvents[i];
     if (!event) return false;
     if (event.getId() === readUpToId) return false;
     if (isHiddenRoomActivity(room, event)) continue;
-    sawVisibleMainEvent = true;
     if (isNotificationEvent(event)) return true;
   }
-  return sawVisibleMainEvent;
+  return false;
 };
 
 export const getUnreadInfo = (room: Room): UnreadInfo => {

@@ -25,16 +25,24 @@ const getCommandDescription = (t: TFunction, command: MindroomCommandItem): stri
       return t('mindroomUi.commands.descriptions.cancel_schedule');
     case 'edit_schedule':
       return t('mindroomUi.commands.descriptions.edit_schedule');
+    case 'jobs':
+      return t('mindroomUi.commands.descriptions.jobs');
+    case 'cancel_job':
+      return t('mindroomUi.commands.descriptions.cancel_job');
     case 'config':
       return t('mindroomUi.commands.descriptions.config');
     case 'desktop':
       return t('mindroomUi.commands.descriptions.desktop');
+    case 'mode':
+      return t('mindroomUi.commands.descriptions.mode');
     case 'model':
       return t('mindroomUi.commands.descriptions.model');
     case 'room_model':
       return t('mindroomUi.commands.descriptions.room_model');
     case 'thread_mode':
       return t('mindroomUi.commands.descriptions.thread_mode');
+    case 'auto_approve':
+      return t('mindroomUi.commands.descriptions.auto_approve');
     case 'encrypt':
       return t('mindroomUi.commands.descriptions.encrypt');
     case 'e2ee':

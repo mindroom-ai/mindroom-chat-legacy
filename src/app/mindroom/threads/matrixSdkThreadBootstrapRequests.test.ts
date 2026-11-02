@@ -1,4 +1,13 @@
-import { createClient, MatrixEvent, Room, type IEvent, type MatrixClient } from 'matrix-js-sdk';
+import {
+  createClient,
+  MatrixEvent,
+  Room,
+  RoomEvent,
+  ThreadEvent,
+  type IEvent,
+  type MatrixClient,
+} from 'matrix-js-sdk';
+import { Feature, ServerSupport } from 'matrix-js-sdk/lib/feature';
 import { Direction } from 'matrix-js-sdk/lib/models/event-timeline';
 import { FeatureSupport, Thread } from 'matrix-js-sdk/lib/models/thread';
 import { MemoryStore } from 'matrix-js-sdk/lib/store/memory';
@@ -447,6 +456,56 @@ describe('SDK thread bootstrap requests', () => {
     expect(f.rootFetches()).toBe(1);
     expect(f.relationPages()).toBe(1);
     expect(thread.findEventById(replyId)!.getContent().body).toBe('chunk 5');
+  });
+
+  it('replays what an unopened thread buffered as history, not as new events', async () => {
+    // Opening a thread announced each buffered reaction and edit as a live event, one at a
+    // time, so live-event listeners saved and rendered each on its own.
+    const rootId = rootIdAt(1);
+    const f = server({ roots: [summarizedRoot(rootId, 30)] });
+    // Tuwunel serves recursive relations, so the SDK appends replayed relations.
+    f.client.canSupport.set(Feature.RelationsRecursion, ServerSupport.Stable);
+    const room = roomFor(f.client);
+    room.processThreadRoots([f.client.getEventMapper()(summarizedRoot(rootId, 30))], true);
+    const thread = room.getThread(rootId)!;
+    // The saved sync holds the replies, then their reactions and streamed edits.
+    await room.addLiveEvents(
+      Array.from({ length: 30 }, (_, index) => new MatrixEvent(reply(rootId, index + 1))),
+      { addToState: false, fromCache: true }
+    );
+    const relations = Array.from({ length: 30 }, (_, index) => {
+      const replyId = `${rootId}-reply-${index + 1}`;
+      const reaction = new MatrixEvent(
+        message(`$reaction-${index}`, 100 + index, {
+          'm.relates_to': { rel_type: 'm.annotation', event_id: replyId, key: '🛑' },
+        })
+      );
+      reaction.event.type = 'm.reaction';
+      return [reaction, edit(replyId, `final ${index + 1}`, 200 + index)];
+    }).flat();
+    await room.addLiveEvents(relations, { addToState: false, fromCache: true });
+    expect(thread.replayEvents).toHaveLength(60);
+    await settle();
+    const live = vi.fn();
+    const updates = vi.fn();
+    room.on(RoomEvent.Timeline, (_event, _room, toStart, _removed, data) => {
+      if (!toStart && data?.liveEvent) live();
+    });
+    room.on(ThreadEvent.Update, updates);
+
+    await thread.initialize();
+    await settle();
+
+    expect(live).not.toHaveBeenCalled();
+    // The opening's own updates, not one per replayed event.
+    expect(updates.mock.calls.length).toBeLessThanOrEqual(2);
+    // The first page holds the latest reply, whose buffered edit still applies.
+    expect(thread.findEventById(`${rootId}-reply-30`)!.getContent().body).toBe('final 30');
+    const stopCount = thread.timelineSet.relations
+      .getChildEventsForEvent(`${rootId}-reply-1`, 'm.annotation', 'm.reaction')
+      ?.getSortedAnnotationsByKey()
+      ?.find(([key]) => key === '🛑')?.[1].size;
+    expect(stopCount).toBe(1);
   });
 
   it('lists encrypted threads without fetching their edits', async () => {

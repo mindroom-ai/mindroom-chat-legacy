@@ -182,7 +182,7 @@ Both before and after footprints use the current configured release tag, while P
 ## Conflict rules
 
 - Preserve upstream ownership of `config.json` and place MindRoom runtime defaults in `config.mindroom.json`.
-  The current fork also intentionally sets `messageRendering.additionalAllowedUriSchemes` to `["obsidian"]` in the shared `config.json`; retain this existing compatibility setting when merging upstream changes.
+  The current fork also intentionally sets `messageRendering.additionalAllowedUriSchemes` to `["obsidian", "readdlespark"]` in the shared `config.json`; retain this existing compatibility setting when merging upstream changes.
 - The seven `mindroom-wrapper` entries in `.gitattributes` protect pure re-export wrappers.
   `bash scripts/setup-git-merge-drivers.sh` installs the optional local driver.
   The driver preserves wrappers but cannot port upstream behavior into `src/app/mindroom/`.
@@ -196,7 +196,8 @@ Both before and after footprints use the current configured release tag, while P
 - Preserve exact patched versions or deliberately regenerate and validate the corresponding patches.
   Current patches target `matrix-js-sdk@41.7.0`, `@tanstack/virtual-core@3.17.3`, and `folds@2.7.1`.
   The Matrix SDK patch covers thread reset protection and relation insertion when the parent belongs to another timeline in the same set.
-  Run both actual-SDK regression suites after upgrading, and keep patched runtime JavaScript, TypeScript, and source maps aligned.
+  It also gives ephemeral events the room of their sync section and keeps failed decryptions of live reply frames (`$io.mindroom.live.` event IDs) out of the pending-key list and key-backup downloads.
+  Run the four actual-SDK regression suites after upgrading (`src/app/mindroom/threads/matrixSdkThreadReset.test.ts`, `src/app/mindroom/threads/matrixSdkTimelineInsertion.test.ts`, `src/client/syncEphemeralRoom.test.ts`, and `src/client/rustCryptoLiveFrames.test.ts`), and keep patched runtime JavaScript, TypeScript, and source maps aligned.
   The folds patch adds six scrollbar color fallbacks and must retain upstream's Firefox feature query.
 
 ## Verification

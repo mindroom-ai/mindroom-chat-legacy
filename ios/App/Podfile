@@ -30,4 +30,13 @@ end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+  # Resource bundles contain no executable code and need no separate signature.
+  # Keep iOS signing untouched and avoid applying the app's profile to Pods.
+  installer.pods_project.targets.each do |target|
+    next unless target.product_type == 'com.apple.product-type.bundle'
+
+    target.build_configurations.each do |config|
+      config.build_settings['CODE_SIGNING_ALLOWED[sdk=macosx*]'] = 'NO'
+    end
+  end
 end

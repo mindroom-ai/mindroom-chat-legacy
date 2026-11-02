@@ -589,7 +589,14 @@
       "searchResults": "搜索结果",
       "noResultsFound": "没有找到结果",
       "personalPack": "个人包",
-      "unknown": "未知"
+      "unknown": "未知",
+      "addCustomEmoji": "添加自定义表情",
+      "addCustomEmojiDescription": "它会保存到你的个人包，可在每个房间中使用。",
+      "addCustomEmojiServerDescription": "{{server}} 上的所有人都可以在每个房间中使用。",
+      "addCustomEmojiFailed": "无法添加表情。请重试。",
+      "addCustomEmojiNameTaken": "该名称已被占用。请换一个。",
+      "addCustomEmojiTooLarge": "动态 GIF 必须小于 {{limit}}。",
+      "add": "添加"
     },
     "noStickerPacks": {
       "noStickerPacks": "没有贴纸包！",
@@ -1242,7 +1249,7 @@
       "support": "支持",
       "privacy": "隐私",
       "terms": "条款",
-      "poweredBy": "由 <app>{{appName}}</app>、<matrix>Matrix</matrix>、<cinny>Cinny</cinny> 提供支持"
+      "poweredBy": "由 <links /> 提供支持"
     },
     "router": {
       "join": "加入",
@@ -2109,6 +2116,11 @@
           "defaultPack": "默认表情包",
           "view": "查看",
           "unknown": "未知"
+        },
+        "serverPack": {
+          "title": "服务器表情符号",
+          "description": "{{server}} 上的所有人都可以使用。",
+          "permissions": "权限"
         }
       },
       "notifications": {
@@ -2332,11 +2344,15 @@
         "list_schedules": "列出所有计划任务。",
         "cancel_schedule": "按 ID 取消一个计划或所有计划。",
         "edit_schedule": "更新现有计划任务。",
+        "jobs": "列出此处正在运行的后台任务。",
+        "cancel_job": "按 ID 取消一个后台任务，或取消此处的全部任务。",
         "config": "管理 MindRoom 配置（仅限管理员）。",
         "desktop": "管理您的桌面目标。",
+        "mode": "将单个智能体在标准工具和仅 Bash 界面之间切换。",
         "model": "显示或切换当前讨论串中使用的模型。",
         "room_model": "显示房间模型默认值或切换它（设置/重置需要房间管理员）。",
         "thread_mode": "显示或切换当前房间使用的讨论串模式（仅限房间管理员）。",
+        "auto_approve": "在一段时间内无需批准即可运行您在此讨论串中的工具调用，或显示或结束该时段。",
         "encrypt": "查看或启用当前房间的端到端加密。",
         "e2ee": "显示当前房间的加密诊断。",
         "hi": "显示欢迎信息。"
@@ -2605,26 +2621,11 @@
         "moreOptions": "更多选项"
       },
       "mindroomMessageControls": {
-        "requestContextWindow": "请求上下文窗口",
-        "aiRunMetadata": "AI运行元数据",
         "close": "关闭",
-        "status": "状态",
-        "model": "模型",
-        "tokens": "词元",
-        "runCache": "运行缓存",
-        "requestContext": "请求上下文",
-        "requestCache": "请求缓存",
-        "tools": "工具",
-        "ttft": "TTFT",
-        "run": "运行",
-        "session": "会话",
-        "openAiRunMetadata": "查看 AI 运行元数据",
-        "tokenUsage": "词元用量",
         "downloadingOriginal": "正在下载原版...",
         "retryDownloadOriginal": "重试下载原件",
         "downloadOriginal": "下载原版",
-        "segmentTokenCount_one": "{{label}}：{{formattedCount}} 个词元",
-        "segmentTokenCount_other": "{{label}}：{{formattedCount}} 个词元"
+        "replyDetails": "回复详情"
       },
       "mindroomMessageExtras": {
         "messageExtras": "消息附加信息"
@@ -2648,6 +2649,10 @@
       "mindroomThinkingPlaceholder": {
         "aiIsResponding": "AI正在响应",
         "thinking": "正在思考…"
+      },
+      "mindroomReasoning": {
+        "thinking": "思考中",
+        "thoughtFor_other": "思考了 {{count}} 秒"
       },
       "mindroomThreadSummaryCard": {
         "aiThreadSummary": "AI 讨论串摘要"
@@ -2756,28 +2761,37 @@
         "retry": "重试",
         "delete": "删除"
       },
-      "aiRunDisplay": {
-        "inputTokens": "输入 {{formattedCount}}",
-        "outputTokens": "输出 {{formattedCount}}",
-        "totalTokens": "总计 {{formattedCount}}",
-        "readTokens": "读取 {{formattedCount}}",
-        "writeTokens": "写入 {{formattedCount}}",
-        "notReadTokens": "未读取 {{formattedCount}}",
-        "contextUsage": "{{input}} / {{window}} ({{percentage}}%)",
-        "contextBarTitle_one": "{{label}}：{{formattedCount}} 个词元（占上下文窗口的 {{percentage}}%）",
-        "contextBarTitle_other": "{{label}}：{{formattedCount}} 个词元（占上下文窗口的 {{percentage}}%）",
-        "contextBarTitleWithSuffix_one": "{{label}}：{{formattedCount}} 个词元（占上下文窗口的 {{percentage}}%）；{{suffix}}",
-        "contextBarTitleWithSuffix_other": "{{label}}：{{formattedCount}} 个词元（占上下文窗口的 {{percentage}}%）；{{suffix}}",
-        "reportedCacheRead_one": "报告的缓存读取：{{formattedCount}} 个词元",
-        "reportedCacheRead_other": "报告的缓存读取：{{formattedCount}} 个词元",
-        "cacheWrite_one": "缓存写入：{{formattedCount}} 个词元",
-        "cacheWrite_other": "缓存写入：{{formattedCount}} 个词元",
-        "cacheRead": "缓存读取",
-        "newInput": "新输入",
-        "reserve": "预留"
-      },
       "mindroomModelBadge": {
         "model": "模型：{{model}}"
+      },
+      "mindroomReplyDetails": {
+        "tokens": "词元",
+        "cost": "费用",
+        "conversationSoFar": "目前对话",
+        "failed": "失败",
+        "stopped": "已停止",
+        "thisReply": "本条回复",
+        "input": "输入",
+        "fromCache": "来自缓存",
+        "output": "输出",
+        "contextWindow": "上下文窗口",
+        "contextWindowUsage": "{{input}} / {{window}} · {{percentage}}",
+        "timeToFirstToken": "首个词元",
+        "technicalDetails": "技术详情",
+        "configuredModel": "配置的模型",
+        "runId": "运行 ID",
+        "sessionId": "会话 ID",
+        "newInput": "新输入",
+        "replyCount_one": "{{count}} 条回复",
+        "replyCount_other": "{{count}} 条回复",
+        "loadedReplyCount_one": "已加载 {{count}} 条回复",
+        "loadedReplyCount_other": "已加载 {{count}} 条回复",
+        "atLeastCost": "≥ {{cost}}",
+        "costHistory": "此对话中每条回复的费用",
+        "costHistoryBar": "第 {{index}} 条回复：{{cost}}",
+        "costHistoryPosition": "本条回复 · 第 {{index}} / {{count}} 条",
+        "toolCallCount_one": "{{count}} 次工具调用",
+        "toolCallCount_other": "{{count}} 次工具调用"
       }
     },
     "native": {
@@ -2791,6 +2805,11 @@
         "enable": "启用",
         "iosPushNotifications": "iOS 推送通知",
         "permissionDenied": "通知权限已被拒绝。请在 iOS“设置”中为 {{appName}} 启用通知。"
+      },
+      "cloudflareAccess": {
+        "signInRequired": "{{value1}} 需要通过你所在的组织登录。",
+        "continue": "继续",
+        "signInFailed": "登录未完成。请重试。"
       }
     },
     "notifications": {
@@ -3066,6 +3085,21 @@
       "stopFailed": "无法停止 {{tool}}，请重试。",
       "stopAllFailed": "无法停止后台任务，请重试。",
       "inRoom": "后台任务运行中"
+    },
+    "autoApprove": {
+      "label": "自动批准",
+      "labelOne": "自动批准：{{name}}",
+      "labelMany": "自动批准：{{name}} +{{count}}",
+      "title": "自动批准",
+      "intro": "在此话题中，这些人请求的工具调用无需审批卡片即可运行。",
+      "you": "你",
+      "until": "至 {{time}}",
+      "ownUntil": "至 {{time}}。发送 !auto_approve off 可提前结束。"
+    },
+    "notices": {
+      "dismiss": "关闭通知",
+      "showMore": "显示更多",
+      "showLess": "收起"
     }
   },
   "roomSchedules": {

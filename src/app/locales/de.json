@@ -589,7 +589,14 @@
       "searchResults": "Suchergebnisse",
       "noResultsFound": "Keine Ergebnisse gefunden",
       "personalPack": "Persönliches Paket",
-      "unknown": "Unbekannt"
+      "unknown": "Unbekannt",
+      "addCustomEmoji": "Eigenes Emoji hinzufügen",
+      "addCustomEmojiDescription": "Es wird in deinem persönlichen Paket gespeichert, damit du es in jedem Raum nutzen kannst.",
+      "addCustomEmojiServerDescription": "Alle auf {{server}} können es in jedem Raum nutzen.",
+      "addCustomEmojiFailed": "Das Emoji konnte nicht hinzugefügt werden. Versuche es erneut.",
+      "addCustomEmojiNameTaken": "Dieser Name ist schon vergeben. Wähle einen anderen.",
+      "addCustomEmojiTooLarge": "Animierte GIFs müssen kleiner als {{limit}} sein.",
+      "add": "Hinzufügen"
     },
     "noStickerPacks": {
       "noStickerPacks": "Keine Stickerpakete!",
@@ -1246,7 +1253,7 @@
       "support": "Support",
       "privacy": "Datenschutz",
       "terms": "Bedingungen",
-      "poweredBy": "Bereitgestellt von <app>{{appName}}</app>, <matrix>Matrix</matrix>, <cinny>Cinny</cinny>"
+      "poweredBy": "Bereitgestellt von <links />"
     },
     "router": {
       "join": "Beitreten",
@@ -2109,6 +2116,11 @@
           "defaultPack": "Standardpaket",
           "view": "Anzeigen",
           "unknown": "Unbekannt"
+        },
+        "serverPack": {
+          "title": "Server-Emojis",
+          "description": "Alle auf {{server}} können sie nutzen.",
+          "permissions": "Berechtigungen"
         }
       },
       "notifications": {
@@ -2332,11 +2344,15 @@
         "list_schedules": "Zeige alle geplanten Aufgaben an.",
         "cancel_schedule": "Brich einen Zeitplan anhand der ID oder alle Zeitpläne ab.",
         "edit_schedule": "Aktualisiere eine vorhandene geplante Aufgabe.",
+        "jobs": "Liste die hier laufenden Hintergrundaufgaben auf.",
+        "cancel_job": "Brich eine Hintergrundaufgabe per ID oder alle hier ab.",
         "config": "Verwalte die MindRoom-Konfiguration (nur Administratoren).",
         "desktop": "Verwalte dein Desktop-Ziel.",
+        "mode": "Schalte einen Agenten zwischen Standardwerkzeugen und einer reinen Bash-Oberfläche um.",
         "model": "Zeige oder wechsle das im aktuellen Thread verwendete Modell.",
         "room_model": "Zeige oder wechsle das Standardmodell des Raums (Festlegen/Zurücksetzen erfordert Raumadministratorrechte).",
         "thread_mode": "Zeige oder wechsle den im aktuellen Raum verwendeten Thread-Modus (nur Raumadministratoren).",
+        "auto_approve": "Führe deine Werkzeugaufrufe in diesem Thread eine Weile ohne Genehmigung aus, oder zeige oder beende dieses Zeitfenster.",
         "encrypt": "Prüfe oder aktiviere die Ende-zu-Ende-Verschlüsselung für den aktuellen Raum.",
         "e2ee": "Zeige Verschlüsselungsdiagnosen für den aktuellen Raum.",
         "hi": "Zeige Begrüßungsinformationen."
@@ -2611,26 +2627,11 @@
         "moreOptions": "Weitere Optionen"
       },
       "mindroomMessageControls": {
-        "requestContextWindow": "Kontextfenster der Anfrage",
-        "aiRunMetadata": "Metadaten des KI-Laufs",
         "close": "Schließen",
-        "status": "Status",
-        "model": "Modell",
-        "tokens": "Token",
-        "runCache": "Lauf-Cache",
-        "requestContext": "Anfragekontext",
-        "requestCache": "Anfrage-Cache",
-        "tools": "Werkzeuge",
-        "ttft": "TTFT",
-        "run": "Lauf",
-        "session": "Sitzung",
-        "openAiRunMetadata": "Metadaten des KI-Laufs öffnen",
-        "tokenUsage": "Token-Nutzung",
         "downloadingOriginal": "Original wird heruntergeladen...",
         "retryDownloadOriginal": "Download des Originals wiederholen",
         "downloadOriginal": "Original herunterladen",
-        "segmentTokenCount_one": "{{label}}: {{formattedCount}} Token",
-        "segmentTokenCount_other": "{{label}}: {{formattedCount}} Token"
+        "replyDetails": "Antwortdetails"
       },
       "mindroomMessageExtras": {
         "messageExtras": "Nachrichtenzusätze"
@@ -2654,6 +2655,11 @@
       "mindroomThinkingPlaceholder": {
         "aiIsResponding": "KI antwortet",
         "thinking": "Denkt nach…"
+      },
+      "mindroomReasoning": {
+        "thinking": "Denkt nach",
+        "thoughtFor_one": "{{count}} s nachgedacht",
+        "thoughtFor_other": "{{count}} s nachgedacht"
       },
       "mindroomThreadSummaryCard": {
         "aiThreadSummary": "KI-Thread-Zusammenfassung"
@@ -2768,28 +2774,37 @@
         "retry": "Erneut versuchen",
         "delete": "Löschen"
       },
-      "aiRunDisplay": {
-        "inputTokens": "ein {{formattedCount}}",
-        "outputTokens": "aus {{formattedCount}}",
-        "totalTokens": "gesamt {{formattedCount}}",
-        "readTokens": "gelesen {{formattedCount}}",
-        "writeTokens": "geschrieben {{formattedCount}}",
-        "notReadTokens": "nicht gelesen {{formattedCount}}",
-        "contextUsage": "{{input}}/{{window}} ({{percentage}} %)",
-        "contextBarTitle_one": "{{label}}: {{formattedCount}} Token ({{percentage}} % des Fensters)",
-        "contextBarTitle_other": "{{label}}: {{formattedCount}} Token ({{percentage}} % des Fensters)",
-        "contextBarTitleWithSuffix_one": "{{label}}: {{formattedCount}} Token ({{percentage}} % des Fensters); {{suffix}}",
-        "contextBarTitleWithSuffix_other": "{{label}}: {{formattedCount}} Token ({{percentage}} % des Fensters); {{suffix}}",
-        "reportedCacheRead_one": "gemeldetes Cache-Lesen: {{formattedCount}} Token",
-        "reportedCacheRead_other": "gemeldetes Cache-Lesen: {{formattedCount}} Token",
-        "cacheWrite_one": "Cache-Schreiben: {{formattedCount}} Token",
-        "cacheWrite_other": "Cache-Schreiben: {{formattedCount}} Token",
-        "cacheRead": "Cache-Lesen",
-        "newInput": "Neue Eingabe",
-        "reserve": "Reserve"
-      },
       "mindroomModelBadge": {
         "model": "Modell: {{model}}"
+      },
+      "mindroomReplyDetails": {
+        "tokens": "Token",
+        "cost": "Kosten",
+        "conversationSoFar": "Unterhaltung bisher",
+        "failed": "Fehlgeschlagen",
+        "stopped": "Gestoppt",
+        "thisReply": "Diese Antwort",
+        "input": "Eingabe",
+        "fromCache": "Aus dem Cache",
+        "output": "Ausgabe",
+        "contextWindow": "Kontextfenster",
+        "contextWindowUsage": "{{input}} von {{window}} · {{percentage}}",
+        "timeToFirstToken": "Erstes Token",
+        "technicalDetails": "Technische Details",
+        "configuredModel": "Konfiguriertes Modell",
+        "runId": "Lauf-ID",
+        "sessionId": "Sitzungs-ID",
+        "newInput": "Neue Eingabe",
+        "replyCount_one": "{{count}} Antwort",
+        "replyCount_other": "{{count}} Antworten",
+        "loadedReplyCount_one": "{{count}} geladene Antwort",
+        "loadedReplyCount_other": "{{count}} geladene Antworten",
+        "atLeastCost": "≥ {{cost}}",
+        "costHistory": "Kosten jeder Antwort in dieser Unterhaltung",
+        "costHistoryBar": "Antwort {{index}}: {{cost}}",
+        "costHistoryPosition": "Diese Antwort · {{index}} von {{count}}",
+        "toolCallCount_one": "{{count}} Werkzeugaufruf",
+        "toolCallCount_other": "{{count}} Werkzeugaufrufe"
       }
     },
     "native": {
@@ -2803,6 +2818,11 @@
         "enable": "Aktivieren",
         "iosPushNotifications": "iOS-Push-Benachrichtigungen",
         "permissionDenied": "Die Berechtigung für Benachrichtigungen wurde verweigert. Aktiviere Benachrichtigungen für {{appName}} in den iOS-Einstellungen."
+      },
+      "cloudflareAccess": {
+        "signInRequired": "{{value1}} erfordert die Anmeldung deiner Organisation.",
+        "continue": "Weiter",
+        "signInFailed": "Die Anmeldung wurde nicht abgeschlossen. Versuche es erneut."
       }
     },
     "notifications": {
@@ -3078,6 +3098,21 @@
       "stopFailed": "{{tool}} konnte nicht gestoppt werden. Versuche es erneut.",
       "stopAllFailed": "Die Hintergrundaufgaben konnten nicht gestoppt werden. Versuche es erneut.",
       "inRoom": "Hintergrundaufgaben laufen"
+    },
+    "autoApprove": {
+      "label": "Automatische Genehmigung",
+      "labelOne": "Automatische Genehmigung: {{name}}",
+      "labelMany": "Automatische Genehmigung: {{name}} +{{count}}",
+      "title": "Automatische Genehmigung",
+      "intro": "In diesem Thread laufen Tool-Aufrufe, die diese Personen anfordern, ohne Freigabekarten.",
+      "you": "Du",
+      "until": "Bis {{time}}",
+      "ownUntil": "Bis {{time}}. Sende !auto_approve off, um sie zu beenden."
+    },
+    "notices": {
+      "dismiss": "Hinweis schließen",
+      "showMore": "Mehr anzeigen",
+      "showLess": "Weniger anzeigen"
     }
   },
   "roomSchedules": {

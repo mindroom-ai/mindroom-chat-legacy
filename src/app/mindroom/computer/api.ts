@@ -151,6 +151,9 @@ export class ComputerSessionClient {
 
   private currentStatus: ComputerStatus;
 
+  // Only control this client took counts, so a server cannot start or switch a viewer into control.
+  private controlTaken = false;
+
   constructor(apiUrl: string, session: ComputerSession, request: typeof fetch) {
     this.apiUrl = apiUrl;
     this.request = request;
@@ -158,12 +161,17 @@ export class ComputerSessionClient {
     this.currentStatus = {
       session_id: session.session_id,
       state: session.state,
-      mode: session.mode,
+      mode: 'view',
       expires_at: session.expires_at,
     };
   }
 
   get status(): ComputerStatus {
+    return this.currentStatus;
+  }
+
+  private accept(status: ComputerStatus): ComputerStatus {
+    this.currentStatus = this.controlTaken ? status : { ...status, mode: 'view' };
     return this.currentStatus;
   }
 
@@ -179,8 +187,7 @@ export class ComputerSessionClient {
       headers: bearerHeaders(this.sessionToken),
       signal,
     });
-    this.currentStatus = status;
-    return status;
+    return this.accept(status);
   }
 
   async createStream(signal?: AbortSignal): Promise<ComputerStreamConnection> {
@@ -211,8 +218,8 @@ export class ComputerSessionClient {
       body: JSON.stringify({ action }),
       signal,
     });
-    this.currentStatus = status;
-    return status;
+    this.controlTaken = action === 'take';
+    return this.accept(status);
   }
 
   dispose(signal?: AbortSignal): Promise<void> {

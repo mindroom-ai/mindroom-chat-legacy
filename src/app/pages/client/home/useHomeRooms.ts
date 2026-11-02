@@ -8,7 +8,7 @@ import { roomToParentsAtom } from '../../../state/room/roomToParents';
 import { allRoomsAtom } from '../../../state/room-list/roomList';
 import { useOrphanRooms, useRooms } from '../../../state/hooks/roomList';
 import { useSimpleMode } from '../../../mindroom/settings/useMindroomAccountSettings';
-import { isSpace } from '../../../utils/room';
+import { isMindroomEmojiRoom, isSpace } from '../../../utils/room';
 
 export const useHomeRooms = () => {
   const mx = useMatrixClient();
@@ -33,7 +33,8 @@ export const getHomeSearchRooms = (
     (roomId) =>
       !mDirects.has(roomId) &&
       (includeSpaceChildren || !roomToParents.has(roomId)) &&
-      !isSpace(mx.getRoom(roomId))
+      !isSpace(mx.getRoom(roomId)) &&
+      !isMindroomEmojiRoom(mx.getRoom(roomId))
   );
 
 export const mergeHomeSearchRoomSources = (sdkRoomIds: string[], allRoomIds: string[]): string[] =>

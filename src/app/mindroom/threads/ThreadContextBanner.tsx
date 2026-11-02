@@ -30,6 +30,7 @@ import { getThreadResolverDisplayName } from './threadResolutionAttribution';
 import * as css from './ThreadContextBanner.css';
 import { IconTooltip } from '../tooltip/IconTooltip';
 import { ThreadApprovalPermissions } from '../messages/ThreadApprovalControls';
+import { AutoApproveChip } from '../auto-approve/AutoApproveChip';
 import { useThreadPinning } from './useThreadPinning';
 import { useLiquidGlass } from '../../components/glass/liquid/useLiquidGlass';
 import { useSetting } from '../../state/hooks/settings';
@@ -299,9 +300,10 @@ export function ThreadContextBanner({
       >
         {collapsed ? (
           // Collapsed to back and Show details; the tint still says resolved, and
-          // an active permissions grant stays in view.
+          // auto-approval and an active permissions grant stay in view.
           <Box alignItems="Center" gap="100">
             {backButton}
+            <AutoApproveChip room={room} threadId={threadId} />
             <ThreadApprovalPermissions />
             <IconTooltip label={t('thread.showDetails')}>
               {(triggerRef) => (
@@ -330,8 +332,9 @@ export function ThreadContextBanner({
                     {t('thread.view')}
                   </Text>
                 )}
-                {/* Desktop: tags inline on title row */}
+                <AutoApproveChip room={room} threadId={threadId} />
                 <ThreadApprovalPermissions />
+                {/* Desktop: tags inline on title row */}
                 {/* More adds the first tag; + tag joins the ones already set. */}
                 {hasTags && (
                   <div className={classNames(css.TagsRow, css.DesktopOnlyTags, css.CompactHidden)}>

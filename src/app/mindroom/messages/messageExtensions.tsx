@@ -52,7 +52,11 @@ export function MindroomMessageExtensionShell({
   if (!state.aiRunInfo) return <>{children()}</>;
 
   return (
-    <MindroomAiRunControls info={state.aiRunInfo} forwardedRef={forwardedRef}>
+    <MindroomAiRunControls
+      info={state.aiRunInfo}
+      eventId={state.eventId}
+      forwardedRef={forwardedRef}
+    >
       {children}
     </MindroomAiRunControls>
   );

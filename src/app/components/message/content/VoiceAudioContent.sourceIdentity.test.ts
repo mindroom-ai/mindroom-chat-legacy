@@ -83,10 +83,6 @@ vi.mock('../../../hooks/useMatrixClient', () => ({
   useMatrixClient: () => ({}),
 }));
 
-vi.mock('../../../hooks/useMediaAuthentication', () => ({
-  useMediaAuthentication: () => false,
-}));
-
 vi.mock('../../../hooks/media', () => ({
   useMediaLoading: () => ({ loading: false }),
   useMediaPlay: () => ({ playing: mocks.playing, setPlaying: mocks.setPlaying }),

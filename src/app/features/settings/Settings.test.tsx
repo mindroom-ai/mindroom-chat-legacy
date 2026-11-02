@@ -67,7 +67,11 @@ vi.mock('../../components/LogoutDialog', () => ({ LogoutDialog: () => null }));
 vi.mock('../../hooks/useUserProfile', () => ({ useUserProfile: () => ({}) }));
 vi.mock('../../hooks/useMediaAuthentication', () => ({ useMediaAuthentication: () => false }));
 vi.mock('../../hooks/useMatrixClient', () => ({
-  useMatrixClient: () => ({ getUserId: () => '@alice:mindroom.chat' }),
+  useMatrixClient: () => ({
+    getUserId: () => '@alice:mindroom.chat',
+    getHomeserverUrl: () => 'https://mindroom.chat',
+    getAccessToken: () => 'token',
+  }),
 }));
 vi.mock('../../hooks/useClientConfig', () => ({ useClientConfig: () => ({ sidebar: {} }) }));
 vi.mock('../../hooks/useScreenSize', async () => ({

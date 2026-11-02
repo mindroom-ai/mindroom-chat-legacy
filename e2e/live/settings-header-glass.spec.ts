@@ -109,7 +109,6 @@ for (const themeId of ['dark-theme', 'silver-theme']) {
         'Notifications',
         'Devices',
         'Emojis & Stickers',
-        'Local MindRoom',
         'Developer Tools',
         'About',
       ]) {

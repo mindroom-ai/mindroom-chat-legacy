@@ -35,3 +35,6 @@ ios/App/fastlane/screenshots/**/*.png
 ios/App/fastlane/screenshots/**/*.jpg
 ios/App/fastlane/screenshots/**/*.jpeg
 ios/App/fastlane/metadata/*/release_notes.txt
+
+# Mac Catalyst build output (scripts/build-macos-app.sh)
+/build/

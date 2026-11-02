@@ -16,3 +16,13 @@ describe('index.html translation opt-out', () => {
     );
   });
 });
+
+// Chromium fetches the web app manifest without cookies unless crossorigin="use-credentials" is set.
+// Behind a reverse proxy that authenticates by cookie, the manifest request would get the sign-in redirect.
+describe('index.html web app manifest', () => {
+  it('fetches the manifest with credentials', () => {
+    expect(indexHtml).toMatch(
+      /<link\b(?=[^>]*\brel="manifest")(?=[^>]*\bcrossorigin="use-credentials")[^>]*>/
+    );
+  });
+});

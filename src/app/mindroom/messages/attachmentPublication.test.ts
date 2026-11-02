@@ -3,6 +3,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { createClient, EventStatus, MatrixEvent, Room } from 'matrix-js-sdk';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
+  createLegacyMediaClient,
   saveAttachmentOwner,
   persistAttachmentEvents,
 } from '../threads/__tests__/attachmentFixtures';
@@ -50,7 +51,7 @@ afterEach(() => {
 it.each(['room-clear', 'logout', 'unowned-logout'] as const)(
   'fences parsed-memory publication after %s',
   async (kind) => {
-    const mx = createClient({ baseUrl, userId });
+    const mx = createLegacyMediaClient({ baseUrl, userId });
     let finish!: (value: Response) => void;
     vi.stubGlobal(
       'fetch',
@@ -63,8 +64,7 @@ it.each(['room-clear', 'logout', 'unowned-logout'] as const)(
     );
     const pending = hydrateCachedMindroomLongText(
       mx,
-      kind === 'unowned-logout' ? { ...source, owner: undefined } : source,
-      false
+      kind === 'unowned-logout' ? { ...source, owner: undefined } : source
     );
     await vi.waitFor(() => expect(finish).toBeDefined());
     if (kind === 'room-clear') await clearRoomCachedContent(sessionId, roomId);
@@ -76,7 +76,7 @@ it.each(['room-clear', 'logout', 'unowned-logout'] as const)(
   }
 );
 it('does not store or read attachment reference rows for ordinary text batches', async () => {
-  const mx = createClient({ baseUrl, userId });
+  const mx = createLegacyMediaClient({ baseUrl, userId });
   let rowsRead = 0;
   let roomReads = 0;
   let referenceReads = 0;
@@ -107,18 +107,18 @@ it('does not store or read attachment reference rows for ordinary text batches',
         content: { msgtype: 'm.text', body: 'ordinary text' },
       })
   );
-  await prefetchEventAttachments(mx, events, false);
+  await prefetchEventAttachments(mx, events);
 
   expect(roomReads).toBe(0);
   expect(rowsRead).toBe(0);
-  await prefetchEventAttachments(mx, events, false);
+  await prefetchEventAttachments(mx, events);
   expect(roomReads).toBe(0);
   expect(rowsRead).toBe(0);
   expect(referenceReads).toBe(0);
 });
 
 it('accepts the server revision after hydrating a pending SDK edit with a later local timestamp', async () => {
-  const mx = createClient({ baseUrl, userId });
+  const mx = createLegacyMediaClient({ baseUrl, userId });
   const room = new Room(roomId, mx, userId);
   mx.store.storeRoom(room);
   const root = new MatrixEvent({
@@ -157,14 +157,10 @@ it('accepts the server revision after hydrating a pending SDK edit with a later 
     )
   );
   const hydrateRoot = () =>
-    hydrateCachedMindroomLongText(
-      mx,
-      {
-        ...getMindroomLongTextSource(root.getContent())!,
-        owner: getEventAttachmentOwner(root),
-      },
-      false
-    );
+    hydrateCachedMindroomLongText(mx, {
+      ...getMindroomLongTextSource(root.getContent())!,
+      owner: getEventAttachmentOwner(root),
+    });
   expect(await hydrateRoot()).toMatchObject({ body: 'complete edited body' });
   room.updatePendingEvent(edit, EventStatus.SENT, '$server-edit');
   room.handleRemoteEcho(
@@ -177,7 +173,7 @@ it('accepts the server revision after hydrating a pending SDK edit with a later 
     edit
   );
   await persistAttachmentEvents(mx, [root]);
-  await prefetchEventAttachments(mx, [root], false);
+  await prefetchEventAttachments(mx, [root]);
   expect(await hydrateRoot()).toMatchObject({ body: 'complete edited body' });
   expect((await getCachedAttachmentMetadata(sessionId, source.mxcUri))?.references).toEqual([
     expect.objectContaining({
@@ -190,7 +186,7 @@ it('accepts the server revision after hydrating a pending SDK edit with a later 
 });
 
 it('preserves saved ownership when a standalone SDK edit fails decryption, then accepts its retry', async () => {
-  const mx = createClient({ baseUrl, userId });
+  const mx = createLegacyMediaClient({ baseUrl, userId });
   const content = {
     msgtype: 'm.text',
     body: 'preview',
@@ -210,7 +206,7 @@ it('preserves saved ownership when a standalone SDK edit fails decryption, then 
     vi.fn(async () => new Response(JSON.stringify({ msgtype: 'm.text', body: 'saved body' })))
   );
   await persistAttachmentEvents(mx, [root]);
-  await prefetchEventAttachments(mx, [root], false);
+  await prefetchEventAttachments(mx, [root]);
   const relation = { rel_type: 'm.replace', event_id: '$body' };
   const edit = new MatrixEvent({
     event_id: '$encrypted-edit',
@@ -229,7 +225,7 @@ it('preserves saved ownership when a standalone SDK edit fails decryption, then 
   expect(edit.getType()).toBe('m.room.message');
   root.makeReplaced(edit);
   await persistAttachmentEvents(mx, [root, edit]);
-  await prefetchEventAttachments(mx, [root, edit], false);
+  await prefetchEventAttachments(mx, [root, edit]);
   expect(await loadCachedAttachment(sessionId, source.mxcUri)).toBeDefined();
   expect((await getCachedAttachmentMetadata(sessionId, source.mxcUri))?.references).toEqual([
     expect.objectContaining({ eventId: '$body', revisionTs: 1, revisionId: '', status: 'cached' }),
@@ -243,7 +239,7 @@ it('preserves saved ownership when a standalone SDK edit fails decryption, then 
     }),
   } as never);
   await persistAttachmentEvents(mx, [root, edit]);
-  await prefetchEventAttachments(mx, [root, edit], false);
+  await prefetchEventAttachments(mx, [root, edit]);
   expect(await readRoomAttachmentStorage(sessionId, roomId)).toMatchObject({
     saved: 1,
     missing: 0,
@@ -341,7 +337,7 @@ it('keeps validated essential coverage when storage pressure denies a repeated p
   const { __setCacheStoreByteBudgetForTests, runCacheEvictionIfOverBudget } = await import(
     '../threads/cacheStore'
   );
-  const mx = createClient({ baseUrl, userId });
+  const mx = createLegacyMediaClient({ baseUrl, userId });
   const body = new MatrixEvent({
     room_id: roomId,
     event_id: '$body',
@@ -360,14 +356,14 @@ it('keeps validated essential coverage when storage pressure denies a repeated p
   );
   vi.stubGlobal('fetch', fetch);
   await persistAttachmentEvents(mx, [body]);
-  await prefetchEventAttachments(mx, [body], false);
+  await prefetchEventAttachments(mx, [body]);
   expect(await readRoomAttachmentStorage(sessionId, roomId)).toMatchObject({
     saved: 1,
     missing: 0,
   });
   __setCacheStoreByteBudgetForTests(1);
   try {
-    await prefetchEventAttachments(mx, [body], false, {
+    await prefetchEventAttachments(mx, [body], {
       canDownload: async () => !(await runCacheEvictionIfOverBudget(sessionId)).underPressure,
     });
     expect(await readRoomAttachmentStorage(sessionId, roomId)).toMatchObject({
@@ -376,7 +372,7 @@ it('keeps validated essential coverage when storage pressure denies a repeated p
     });
     expect(fetch).toHaveBeenCalledTimes(1);
     clearMindroomLongTextHydrationCache();
-    expect(await hydrateCachedMindroomLongText(mx, source, false)).toMatchObject({
+    expect(await hydrateCachedMindroomLongText(mx, source)).toMatchObject({
       body: 'validated body',
     });
     expect(fetch).toHaveBeenCalledTimes(1);

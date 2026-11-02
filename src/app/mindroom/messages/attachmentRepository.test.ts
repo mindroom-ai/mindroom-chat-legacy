@@ -3,7 +3,11 @@ import { encryptAttachment } from 'browser-encrypt-attachment';
 import { IDBFactory } from 'fake-indexeddb';
 import { createClient, type MatrixClient } from 'matrix-js-sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { saveAttachmentOwner } from '../threads/__tests__/attachmentFixtures';
+import {
+  createLegacyMediaClient,
+  saveAttachmentOwner,
+} from '../threads/__tests__/attachmentFixtures';
+import { writeCachedSpecVersions } from '../../state/cachedSpecVersions';
 import { createSessionId } from '../../state/sessions';
 import type { IEncryptedFile } from '../../../types/matrix/common';
 import {
@@ -23,6 +27,7 @@ import {
   clearAttachmentRepositoryMemory,
   downloadCachedAttachment,
   getCachedAttachmentCacheMetadata,
+  hydrateCachedMindroomLongText,
   type CachedAttachmentSource,
 } from './attachmentRepository';
 
@@ -43,7 +48,7 @@ const SOURCE: MindroomLongTextSource = {
 };
 
 const createAccountClient = (userId: string): MatrixClient =>
-  createClient({ baseUrl: BASE_URL, userId });
+  createLegacyMediaClient({ baseUrl: BASE_URL, userId });
 
 const admitSource = async <T extends CachedAttachmentSource>(
   mx: MatrixClient,
@@ -66,7 +71,7 @@ const admitSource = async <T extends CachedAttachmentSource>(
 const hydrate = (mx: MatrixClient) =>
   hydrateMindroomLongTextSource(
     SOURCE,
-    (source) => downloadMindroomLongTextSidecarText(mx, source, false),
+    (source) => downloadMindroomLongTextSidecarText(mx, source),
     mx
   );
 
@@ -195,7 +200,6 @@ describe('persistent attachment repository', () => {
         encryptedFile,
         mimeType: 'text/plain',
       },
-      false,
       { essential: true, roomId: '!room:matrix.example.org' }
     );
 
@@ -217,8 +221,8 @@ describe('persistent attachment repository', () => {
     const alice = createAccountClient('@alice:matrix.example.org');
     const source = { mxcUri: 'mxc://matrix.example.org/retry', mimeType: 'text/plain' };
 
-    await expect(downloadCachedAttachment(alice, source, false)).rejects.toThrow('network offline');
-    await expect((await downloadCachedAttachment(alice, source, false)).text()).resolves.toBe(
+    await expect(downloadCachedAttachment(alice, source)).rejects.toThrow('network offline');
+    await expect((await downloadCachedAttachment(alice, source)).text()).resolves.toBe(
       'available again'
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -254,13 +258,12 @@ describe('persistent attachment repository', () => {
         ...source,
         owner: { roomId: '!essential:matrix.example.org', eventId: '$essential', revisionTs: 1 },
       },
-      false,
       {
         essential: true,
         roomId: '!essential:matrix.example.org',
       }
     );
-    const ordinary = downloadCachedAttachment(alice, ordinarySource, false, {
+    const ordinary = downloadCachedAttachment(alice, ordinarySource, {
       roomId: '!ordinary:matrix.example.org',
     });
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -281,13 +284,17 @@ describe('persistent attachment repository', () => {
     );
   });
 
-  it('keeps authenticated transport separate from a pending unauthenticated download', async () => {
-    let finishUnauthenticated!: (response: Response) => void;
-    const fetchMock = vi.fn((url: string, init: RequestInit) => {
-      if (init.headers) return Promise.resolve(new Response('authenticated body'));
-      return new Promise<Response>((resolve) => {
-        finishUnauthenticated = resolve;
-      });
+  it('hydrates a long text from authenticated media without a service worker', async () => {
+    // Homeservers that enforce authenticated media answer the legacy endpoint with 403.
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      if (String(url).includes('/_matrix/client/versions')) {
+        return Response.json({ versions: ['v1.11'] });
+      }
+      if (!String(url).includes('/_matrix/client/v1/media/download/')) {
+        return new Response('Unauthenticated media is disabled.', { status: 403 });
+      }
+      expect(init?.headers).toEqual({ Authorization: 'Bearer test-token' });
+      return Response.json({ body: 'Complete response from the sidecar', msgtype: 'm.text' });
     });
     vi.stubGlobal('fetch', fetchMock);
     const alice = createClient({
@@ -295,22 +302,58 @@ describe('persistent attachment repository', () => {
       userId: '@alice:matrix.example.org',
       accessToken: 'test-token',
     });
-    const source = { mxcUri: 'mxc://matrix.example.org/auth-transition' };
-    const previous = downloadCachedAttachment(alice, source, false).catch((error) => error);
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    const current = downloadCachedAttachment(alice, source, true);
-    try {
-      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-      expect(fetchMock.mock.calls[0][0]).toContain('/_matrix/media/v3/download/');
-      expect(fetchMock.mock.calls[0][1].headers).toBeUndefined();
-      expect(fetchMock.mock.calls[1][0]).toContain('/_matrix/client/v1/media/download/');
-      expect(fetchMock.mock.calls[1][1].headers).toEqual({ Authorization: 'Bearer test-token' });
-    } finally {
-      finishUnauthenticated(new Response('unauthorized', { status: 401 }));
-      await Promise.allSettled([previous, current]);
-    }
-    expect(await previous).toBeInstanceOf(Error);
-    await expect((await current).text()).resolves.toBe('authenticated body');
+
+    const content = await hydrateCachedMindroomLongText(alice, SOURCE);
+
+    expect(content.body).toBe('Complete response from the sidecar');
+  });
+
+  it('downloads from the legacy endpoint without the access token when authenticated media is unsupported', async () => {
+    const fetchMock = vi.fn(
+      async (_url: string | URL, _init?: RequestInit) => new Response('bytes')
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const alice = createLegacyMediaClient({
+      baseUrl: BASE_URL,
+      userId: '@alice:matrix.example.org',
+      accessToken: 'test-token',
+    });
+
+    await downloadCachedAttachment(alice, { mxcUri: 'mxc://matrix.example.org/legacy' });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain('/_matrix/media/v3/download/');
+    expect(init?.headers).toBeUndefined();
+  });
+
+  it('uses the cached server versions when /versions fails', async () => {
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      if (String(url).includes('/_matrix/client/versions')) {
+        return new Response('Bad gateway', { status: 502 });
+      }
+      if (!String(url).includes('/_matrix/client/v1/media/download/')) {
+        return new Response('Unauthenticated media is disabled.', { status: 403 });
+      }
+      expect(init?.headers).toEqual({ Authorization: 'Bearer test-token' });
+      return Response.json({ body: 'Complete response from the sidecar', msgtype: 'm.text' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const stored = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => stored.set(key, value),
+      removeItem: (key: string) => stored.delete(key),
+    });
+    writeCachedSpecVersions(BASE_URL, '@alice:matrix.example.org', { versions: ['v1.11'] });
+    const alice = createClient({
+      baseUrl: BASE_URL,
+      userId: '@alice:matrix.example.org',
+      accessToken: 'test-token',
+    });
+
+    const content = await hydrateCachedMindroomLongText(alice, SOURCE);
+
+    expect(content.body).toBe('Complete response from the sidecar');
   });
 
   it('aborts active transport on memory cleanup and allows a shared fresh download', async () => {
@@ -327,7 +370,7 @@ describe('persistent attachment repository', () => {
     vi.stubGlobal('fetch', fetchMock);
     const alice = createAccountClient('@alice:matrix.example.org');
     const source = { mxcUri: 'mxc://matrix.example.org/cleanup' };
-    const pending = downloadCachedAttachment(alice, source, false).catch((error) => error);
+    const pending = downloadCachedAttachment(alice, source).catch((error) => error);
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     clearAttachmentRepositoryMemory();
     try {
@@ -339,8 +382,8 @@ describe('persistent attachment repository', () => {
     expect(await pending).toMatchObject({ name: 'AbortError' });
     expect(await getCachedAttachmentCacheMetadata(alice, source.mxcUri)).toBeUndefined();
     const fresh = Promise.all([
-      downloadCachedAttachment(alice, source, false),
-      downloadCachedAttachment(alice, source, false),
+      downloadCachedAttachment(alice, source),
+      downloadCachedAttachment(alice, source),
     ]);
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     finish(new Response('fresh body'));
@@ -359,7 +402,7 @@ describe('persistent attachment repository', () => {
     };
 
     const blobs = await Promise.all(
-      Array.from({ length: 10 }, () => downloadCachedAttachment(alice, source, false))
+      Array.from({ length: 10 }, () => downloadCachedAttachment(alice, source))
     );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -378,14 +421,18 @@ describe('persistent attachment repository', () => {
       mimeType: 'text/plain',
     });
 
-    await downloadCachedAttachment(alice, source, false);
+    await downloadCachedAttachment(alice, source);
     expect((await getCachedAttachmentCacheMetadata(alice, source.mxcUri))?.essential).toBe(false);
 
     await admitSource(alice, source, true);
-    await downloadCachedAttachment(alice, { ...source, owner: SOURCE.owner }, false, {
-      essential: true,
-      roomId: '!room:matrix.example.org',
-    });
+    await downloadCachedAttachment(
+      alice,
+      { ...source, owner: SOURCE.owner },
+      {
+        essential: true,
+        roomId: '!room:matrix.example.org',
+      }
+    );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const promoted = await getCachedAttachmentCacheMetadata(alice, source.mxcUri);
@@ -403,7 +450,7 @@ describe('persistent attachment repository', () => {
     const alice = createAccountClient('@alice:matrix.example.org');
     const mxcUri = 'mxc://matrix.example.org/ordinary-sidecar';
 
-    await downloadMindroomSidecarBlob(alice, { mxcUri }, false);
+    await downloadMindroomSidecarBlob(alice, { mxcUri });
 
     expect(await getCachedAttachmentCacheMetadata(alice, mxcUri)).toBeUndefined();
   });
@@ -418,9 +465,7 @@ describe('persistent attachment repository', () => {
     const alice = createAccountClient('@alice:matrix.example.org');
     const source = { mxcUri: 'mxc://matrix.example.org/no-storage', mimeType: 'text/plain' };
 
-    expect(await (await downloadCachedAttachment(alice, source, false)).text()).toBe(
-      'interactive body'
-    );
+    expect(await (await downloadCachedAttachment(alice, source)).text()).toBe('interactive body');
     expect(await getCachedAttachmentCacheMetadata(alice, source.mxcUri)).toBeUndefined();
   });
 
@@ -437,7 +482,7 @@ describe('persistent attachment repository', () => {
     const source = { mxcUri: 'mxc://matrix.example.org/late', mimeType: 'text/plain' };
     const sessionId = createSessionId(BASE_URL, '@alice:matrix.example.org');
 
-    const pending = downloadCachedAttachment(alice, source, false, { essential: true });
+    const pending = downloadCachedAttachment(alice, source, { essential: true });
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     await deleteCacheStoreDb(sessionId);
     resolveFetch?.(new Response('late body', { status: 200 }));
@@ -460,7 +505,7 @@ describe('persistent attachment repository', () => {
     const alice = createAccountClient('@alice:matrix.example.org');
     const source = { mxcUri: 'mxc://matrix.example.org/aborted', mimeType: 'text/plain' };
     const controller = new AbortController();
-    const pending = downloadCachedAttachment(alice, source, false, {
+    const pending = downloadCachedAttachment(alice, source, {
       essential: true,
       signal: controller.signal,
     });
@@ -490,12 +535,12 @@ describe('persistent attachment repository', () => {
       mimeType: 'text/plain',
     });
     const controller = new AbortController();
-    const canceled = downloadCachedAttachment(alice, source, false, {
+    const canceled = downloadCachedAttachment(alice, source, {
       essential: true,
       roomId: '!canceled:matrix.example.org',
       signal: controller.signal,
     });
-    const remaining = downloadCachedAttachment(alice, source, false, {
+    const remaining = downloadCachedAttachment(alice, source, {
       roomId: '!remaining:matrix.example.org',
     });
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -540,7 +585,7 @@ describe('persistent attachment repository', () => {
     );
 
     await expect(
-      downloadCachedAttachment(alice, source, false, { signal: controller.signal })
+      downloadCachedAttachment(alice, source, { signal: controller.signal })
     ).rejects.toMatchObject({ name: 'AbortError' });
     expect(await getCachedAttachmentCacheMetadata(alice, source.mxcUri)).toBeUndefined();
   });
@@ -555,12 +600,12 @@ describe('persistent attachment repository', () => {
       mxcUri: 'mxc://matrix.example.org/abort-cached',
       mimeType: 'text/plain',
     });
-    await downloadCachedAttachment(alice, source, false);
+    await downloadCachedAttachment(alice, source);
     const controller = new AbortController();
     controller.abort();
 
     await expect(
-      downloadCachedAttachment(alice, source, false, { signal: controller.signal })
+      downloadCachedAttachment(alice, source, { signal: controller.signal })
     ).rejects.toMatchObject({ name: 'AbortError' });
   });
 
@@ -579,7 +624,7 @@ describe('persistent attachment repository', () => {
     controller.abort();
 
     await expect(
-      downloadCachedAttachment(alice, source, false, { signal: controller.signal })
+      downloadCachedAttachment(alice, source, { signal: controller.signal })
     ).rejects.toMatchObject({ name: 'AbortError' });
     expect(fetchMock).not.toHaveBeenCalled();
     await expect(lookup.waitUntilStarted(30)).rejects.toThrow();
@@ -597,7 +642,7 @@ describe('persistent attachment repository', () => {
     await openCacheStore(sessionId);
     const lookup = pauseAttachmentLookup(source.mxcUri);
     const controller = new AbortController();
-    const pending = downloadCachedAttachment(alice, source, false, {
+    const pending = downloadCachedAttachment(alice, source, {
       signal: controller.signal,
     });
     await lookup.waitUntilStarted();
@@ -624,11 +669,11 @@ describe('persistent attachment repository', () => {
     await openCacheStore(sessionId);
     const lookup = pauseAttachmentLookup(source.mxcUri);
     const controller = new AbortController();
-    const canceled = downloadCachedAttachment(alice, source, false, {
+    const canceled = downloadCachedAttachment(alice, source, {
       signal: controller.signal,
     });
     await lookup.waitUntilStarted();
-    const remaining = downloadCachedAttachment(alice, source, false);
+    const remaining = downloadCachedAttachment(alice, source);
 
     controller.abort();
     await expect(canceled).rejects.toMatchObject({ name: 'AbortError' });
@@ -671,7 +716,6 @@ describe('bounded attachment transport', () => {
       downloadCachedAttachment(
         createAccountClient('@alice:matrix.example.org'),
         { mxcUri: 'mxc://test/bounded' },
-        false,
         { maxBytes: 2048 }
       )
     ).rejects.toThrow('limit');
@@ -685,8 +729,8 @@ describe('bounded attachment transport', () => {
     const mx = createAccountClient('@alice:matrix.example.org');
     const source = { mxcUri: 'mxc://test/shared-limit' };
     const [automatic, explicit] = await Promise.allSettled([
-      downloadCachedAttachment(mx, source, false, { maxBytes: 2048 }),
-      downloadCachedAttachment(mx, source, false),
+      downloadCachedAttachment(mx, source, { maxBytes: 2048 }),
+      downloadCachedAttachment(mx, source),
     ]);
     expect(automatic.status).toBe('rejected');
     expect(explicit.status === 'fulfilled' && explicit.value.size).toBe(4096);
@@ -714,8 +758,8 @@ it('cancels shared HTTP transport when its last consumer leaves', async () => {
   const second = new AbortController();
   const mx = createAccountClient('@alice:matrix.example.org');
   const source = { mxcUri: 'mxc://test/all-canceled' };
-  const one = downloadCachedAttachment(mx, source, false, { signal: first.signal });
-  const two = downloadCachedAttachment(mx, source, false, { signal: second.signal });
+  const one = downloadCachedAttachment(mx, source, { signal: first.signal });
+  const two = downloadCachedAttachment(mx, source, { signal: second.signal });
   await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
   first.abort();
   await expect(one).rejects.toMatchObject({ name: 'AbortError' });
@@ -747,8 +791,8 @@ it('validates a second admitted warm-memory owner and keeps its body after clear
   const second = { ...SOURCE, owner: { roomId: 'room-b', eventId: '$b', revisionTs: 1 } };
   await admitSource(mx, first, true);
   await admitSource(mx, second, true);
-  await repository.hydrateCachedMindroomLongText(mx, first, false);
-  await repository.hydrateCachedMindroomLongText(mx, second, false);
+  await repository.hydrateCachedMindroomLongText(mx, first);
+  await repository.hydrateCachedMindroomLongText(mx, second);
   expect(await readRoomAttachmentStorage(session, 'room-b')).toMatchObject({
     saved: 1,
     missingEssential: 0,
@@ -757,7 +801,7 @@ it('validates a second admitted warm-memory owner and keeps its body after clear
   clearAttachmentRepositoryMemory();
   clearMindroomLongTextHydrationCache();
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
-  expect(await repository.hydrateCachedMindroomLongText(mx, second, false)).toMatchObject({
+  expect(await repository.hydrateCachedMindroomLongText(mx, second)).toMatchObject({
     body: 'shared complete body',
   });
   vi.unstubAllGlobals();
@@ -784,7 +828,7 @@ it('does not resurrect a retired interactive long-text body after delayed transp
     { ...SOURCE, owner: { roomId: 'room-a', eventId: '$stream', revisionTs: 1 } },
     true
   );
-  const pending = downloadMindroomLongTextSidecarText(mx, initial, false);
+  const pending = downloadMindroomLongTextSidecarText(mx, initial);
   await vi.waitFor(() => expect(finish).toBeDefined());
   await saveAttachmentOwner(session, 'room-a', '$stream', 2, []);
   finish(new Response(JSON.stringify({ msgtype: 'm.text', body: 'obsolete' })));
@@ -824,17 +868,15 @@ it('persists for a surviving shared hydration owner after the first room is clea
     { ...SOURCE, owner: { roomId: 'room-b', eventId: '$b', revisionTs: 1 } },
     true
   );
-  const first = hydrateCachedMindroomLongText(
-    mx,
-    { ...SOURCE, owner: { roomId: 'room-a', eventId: '$a', revisionTs: 1 } },
-    false
-  );
+  const first = hydrateCachedMindroomLongText(mx, {
+    ...SOURCE,
+    owner: { roomId: 'room-a', eventId: '$a', revisionTs: 1 },
+  });
   await vi.waitFor(() => expect(finish).toBeDefined());
-  const second = hydrateCachedMindroomLongText(
-    mx,
-    { ...SOURCE, owner: { roomId: 'room-b', eventId: '$b', revisionTs: 1 } },
-    false
-  );
+  const second = hydrateCachedMindroomLongText(mx, {
+    ...SOURCE,
+    owner: { roomId: 'room-b', eventId: '$b', revisionTs: 1 },
+  });
   await vi.waitFor(async () =>
     expect(await readRoomAttachmentStorage(session, 'room-b')).toMatchObject({
       missingEssential: 1,
@@ -866,8 +908,8 @@ it('renders unadmitted media and thumbnails without creating ownership', async (
   );
   const owner = { roomId: 'room-a', eventId: '$image', revisionTs: 1 };
   await Promise.all([
-    downloadCachedAttachment(mx, { owner, mxcUri: 'mxc://test/image' }, false),
-    downloadCachedAttachment(mx, { owner, mxcUri: 'mxc://test/thumb' }, false),
+    downloadCachedAttachment(mx, { owner, mxcUri: 'mxc://test/image' }),
+    downloadCachedAttachment(mx, { owner, mxcUri: 'mxc://test/thumb' }),
   ]);
   expect(await readRoomAttachmentStorage(session, 'room-a')).toMatchObject({
     saved: 0,
@@ -889,7 +931,7 @@ it('keeps an original sidecar file incomplete until body validation even without
   );
   const source = { ...SOURCE, owner: { roomId: 'room-a', eventId: '$body', revisionTs: 1 } };
   await admitSource(mx, source, true);
-  expect(await (await downloadMindroomLongTextSidecarBlob(mx, source, false, true)).text()).toBe(
+  expect(await (await downloadMindroomLongTextSidecarBlob(mx, source, true)).text()).toBe(
     'invalid json'
   );
   expect(await readRoomAttachmentStorage(session, 'room-a')).toMatchObject({
@@ -909,7 +951,7 @@ it('ownerless essential hydration renders without protected persistent bytes', a
   );
   const mx = createAccountClient('@unowned:test');
   const source = { ...SOURCE, owner: undefined, mxcUri: 'mxc://matrix.example.org/unowned' };
-  expect((await hydrateCachedMindroomLongText(mx, source, false)).body).toBe('unowned full body');
+  expect((await hydrateCachedMindroomLongText(mx, source)).body).toBe('unowned full body');
   expect(
     await loadCachedAttachment(
       createSessionId(mx.getHomeserverUrl(), mx.getSafeUserId()),
@@ -932,7 +974,7 @@ it('validated owned cache hits do not rewrite attachment payloads', async () => 
     owner: { roomId: '!hit:test', eventId: '$hit', revisionTs: 1, revisionId: '' },
   };
   await admitSource(mx, source, true);
-  await hydrateCachedMindroomLongText(mx, source, false);
+  await hydrateCachedMindroomLongText(mx, source);
   clearMindroomLongTextHydrationCache();
   const writes: string[] = [];
   const original = IDBObjectStore.prototype.put;
@@ -943,7 +985,7 @@ it('validated owned cache hits do not rewrite attachment payloads', async () => 
       return original.call(this, value, key);
     });
   try {
-    expect((await hydrateCachedMindroomLongText(mx, source, false)).body).toBe('owned body');
+    expect((await hydrateCachedMindroomLongText(mx, source)).body).toBe('owned body');
     expect(writes.filter((name) => name === 'attachments')).toHaveLength(0);
   } finally {
     spy.mockRestore();

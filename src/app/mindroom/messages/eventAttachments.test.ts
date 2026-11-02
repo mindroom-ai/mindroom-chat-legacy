@@ -1,9 +1,12 @@
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { encryptAttachment } from 'browser-encrypt-attachment';
-import { createClient, MatrixEvent } from 'matrix-js-sdk';
+import { MatrixEvent } from 'matrix-js-sdk';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { persistAttachmentEvents } from '../threads/__tests__/attachmentFixtures';
+import {
+  createLegacyMediaClient,
+  persistAttachmentEvents,
+} from '../threads/__tests__/attachmentFixtures';
 import { createSessionId } from '../../state/sessions';
 import {
   readRoomAttachmentStorage,
@@ -25,7 +28,10 @@ const saveAndReadCoverage = async (...args: Parameters<typeof prefetchEventAttac
   );
 };
 
-const mx = createClient({ baseUrl: 'https://matrix.example.org', userId: '@alice:example.org' });
+const mx = createLegacyMediaClient({
+  baseUrl: 'https://matrix.example.org',
+  userId: '@alice:example.org',
+});
 const sessionId = createSessionId(mx.getHomeserverUrl(), mx.getSafeUserId());
 const event = (eventId: string, content: Record<string, unknown>, ts = 1) =>
   new MatrixEvent({
@@ -97,32 +103,28 @@ it('counts missing essentials before failed fetch and retires old revisions on r
     url: 'mxc://test/body',
     'io.mindroom.long_text': { version: 2, encoding: 'matrix_event_content_json' },
   };
-  expect(await saveAndReadCoverage(mx, [event('$body', body)], false)).toMatchObject({
+  expect(await saveAndReadCoverage(mx, [event('$body', body)])).toMatchObject({
     saved: 0,
     missing: 1,
   });
   expect(await readRoomAttachmentStorage(sessionId, '!room')).toMatchObject({
     missingEssential: 1,
   });
-  await saveAndReadCoverage(
-    mx,
-    [
-      event('$body', body),
-      event(
-        '$edit',
-        {
-          'm.relates_to': { rel_type: 'm.replace', event_id: '$body' },
-          'm.new_content': { msgtype: 'm.text', body: 'short' },
-        },
-        2
-      ),
-    ],
-    false
-  );
+  await saveAndReadCoverage(mx, [
+    event('$body', body),
+    event(
+      '$edit',
+      {
+        'm.relates_to': { rel_type: 'm.replace', event_id: '$body' },
+        'm.new_content': { msgtype: 'm.text', body: 'short' },
+      },
+      2
+    ),
+  ]);
   expect(await readRoomAttachmentStorage(sessionId, '!room')).toMatchObject({
     missingEssential: 0,
   });
-  await saveAndReadCoverage(mx, [event('$body', body)], false);
+  await saveAndReadCoverage(mx, [event('$body', body)]);
   expect(await readRoomAttachmentStorage(sessionId, '!room')).toMatchObject({
     missingEssential: 0,
   });
@@ -135,9 +137,9 @@ it('skips unknown and large optional media unless explicitly included', async ()
     event('$unknown', { msgtype: 'm.image', url: 'mxc://test/unknown' }),
     event('$file', { msgtype: 'm.file', url: 'mxc://test/file', info: { size: 6 * 1024 * 1024 } }),
   ];
-  expect(await saveAndReadCoverage(mx, events, false)).toMatchObject({ saved: 0, missing: 2 });
+  expect(await saveAndReadCoverage(mx, events)).toMatchObject({ saved: 0, missing: 2 });
   expect(fetchMock).not.toHaveBeenCalled();
-  expect(await saveAndReadCoverage(mx, events, false, { includeAllMedia: true })).toMatchObject({
+  expect(await saveAndReadCoverage(mx, events, { includeAllMedia: true })).toMatchObject({
     saved: 2,
     missing: 0,
   });
@@ -172,7 +174,7 @@ it.each([
       vi.fn(async () => new Response(encrypted.data))
     );
     const events = reverse ? [invalid, valid] : [valid, invalid];
-    await saveAndReadCoverage(mx, events, false);
+    await saveAndReadCoverage(mx, events);
     expect((await getCachedAttachmentMetadata(sessionId, mxcUri))?.references).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ eventId: '$valid', status: 'cached' }),
@@ -183,7 +185,7 @@ it.each([
       missingEssential: 1,
     });
     // Retrying the unreadable owner cannot downgrade its independently validated sibling.
-    await saveAndReadCoverage(mx, events, false);
+    await saveAndReadCoverage(mx, events);
     expect(await readRoomAttachmentStorage(sessionId, invalid.getRoomId()!)).toMatchObject({
       saved: 0,
       missing: 1,
@@ -204,17 +206,20 @@ it('downloads a historical sticker through optional media policy and reopens it 
     'fetch',
     vi.fn(async () => new Response('sticker bytes'))
   );
-  expect(await saveAndReadCoverage(mx, [sticker], false)).toMatchObject({ saved: 0, missing: 1 });
+  expect(await saveAndReadCoverage(mx, [sticker])).toMatchObject({ saved: 0, missing: 1 });
   expect(fetch).not.toHaveBeenCalled();
-  expect(await saveAndReadCoverage(mx, [sticker], false, { includeAllMedia: true })).toMatchObject({
+  expect(await saveAndReadCoverage(mx, [sticker], { includeAllMedia: true })).toMatchObject({
     saved: 1,
     missing: 0,
   });
   clearAttachmentRepositoryMemory();
   resetCacheStoreForTesting();
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
-  const coldClient = createClient({ baseUrl: mx.getHomeserverUrl(), userId: mx.getSafeUserId() });
-  const blob = await downloadCachedAttachment(coldClient, { mxcUri: 'mxc://test/sticker' }, false);
+  const coldClient = createLegacyMediaClient({
+    baseUrl: mx.getHomeserverUrl(),
+    userId: mx.getSafeUserId(),
+  });
+  const blob = await downloadCachedAttachment(coldClient, { mxcUri: 'mxc://test/sticker' });
   expect(await blob.text()).toBe('sticker bytes');
   expect(fetch).not.toHaveBeenCalled();
 });
@@ -232,7 +237,7 @@ it('leaves oversized essential bodies incomplete even if an explicit download al
     url: 'mxc://test/oversized',
     'io.mindroom.long_text': { version: 2, encoding: 'matrix_event_content_json' },
   });
-  expect(await saveAndReadCoverage(mx, [body], false)).toMatchObject({ saved: 0, missing: 1 });
+  expect(await saveAndReadCoverage(mx, [body])).toMatchObject({ saved: 0, missing: 1 });
   expect(await readRoomAttachmentStorage(sessionId, '!room')).toMatchObject({
     missingEssential: 1,
     saved: 0,
@@ -267,7 +272,7 @@ it('keeps body coverage incomplete after quota failure while interactive bytes r
     url: 'mxc://test/quota',
     'io.mindroom.long_text': { version: 2, encoding: 'matrix_event_content_json' },
   });
-  expect(await saveAndReadCoverage(mx, [body], false)).toMatchObject({ saved: 0, missing: 1 });
+  expect(await saveAndReadCoverage(mx, [body])).toMatchObject({ saved: 0, missing: 1 });
   expect(await readRoomAttachmentStorage(sessionId, '!room')).toMatchObject({
     missingEssential: 1,
   });
@@ -277,7 +282,6 @@ it('keeps body coverage incomplete after quota failure while interactive bytes r
   const interactive = await downloadCachedAttachment(
     mx,
     { mxcUri: 'mxc://test/quota', isV2ContentJson: true },
-    false,
     { essential: true }
   );
   expect(await interactive.text()).toContain('complete body');
@@ -305,7 +309,7 @@ it('does not count malformed body JSON as readable saved content', async () => {
     url: 'mxc://test/invalid',
     'io.mindroom.long_text': { version: 2, encoding: 'matrix_event_content_json' },
   });
-  expect(await saveAndReadCoverage(mx, [body], false)).toMatchObject({ saved: 0, missing: 1 });
+  expect(await saveAndReadCoverage(mx, [body])).toMatchObject({ saved: 0, missing: 1 });
   expect(await readRoomAttachmentStorage(sessionId, '!room')).toMatchObject({
     missingEssential: 1,
     saved: 0,
@@ -357,7 +361,7 @@ it.each([false, true])(
       vi.fn(async () => new Response('invalid json'))
     );
     const events = reverse ? [body, file] : [file, body];
-    expect(await saveAndReadCoverage(mx, events, false)).toMatchObject({ saved: 0, missing: 1 });
+    expect(await saveAndReadCoverage(mx, events)).toMatchObject({ saved: 0, missing: 1 });
     expect(await readRoomAttachmentStorage(sessionId, '!room')).toMatchObject({
       bytes: 12,
       missingEssential: 1,

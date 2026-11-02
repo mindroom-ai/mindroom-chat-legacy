@@ -592,7 +592,14 @@
       "searchResults": "Résultats de recherche",
       "noResultsFound": "Aucun résultat trouvé",
       "personalPack": "Pack personnel",
-      "unknown": "Inconnue"
+      "unknown": "Inconnue",
+      "addCustomEmoji": "Ajouter un emoji personnalisé",
+      "addCustomEmojiDescription": "Il est enregistré dans votre pack personnel, pour l’utiliser dans tous vos salons.",
+      "addCustomEmojiServerDescription": "Tout le monde sur {{server}} peut l’utiliser dans tous les salons.",
+      "addCustomEmojiFailed": "Impossible d’ajouter l’emoji. Réessayez.",
+      "addCustomEmojiNameTaken": "Ce nom est déjà pris. Choisissez-en un autre.",
+      "addCustomEmojiTooLarge": "Les GIF animés doivent faire moins de {{limit}}.",
+      "add": "Ajouter"
     },
     "noStickerPacks": {
       "noStickerPacks": "Aucun pack d'autocollants !",
@@ -1253,7 +1260,7 @@
       "support": "Assistance",
       "privacy": "Confidentialité",
       "terms": "Conditions",
-      "poweredBy": "Propulsé par <app>{{appName}}</app>, <matrix>Matrix</matrix> et <cinny>Cinny</cinny>"
+      "poweredBy": "Propulsé par <links />"
     },
     "router": {
       "join": "Rejoindre",
@@ -2137,6 +2144,11 @@
           "defaultPack": "Pack par défaut",
           "view": "Afficher",
           "unknown": "Inconnue"
+        },
+        "serverPack": {
+          "title": "Émojis du serveur",
+          "description": "Tout le monde sur {{server}} peut les utiliser.",
+          "permissions": "Autorisations"
         }
       },
       "notifications": {
@@ -2360,11 +2372,15 @@
         "list_schedules": "Afficher toutes les tâches planifiées.",
         "cancel_schedule": "Annuler une planification par identifiant ou toutes les planifications.",
         "edit_schedule": "Mettre à jour une tâche planifiée existante.",
+        "jobs": "Lister les tâches en arrière-plan en cours ici.",
+        "cancel_job": "Annuler une tâche en arrière-plan par identifiant ou toutes celles en cours ici.",
         "config": "Gérer la configuration de MindRoom (administrateurs uniquement).",
         "desktop": "Gérer votre destination Desktop.",
+        "mode": "Basculer un agent entre les outils standard et une interface limitée à Bash.",
         "model": "Afficher ou changer le modèle utilisé dans le fil actuel.",
         "room_model": "Afficher le modèle par défaut du salon ou le changer (le définir ou le réinitialiser nécessite les droits d’administration du salon).",
         "thread_mode": "Afficher ou changer le mode de fil utilisé dans le salon actuel (administrateurs du salon uniquement).",
+        "auto_approve": "Exécuter vos appels d’outils dans ce fil sans approbation pendant un temps, ou afficher ou terminer cette période.",
         "encrypt": "Examiner ou activer le chiffrement de bout en bout pour le salon actuel.",
         "e2ee": "Afficher les diagnostics de chiffrement du salon actuel.",
         "hi": "Afficher les informations de bienvenue."
@@ -2651,27 +2667,11 @@
         "moreOptions": "Plus d'options"
       },
       "mindroomMessageControls": {
-        "requestContextWindow": "Fenêtre de contexte de la demande",
-        "aiRunMetadata": "Métadonnées d’exécution de l’IA",
         "close": "Fermer",
-        "status": "État",
-        "model": "Modèle",
-        "tokens": "Jetons",
-        "runCache": "Cache d’exécution",
-        "requestContext": "Contexte de la demande",
-        "requestCache": "Cache de la demande",
-        "tools": "Outils",
-        "ttft": "TTFT",
-        "run": "Exécution",
-        "session": "Session",
-        "openAiRunMetadata": "Ouvrir les métadonnées d’exécution de l’IA",
-        "tokenUsage": "Utilisation des jetons",
         "downloadingOriginal": "Téléchargement de l’original...",
         "retryDownloadOriginal": "Réessayer le téléchargement de l’original",
         "downloadOriginal": "Télécharger l’original",
-        "segmentTokenCount_one": "{{label}} : {{formattedCount}} jeton",
-        "segmentTokenCount_other": "{{label}} : {{formattedCount}} jetons",
-        "segmentTokenCount_many": "{{label}} : {{formattedCount}} jetons"
+        "replyDetails": "Détails de la réponse"
       },
       "mindroomMessageExtras": {
         "messageExtras": "Éléments supplémentaires du message"
@@ -2696,6 +2696,12 @@
       "mindroomThinkingPlaceholder": {
         "aiIsResponding": "L’IA répond",
         "thinking": "Réflexion…"
+      },
+      "mindroomReasoning": {
+        "thinking": "Réflexion en cours",
+        "thoughtFor_one": "A réfléchi pendant {{count}} s",
+        "thoughtFor_many": "A réfléchi pendant {{count}} s",
+        "thoughtFor_other": "A réfléchi pendant {{count}} s"
       },
       "mindroomThreadSummaryCard": {
         "aiThreadSummary": "Résumé du fil par l’IA"
@@ -2823,32 +2829,40 @@
         "retry": "Réessayer",
         "delete": "Supprimer"
       },
-      "aiRunDisplay": {
-        "inputTokens": "entrée {{formattedCount}}",
-        "outputTokens": "sortie {{formattedCount}}",
-        "totalTokens": "total {{formattedCount}}",
-        "readTokens": "lus {{formattedCount}}",
-        "writeTokens": "écrits {{formattedCount}}",
-        "notReadTokens": "non lus {{formattedCount}}",
-        "contextUsage": "{{input}} / {{window}} ({{percentage}} %)",
-        "contextBarTitle_one": "{{label}} : {{formattedCount}} jeton ({{percentage}} % de la fenêtre)",
-        "contextBarTitle_other": "{{label}} : {{formattedCount}} jetons ({{percentage}} % de la fenêtre)",
-        "contextBarTitleWithSuffix_one": "{{label}} : {{formattedCount}} jeton ({{percentage}} % de la fenêtre) ; {{suffix}}",
-        "contextBarTitleWithSuffix_other": "{{label}} : {{formattedCount}} jetons ({{percentage}} % de la fenêtre) ; {{suffix}}",
-        "reportedCacheRead_one": "lecture du cache signalée : {{formattedCount}} jeton",
-        "reportedCacheRead_other": "lecture du cache signalée : {{formattedCount}} jetons",
-        "cacheWrite_one": "écriture dans le cache : {{formattedCount}} jeton",
-        "cacheWrite_other": "écriture dans le cache : {{formattedCount}} jetons",
-        "cacheRead": "Lecture du cache",
-        "newInput": "Nouvelle entrée",
-        "reserve": "Réserve",
-        "contextBarTitle_many": "{{label}} : {{formattedCount}} jetons ({{percentage}} % de la fenêtre)",
-        "contextBarTitleWithSuffix_many": "{{label}} : {{formattedCount}} jetons ({{percentage}} % de la fenêtre) ; {{suffix}}",
-        "reportedCacheRead_many": "lecture du cache signalée : {{formattedCount}} jetons",
-        "cacheWrite_many": "écriture dans le cache : {{formattedCount}} jetons"
-      },
       "mindroomModelBadge": {
         "model": "Modèle : {{model}}"
+      },
+      "mindroomReplyDetails": {
+        "tokens": "Jetons",
+        "cost": "Coût",
+        "conversationSoFar": "Conversation jusqu’ici",
+        "failed": "Échec",
+        "stopped": "Arrêtée",
+        "thisReply": "Cette réponse",
+        "input": "Entrée",
+        "fromCache": "Depuis le cache",
+        "output": "Sortie",
+        "contextWindow": "Fenêtre de contexte",
+        "contextWindowUsage": "{{input}} sur {{window}} · {{percentage}}",
+        "timeToFirstToken": "Premier jeton",
+        "technicalDetails": "Détails techniques",
+        "configuredModel": "Modèle configuré",
+        "runId": "ID d’exécution",
+        "sessionId": "ID de session",
+        "newInput": "Nouvelle entrée",
+        "replyCount_one": "{{count}} réponse",
+        "replyCount_other": "{{count}} réponses",
+        "replyCount_many": "{{count}} réponses",
+        "loadedReplyCount_one": "{{count}} réponse chargée",
+        "loadedReplyCount_other": "{{count}} réponses chargées",
+        "loadedReplyCount_many": "{{count}} réponses chargées",
+        "atLeastCost": "≥ {{cost}}",
+        "costHistory": "Coût de chaque réponse dans cette conversation",
+        "costHistoryBar": "Réponse {{index}} : {{cost}}",
+        "costHistoryPosition": "Cette réponse · {{index}} sur {{count}}",
+        "toolCallCount_one": "{{count}} appel d’outil",
+        "toolCallCount_other": "{{count}} appels d’outils",
+        "toolCallCount_many": "{{count}} appels d’outils"
       }
     },
     "native": {
@@ -2862,6 +2876,11 @@
         "enable": "Activer",
         "iosPushNotifications": "Notifications push iOS",
         "permissionDenied": "L’autorisation des notifications a été refusée. Activez les notifications pour {{appName}} dans les réglages iOS."
+      },
+      "cloudflareAccess": {
+        "signInRequired": "{{value1}} nécessite la connexion de votre organisation.",
+        "continue": "Continuer",
+        "signInFailed": "La connexion n’a pas abouti. Réessayez."
       }
     },
     "notifications": {
@@ -3144,6 +3163,21 @@
       "stopFailed": "Impossible d’arrêter {{tool}}. Réessayez.",
       "stopAllFailed": "Impossible d’arrêter les tâches en arrière-plan. Réessayez.",
       "inRoom": "Tâches en arrière-plan en cours"
+    },
+    "autoApprove": {
+      "label": "Approbation automatique",
+      "labelOne": "Approbation automatique : {{name}}",
+      "labelMany": "Approbation automatique : {{name}} +{{count}}",
+      "title": "Approbation automatique",
+      "intro": "Dans ce fil, les appels d’outils demandés par ces personnes s’exécutent sans carte d’approbation.",
+      "you": "Vous",
+      "until": "Jusqu’à {{time}}",
+      "ownUntil": "Jusqu’à {{time}}. Envoyez !auto_approve off pour y mettre fin."
+    },
+    "notices": {
+      "dismiss": "Fermer l’avis",
+      "showMore": "Afficher plus",
+      "showLess": "Afficher moins"
     }
   },
   "roomSchedules": {

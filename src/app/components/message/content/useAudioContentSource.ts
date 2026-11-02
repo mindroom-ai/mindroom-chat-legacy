@@ -5,7 +5,6 @@ import { useMatrixClient } from '../../../hooks/useMatrixClient';
 import { AsyncState, AsyncStatus } from '../../../hooks/useAsyncCallback';
 import { revokeBlobUrl, useBlobUrlCleanup } from '../../../hooks/useBlobUrlCleanup';
 import { downloadCachedAttachment } from '../../../mindroom/messages/attachmentRepository';
-import { useMediaAuthentication } from '../../../hooks/useMediaAuthentication';
 import { useAlive } from '../../../hooks/useAlive';
 
 type AudioContentSourceOptions = {
@@ -38,7 +37,6 @@ export const useAudioContentSource = ({
   owner,
 }: AudioContentSourceOptions): [AsyncState<string>, () => Promise<string>] => {
   const mx = useMatrixClient();
-  const useAuthentication = useMediaAuthentication();
   const alive = useAlive();
   const mediaIdentity = getAudioContentSourceIdentity({ mimeType, url, encInfo, owner });
   const mediaIdentityRef = useRef(mediaIdentity);
@@ -73,16 +71,12 @@ export const useAudioContentSource = ({
     setSrcState({ status: AsyncStatus.Loading });
 
     try {
-      const fileContent = await downloadCachedAttachment(
-        mx,
-        {
-          owner,
-          mxcUri: url,
-          mimeType,
-          encryptedFile: encInfo ? { ...encInfo, url } : undefined,
-        },
-        useAuthentication
-      );
+      const fileContent = await downloadCachedAttachment(mx, {
+        owner,
+        mxcUri: url,
+        mimeType,
+        encryptedFile: encInfo ? { ...encInfo, url } : undefined,
+      });
       const blobUrl = URL.createObjectURL(fileContent);
       if (
         request !== requestRef.current ||
@@ -106,17 +100,7 @@ export const useAudioContentSource = ({
       }
       throw error;
     }
-  }, [
-    owner,
-    alive,
-    discardPendingSrc,
-    encInfo,
-    mediaIdentity,
-    mimeType,
-    mx,
-    url,
-    useAuthentication,
-  ]);
+  }, [owner, alive, discardPendingSrc, encInfo, mediaIdentity, mimeType, mx, url]);
 
   useLayoutEffect(
     () => () => {

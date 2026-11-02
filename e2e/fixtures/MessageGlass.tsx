@@ -9,7 +9,8 @@ import {
   ApprovalHistory,
 } from '../../src/app/mindroom/messages/ThreadApprovalControls';
 import { ApprovalReceipt } from '../../src/app/mindroom/messages/ApprovalReceipt';
-import { withMindroomToolTraceMarkerParserOptions } from '../../src/app/mindroom/messages/MindroomHtmlBlocks';
+import { useMindroomToolTraceMarkerParserOptions } from '../../src/app/mindroom/messages/MindroomHtmlBlocks';
+import { resolveHtmlReactParserOptions } from '../../src/app/utils/htmlReactParserOptions';
 import type { ToolApprovalData } from '../../src/app/mindroom/messages/toolApproval';
 import * as approvals from '../../src/app/mindroom/messages/ThreadApprovals.css';
 
@@ -40,7 +41,13 @@ const approval: ToolApprovalData = {
 };
 const toolHtml = '<p>🔧 <code>web_search</code> [1]</p><p>🔧 <code>read_file</code> [2]</p>';
 
+const toolBaseOptions = {};
+const toolContent = { formatted_body: toolHtml };
+
 export function MessageGlass() {
+  const toolParserOptions = resolveHtmlReactParserOptions(
+    useMindroomToolTraceMarkerParserOptions(toolBaseOptions, toolContent)
+  );
   const editor = useEditor();
   return (
     <main
@@ -59,12 +66,7 @@ export function MessageGlass() {
             renderBody={({ body }) => body}
           />
         </div>
-        <div data-testid="tool">
-          {parse(
-            toolHtml,
-            withMindroomToolTraceMarkerParserOptions({}, { formatted_body: toolHtml })
-          )}
-        </div>
+        <div data-testid="tool">{parse(toolHtml, toolParserOptions)}</div>
         <div data-testid="history">
           <ApprovalHistory
             records={[

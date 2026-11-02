@@ -1,17 +1,21 @@
 import React, { useMemo } from 'react';
-import parse, { HTMLReactParserOptions } from 'html-react-parser';
+import parse from 'html-react-parser';
 import { Opts } from 'linkifyjs';
 import { MessageEmptyContent } from './content';
 import { sanitizeCustomHtml } from '../../utils/sanitize';
 import { renderTextWithLatex } from '../../plugins/react-custom-html-parser';
 import { useClientConfig } from '../../hooks/useClientConfig';
+import {
+  type HtmlReactParserOptionsSource,
+  resolveHtmlReactParserOptions,
+} from '../../utils/htmlReactParserOptions';
 
 type RenderBodyProps = {
   body: string;
   customBody?: string;
 
   highlightRegex?: RegExp;
-  htmlReactParserOptions: HTMLReactParserOptions;
+  htmlReactParserOptions: HtmlReactParserOptionsSource;
   linkifyOpts: Opts;
 };
 export function RenderBody({
@@ -31,7 +35,7 @@ export function RenderBody({
     if (customBody) {
       return parse(
         sanitizeCustomHtml(customBody, { additionalAllowedUriSchemes }),
-        htmlReactParserOptions
+        resolveHtmlReactParserOptions(htmlReactParserOptions)
       );
     }
     if (body === '') return <MessageEmptyContent />;

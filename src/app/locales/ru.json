@@ -595,7 +595,14 @@
       "searchResults": "Результаты поиска",
       "noResultsFound": "Ничего не найдено",
       "personalPack": "Личный набор",
-      "unknown": "Неизвестно"
+      "unknown": "Неизвестно",
+      "addCustomEmoji": "Добавить свой эмодзи",
+      "addCustomEmojiDescription": "Он сохранится в вашем личном наборе, и его можно будет использовать в любой комнате.",
+      "addCustomEmojiServerDescription": "Все на сервере {{server}} могут использовать его в любой комнате.",
+      "addCustomEmojiFailed": "Не удалось добавить эмодзи. Попробуйте ещё раз.",
+      "addCustomEmojiNameTaken": "Это имя уже занято. Выберите другое.",
+      "addCustomEmojiTooLarge": "Анимированные GIF должны быть меньше {{limit}}.",
+      "add": "Добавить"
     },
     "noStickerPacks": {
       "noStickerPacks": "Нет наборов стикеров!",
@@ -1260,7 +1267,7 @@
       "support": "Поддержка",
       "privacy": "Конфиденциальность",
       "terms": "Условия",
-      "poweredBy": "На базе <app>{{appName}}</app>, <matrix>Matrix</matrix> и <cinny>Cinny</cinny>"
+      "poweredBy": "На базе <links />"
     },
     "router": {
       "join": "Войти",
@@ -2165,6 +2172,11 @@
           "defaultPack": "Набор по умолчанию",
           "view": "Просмотреть",
           "unknown": "Неизвестно"
+        },
+        "serverPack": {
+          "title": "Эмодзи сервера",
+          "description": "Все на сервере {{server}} могут их использовать.",
+          "permissions": "Разрешения"
         }
       },
       "notifications": {
@@ -2388,11 +2400,15 @@
         "list_schedules": "Показать все запланированные задачи.",
         "cancel_schedule": "Отменить задачу по идентификатору или все задачи.",
         "edit_schedule": "Обновить существующую запланированную задачу.",
+        "jobs": "Показать фоновые задачи, выполняемые здесь.",
+        "cancel_job": "Отменить фоновую задачу по идентификатору или все задачи здесь.",
         "config": "Управлять конфигурацией MindRoom (только для администратора).",
         "desktop": "Управлять целью Desktop.",
+        "mode": "Переключить агента между стандартными инструментами и интерфейсом только с Bash.",
         "model": "Показать или сменить модель текущей ветки.",
         "room_model": "Показать или сменить модель комнаты по умолчанию (установка и сброс требуют прав администратора комнаты).",
         "thread_mode": "Показать или сменить режим веток текущей комнаты (только для администратора комнаты).",
+        "auto_approve": "Какое-то время выполнять ваши вызовы инструментов в этой ветке без одобрения, либо показать или завершить этот период.",
         "encrypt": "Проверить или включить сквозное шифрование текущей комнаты.",
         "e2ee": "Показать диагностику шифрования текущей комнаты.",
         "hi": "Показать приветственную информацию."
@@ -2691,28 +2707,11 @@
         "moreOptions": "Другие параметры"
       },
       "mindroomMessageControls": {
-        "requestContextWindow": "Контекстное окно запроса",
-        "aiRunMetadata": "Метаданные запуска ИИ",
         "close": "Закрыть",
-        "status": "Статус",
-        "model": "Модель",
-        "tokens": "Токены",
-        "runCache": "Кеш запуска",
-        "requestContext": "Контекст запроса",
-        "requestCache": "Кеш запроса",
-        "tools": "Инструменты",
-        "ttft": "TTFT",
-        "run": "Запуск",
-        "session": "Сеанс",
-        "openAiRunMetadata": "Открыть метаданные запуска ИИ",
-        "tokenUsage": "Использование токенов",
         "downloadingOriginal": "Скачивание оригинала…",
         "retryDownloadOriginal": "Повторить скачивание оригинала",
         "downloadOriginal": "Скачать оригинал",
-        "segmentTokenCount_one": "{{label}}: {{formattedCount}} токен",
-        "segmentTokenCount_other": "{{label}}: {{formattedCount}} токенов",
-        "segmentTokenCount_few": "{{label}}: {{formattedCount}} токена",
-        "segmentTokenCount_many": "{{label}}: {{formattedCount}} токенов"
+        "replyDetails": "Сведения об ответе"
       },
       "mindroomMessageExtras": {
         "messageExtras": "Дополнительные данные сообщения"
@@ -2738,6 +2737,13 @@
       "mindroomThinkingPlaceholder": {
         "aiIsResponding": "ИИ отвечает",
         "thinking": "Размышляет…"
+      },
+      "mindroomReasoning": {
+        "thinking": "Думает",
+        "thoughtFor_one": "Думал {{count}} с",
+        "thoughtFor_few": "Думал {{count}} с",
+        "thoughtFor_many": "Думал {{count}} с",
+        "thoughtFor_other": "Думал {{count}} с"
       },
       "mindroomThreadSummaryCard": {
         "aiThreadSummary": "Сводка ветки от ИИ"
@@ -2878,36 +2884,43 @@
         "retry": "Повторить",
         "delete": "Удалить"
       },
-      "aiRunDisplay": {
-        "inputTokens": "вход: {{formattedCount}}",
-        "outputTokens": "выход: {{formattedCount}}",
-        "totalTokens": "всего: {{formattedCount}}",
-        "readTokens": "чтение: {{formattedCount}}",
-        "writeTokens": "запись: {{formattedCount}}",
-        "notReadTokens": "не прочитано: {{formattedCount}}",
-        "contextUsage": "{{input}} / {{window}} ({{percentage}} %)",
-        "contextBarTitle_one": "{{label}}: {{formattedCount}} токен ({{percentage}} % окна)",
-        "contextBarTitle_other": "{{label}}: {{formattedCount}} токенов ({{percentage}} % окна)",
-        "contextBarTitleWithSuffix_one": "{{label}}: {{formattedCount}} токен ({{percentage}} % окна); {{suffix}}",
-        "contextBarTitleWithSuffix_other": "{{label}}: {{formattedCount}} токенов ({{percentage}} % окна); {{suffix}}",
-        "reportedCacheRead_one": "заявлено чтение кеша: {{formattedCount}} токен",
-        "reportedCacheRead_other": "заявлено чтение кеша: {{formattedCount}} токенов",
-        "cacheWrite_one": "запись в кеш: {{formattedCount}} токен",
-        "cacheWrite_other": "запись в кеш: {{formattedCount}} токенов",
-        "cacheRead": "Чтение кеша",
-        "newInput": "Новый ввод",
-        "reserve": "Резерв",
-        "cacheWrite_few": "запись в кэш: {{formattedCount}} токена",
-        "cacheWrite_many": "запись в кэш: {{formattedCount}} токенов",
-        "contextBarTitle_few": "{{label}}: {{formattedCount}} токена ({{percentage}}% окна)",
-        "contextBarTitle_many": "{{label}}: {{formattedCount}} токенов ({{percentage}}% окна)",
-        "contextBarTitleWithSuffix_few": "{{label}}: {{formattedCount}} токена ({{percentage}}% окна); {{suffix}}",
-        "contextBarTitleWithSuffix_many": "{{label}}: {{formattedCount}} токенов ({{percentage}}% окна); {{suffix}}",
-        "reportedCacheRead_few": "зарегистрировано чтение кэша: {{formattedCount}} токена",
-        "reportedCacheRead_many": "зарегистрировано чтение кэша: {{formattedCount}} токенов"
-      },
       "mindroomModelBadge": {
         "model": "Модель: {{model}}"
+      },
+      "mindroomReplyDetails": {
+        "tokens": "Токены",
+        "cost": "Стоимость",
+        "conversationSoFar": "Разговор на данный момент",
+        "failed": "Ошибка",
+        "stopped": "Остановлен",
+        "thisReply": "Этот ответ",
+        "input": "Ввод",
+        "fromCache": "Из кеша",
+        "output": "Вывод",
+        "contextWindow": "Окно контекста",
+        "contextWindowUsage": "{{input}} из {{window}} · {{percentage}}",
+        "timeToFirstToken": "Первый токен",
+        "technicalDetails": "Технические сведения",
+        "configuredModel": "Настроенная модель",
+        "runId": "ID запуска",
+        "sessionId": "ID сеанса",
+        "newInput": "Новый ввод",
+        "replyCount_one": "{{count}} ответ",
+        "replyCount_other": "{{count}} ответа",
+        "replyCount_few": "{{count}} ответа",
+        "replyCount_many": "{{count}} ответов",
+        "loadedReplyCount_one": "{{count}} загруженный ответ",
+        "loadedReplyCount_other": "{{count}} загруженного ответа",
+        "loadedReplyCount_few": "{{count}} загруженных ответа",
+        "loadedReplyCount_many": "{{count}} загруженных ответов",
+        "atLeastCost": "≥ {{cost}}",
+        "costHistory": "Стоимость каждого ответа в этом разговоре",
+        "costHistoryBar": "Ответ {{index}}: {{cost}}",
+        "costHistoryPosition": "Этот ответ · {{index}} из {{count}}",
+        "toolCallCount_one": "{{count}} вызов инструмента",
+        "toolCallCount_other": "{{count}} вызова инструментов",
+        "toolCallCount_few": "{{count}} вызова инструментов",
+        "toolCallCount_many": "{{count}} вызовов инструментов"
       }
     },
     "native": {
@@ -2921,6 +2934,11 @@
         "enable": "Включить",
         "iosPushNotifications": "Push-уведомления iOS",
         "permissionDenied": "Разрешение на уведомления отклонено. Включите уведомления для {{appName}} в настройках iOS."
+      },
+      "cloudflareAccess": {
+        "signInRequired": "Для {{value1}} нужен вход через вашу организацию.",
+        "continue": "Продолжить",
+        "signInFailed": "Вход не завершён. Попробуйте ещё раз."
       }
     },
     "notifications": {
@@ -3210,6 +3228,21 @@
       "stopFailed": "Не удалось остановить {{tool}}. Попробуйте ещё раз.",
       "stopAllFailed": "Не удалось остановить фоновые задачи. Попробуйте ещё раз.",
       "inRoom": "Выполняются фоновые задачи"
+    },
+    "autoApprove": {
+      "label": "Автоодобрение",
+      "labelOne": "Автоодобрение: {{name}}",
+      "labelMany": "Автоодобрение: {{name}} +{{count}}",
+      "title": "Автоодобрение",
+      "intro": "В этой ветке вызовы инструментов, которые запрашивают эти люди, выполняются без карточек подтверждения.",
+      "you": "Вы",
+      "until": "До {{time}}",
+      "ownUntil": "До {{time}}. Отправьте !auto_approve off, чтобы закончить."
+    },
+    "notices": {
+      "dismiss": "Скрыть уведомление",
+      "showMore": "Показать больше",
+      "showLess": "Показать меньше"
     }
   },
   "roomSchedules": {

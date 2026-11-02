@@ -10,8 +10,9 @@ export type IconTooltipProps = {
   children: (triggerRef: RefCallback<HTMLElement | SVGElement>) => ReactNode;
 };
 
-// An icon-only button names itself in a tooltip, as the room header's buttons
-// do. Give the button the same label as its aria-label.
+// A name and an optional quieter hint in a tooltip. An icon-only button names
+// itself in one, as the room header's buttons do; give the button the same label
+// as its aria-label.
 export function IconTooltip({
   label,
   hint,

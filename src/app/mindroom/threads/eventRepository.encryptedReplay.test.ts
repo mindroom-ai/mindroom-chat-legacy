@@ -80,7 +80,7 @@ const seed = async () => {
     ...client,
     chunk: [wire('$root', 1), wire('$edit', 2)],
   });
-  await prefetchEventAttachments(client.mx, saved!.events, false);
+  await prefetchEventAttachments(client.mx, saved!.events);
   expect(await loadCachedAttachment(client.sessionId, bodyUri)).toBeDefined();
   const retained = (await loadCachedRoomEvent(client.sessionId, roomId, '$root'))!;
   resetCacheStoreForTesting();

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { MatrixEvent, Room } from 'matrix-js-sdk';
 import { useMatrixClient } from '../../hooks/useMatrixClient';
-import { useMediaAuthentication } from '../../hooks/useMediaAuthentication';
 import { getEditedEvent } from '../../utils/room';
 import { hydrateCachedMindroomLongText } from './attachmentRepository';
 import { loadMindroomEditableContent } from './longEdit';
@@ -18,7 +17,6 @@ export const useMindroomEditableContent = (
   mEvent: MatrixEvent
 ): MindroomEditableContent => {
   const mx = useMatrixClient();
-  const useAuthentication = useMediaAuthentication();
   const [editable, setEditable] = useState<MindroomEditableContent>({ failed: false });
 
   useEffect(() => {
@@ -29,9 +27,7 @@ export const useMindroomEditableContent = (
       editedEvent?.getContent()['m.new_content'] ?? mEvent.getContent();
     let cancelled = false;
     // No cache owner: the editor only reads the text, usually already cached by the timeline.
-    loadMindroomEditableContent(latest, (source) =>
-      hydrateCachedMindroomLongText(mx, source, useAuthentication)
-    )
+    loadMindroomEditableContent(latest, (source) => hydrateCachedMindroomLongText(mx, source))
       .catch(() => undefined)
       .then((content) => {
         if (!cancelled) setEditable({ content, failed: content === undefined });
@@ -39,7 +35,7 @@ export const useMindroomEditableContent = (
     return () => {
       cancelled = true;
     };
-  }, [mx, room, mEvent, useAuthentication]);
+  }, [mx, room, mEvent]);
 
   return editable;
 };

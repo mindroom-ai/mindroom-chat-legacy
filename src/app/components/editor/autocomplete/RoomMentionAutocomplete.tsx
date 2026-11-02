@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import React, { KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect } from 'react';
+import React, { KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useMemo } from 'react';
 import { Editor } from 'slate';
 import { Avatar, Icon, Icons, Text } from 'folds';
 import { JoinRule, MatrixClient } from 'matrix-js-sdk';
@@ -7,7 +7,7 @@ import { useAtomValue } from 'jotai';
 import { MenuItem } from '../../glass/GlassPrimitives';
 
 import { createMentionElement, moveCursor, replaceWithElement } from '../utils';
-import { getDirectRoomAvatarUrl } from '../../../utils/room';
+import { getDirectRoomAvatarUrl, isMindroomEmojiRoom } from '../../../utils/room';
 import { useMatrixClient } from '../../../hooks/useMatrixClient';
 import { AutocompleteQuery } from './autocompleteQuery';
 import { AutocompleteMenu } from './AutocompleteMenu';
@@ -82,7 +82,15 @@ export function RoomMentionAutocomplete({
   const mx = useMatrixClient();
   const mDirects = useAtomValue(mDirectAtom);
 
-  const allRooms = useAtomValue(allRoomsAtom).sort(factoryRoomIdByActivity(mx));
+  const joinedRoomIds = useAtomValue(allRoomsAtom);
+  // useAsyncSearch starts over whenever it is given a new list, so keep this one stable.
+  const allRooms = useMemo(
+    () =>
+      joinedRoomIds
+        .filter((rId) => !isMindroomEmojiRoom(mx.getRoom(rId)))
+        .sort(factoryRoomIdByActivity(mx)),
+    [joinedRoomIds, mx]
+  );
 
   const [result, search, resetSearch] = useAsyncSearch(
     allRooms,

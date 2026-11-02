@@ -22,6 +22,19 @@ export const Header = style({
   paddingBottom: 0,
 });
 
+export const AddCustomEmoji = style({
+  padding: config.space.S300,
+});
+
+export const AddCustomEmojiPreview = style([
+  DefaultReset,
+  {
+    width: toRem(48),
+    height: toRem(48),
+    objectFit: 'contain',
+  },
+]);
+
 /**
  * Sidebar
  */

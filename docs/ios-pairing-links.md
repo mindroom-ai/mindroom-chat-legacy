@@ -70,3 +70,38 @@ Keep `hashRouter.enabled: false`, as in the shipped `config.mindroom.json`; nati
 Serve the file at the domain root even when the web client uses a base path, and keep the accepted pairing path aligned across the native handler and association file.
 The native handler deliberately forwards only `code`, using the existing `getConnectPath` route builder; `ConnectPage` owns code validation and approval.
 Do not change `capacitor://localhost`: the app's sessions and crypto storage are keyed to that origin.
+
+## Mac Catalyst Developer ID distribution
+
+The Mac app uses the same team, bundle ID and `DNA6966LGZ.chat.mindroom.app` website association as iOS.
+No additional website association is needed.
+When the App Store iPad app is also installed, verify which installation a Notes `/connect` link opens; never delete either installation's data to test routing.
+
+An Account Holder or Admin owns these portal steps:
+
+1. Check Push Notifications, Associated Domains and Sign in with Apple on `chat.mindroom.app` under team `DNA6966LGZ`.
+   For the shared bundle ID, leave the legacy **Mac Catalyst (Existing Apps Only)** option alone; [Apple documents this distinction](https://developer.apple.com/help/account/capabilities/create-a-mac-version-of-an-ipad-app).
+2. Create a **Developer ID** profile, select **Mac Catalyst**, this App ID and the Developer ID Application certificate whose private key is on the signing Mac.
+3. Name it exactly **MindRoom Chat Developer ID** and download it.
+4. Decode with `security cms -D -i <download>` into a temporary directory and inspect the team, platform, App ID, expiry, certificate and allowed entitlements without publishing the profile.
+5. Run `scripts/build-macos-app.sh --sign` with `CODESIGN_IDENTITY`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` and `MACOS_PROVISIONING_PROFILE_PATH` in the environment.
+   Read secret values with hidden `read -s` input in the same shell that uses them; never put them in shell history or commit them.
+   Optional `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` override the archive's versions.
+6. Verify Developer ID, the hardened runtime and expected entitlements with `codesign`, then verify the notarized DMG with `spctl -a -vv -t open --context context:primary-signature build/macos/MindRoom-Chat.dmg`.
+
+Account check on 2026-10-28: the regenerated Mac Catalyst profile allows production push and Associated Domains but omits `com.apple.developer.applesignin`, although the portal lists that capability.
+The Developer ID build therefore omits that entitlement and opens the Apple provider through its browser authentication session.
+The resulting `mindroom://auth` callback returns to the app's login route.
+iOS retains its native Apple authorization sheet, including the App Store iPad build on Apple silicon Macs.
+The hardened-runtime microphone and camera permissions remain and need no provisioning-profile grant.
+See the Runbook for profile metadata, local signing results and the real-Mac checklist.
+
+After an automatic release, **Actions → Create MindRoom Release → Run workflow → release_tag** can retry only the Mac publication for an existing release whose source includes the signing script.
+It verifies that the tag still points to the release's original commit, checks out that commit, and uploads `MindRoom-Chat.dmg`.
+A published DMG is never replaced, so its bytes and the cask checksum stay fixed; ship changes in a new release.
+Only the latest release dispatches the tap update; an older-release recovery must not downgrade the cask.
+If only the tap dispatch failed, the tap's daily schedule or its manual **Update MindRoom Chat cask** run picks up the latest release.
+No manual tag or release creation is needed.
+
+The signing certificate created for this setup expires on February 1, 2027, earlier than the profile's 2044 expiry.
+Before then, renew the Developer ID identity, regenerate the profile with that certificate, and replace the certificate/password and profile repository secrets through the same hidden-input setup.

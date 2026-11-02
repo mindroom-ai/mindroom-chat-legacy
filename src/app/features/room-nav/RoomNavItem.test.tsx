@@ -136,13 +136,13 @@ vi.mock('../../components/room-avatar', async () => {
     alt?: string;
     renderFallback: () => React.ReactNode;
   }) => {
-    const [error, setError] = reactModule.useState(false);
-    return error || !src
+    const [failedSrc, setFailedSrc] = reactModule.useState<string>();
+    return !src || failedSrc === src
       ? renderFallback()
       : reactModule.createElement('img', {
           alt,
           'data-testid': 'room-avatar-image',
-          onError: () => setError(true),
+          onError: () => setFailedSrc(src),
           src,
         });
   };

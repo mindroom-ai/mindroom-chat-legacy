@@ -47,13 +47,17 @@ vi.mock('../MessageCopyActions.css', () => ({
 
 vi.mock('../MindroomMessageControls.css', () => ({
   AiRunInfoButton: 'AiRunInfoButton',
-  AiRunContextBar: 'AiRunContextBar',
-  AiRunContextBarSegment: 'AiRunContextBarSegment',
-  AiRunContextBarSegmentCacheRead: 'AiRunContextBarSegmentCacheRead',
-  AiRunContextBarSegmentNewInput: 'AiRunContextBarSegmentNewInput',
-  AiRunContextBarSegmentReserve: 'AiRunContextBarSegmentReserve',
+  ReplyDetailsScroll: 'ReplyDetailsScroll',
   MenuItemText: 'MenuItemText',
 }));
+
+vi.mock('../../../components/page', async () => {
+  const { createElement } = await import('react');
+  return {
+    PageScroll: ({ header, children }: { header?: React.ReactNode; children?: React.ReactNode }) =>
+      createElement('div', null, header, children),
+  };
+});
 
 vi.mock('focus-trap-react', () => ({
   default: ({
@@ -259,6 +263,10 @@ vi.mock('../../../hooks/useMatrixClient', () => ({
 
 vi.mock('../../../hooks/useRecentEmoji', () => ({
   useRecentEmoji: () => [],
+}));
+
+vi.mock('../../../hooks/useImagePacks', () => ({
+  useRelevantImagePacks: () => [],
 }));
 
 vi.mock('../../../components/event-readers', () => ({
@@ -491,6 +499,17 @@ const getDialogFocusTrapOptions = (renderer: ReactTestRenderer): Record<string, 
   return dialogFocusTrap.props.focusTrapOptions;
 };
 
+/** The value beside a reply-details row label. */
+const rowValue = (renderer: ReactTestRenderer, label: string): string | undefined => {
+  const cells = renderer.root.findAll(
+    (node) => node.type === 'span' && (node.props.as === 'dt' || node.props.as === 'dd')
+  );
+  const term = cells.findIndex(
+    (node) => node.props.as === 'dt' && node.children.join('') === label
+  );
+  return term < 0 ? undefined : cells[term + 1]?.children.join('');
+};
+
 const hasNodeTitle = (renderer: ReactTestRenderer, title: string): boolean =>
   renderer.root.findAll((node) => node.props.title === title).length > 0;
 
@@ -612,8 +631,8 @@ describe('Message local-echo actions', () => {
   });
 });
 
-describe('Message token usage menu item', () => {
-  it('does not render Token usage in the context menu for messages without ai_run metadata', async () => {
+describe('Message reply details menu item', () => {
+  it('does not render Reply details in the context menu for messages without ai_run metadata', async () => {
     const { renderer } = await renderMessage({
       msgtype: 'm.text',
       body: 'hello',
@@ -621,10 +640,10 @@ describe('Message token usage menu item', () => {
 
     await openContextMenu(renderer);
 
-    expect(hasSpanText(renderer, 'Token usage')).toBe(false);
+    expect(hasSpanText(renderer, 'Reply details')).toBe(false);
   }, 10000);
 
-  it('opens the AI run dialog from the context menu and configures explicit return focus', async () => {
+  it('opens reply details from the context menu and configures explicit return focus', async () => {
     const { renderer, messageBaseNode } = await renderMessage(mindroomAiRunContent);
     const aiRunAvatars = renderer.root.findAll(
       (node) => node.type === 'div' && node.props['data-user-id'] === '@alice:example.org'
@@ -639,26 +658,25 @@ describe('Message token usage menu item', () => {
     expect(aiRunAvatarStacks[0]?.findAll((node) => node === aiRunAvatars[0])).toHaveLength(1);
     expect(hasSpanText(renderer, 'Fast')).toBe(true);
     expect(hasNodeTitle(renderer, 'fast (openai / gpt-5-mini)')).toBe(true);
-    expect(hasSpanText(renderer, 'AI Run Metadata')).toBe(false);
+    expect(hasSpanText(renderer, 'Reply details')).toBe(false);
 
     await openContextMenu(renderer);
 
-    expect(hasSpanText(renderer, 'Token usage')).toBe(true);
+    const detailsButton = getButtonByText(renderer, 'Reply details');
 
-    const tokenUsageButton = getButtonByText(renderer, 'Token usage');
-
-    expect(tokenUsageButton).toBeDefined();
-    expect(tokenUsageButton?.props['aria-pressed']).toBeUndefined();
+    expect(detailsButton).toBeDefined();
+    expect(detailsButton?.props['aria-pressed']).toBeUndefined();
     expect(messageBaseNode).toBeDefined();
 
     await act(async () => {
-      tokenUsageButton?.props.onClick();
+      detailsButton?.props.onClick();
     });
 
-    expect(hasSpanText(renderer, 'AI Run Metadata')).toBe(true);
-    expect(hasSpanText(renderer, 'Status: completed')).toBe(true);
-    expect(hasSpanText(renderer, 'Tokens: in 40 • out 2 • total 42')).toBe(true);
-    expect(hasSpanText(renderer, 'Run Cache: read 20 • write 5')).toBe(true);
+    expect(hasSpanText(renderer, 'Reply details')).toBe(true);
+    expect(hasSpanText(renderer, 'Tokens')).toBe(true);
+    expect(hasSpanText(renderer, '42')).toBe(true);
+    expect(hasSpanText(renderer, 'Input')).toBe(true);
+    expect(hasSpanText(renderer, 'Output')).toBe(true);
     const setReturnFocus = getDialogFocusTrapOptions(renderer).setReturnFocus as () =>
       | HostNodeMock
       | false;
@@ -666,10 +684,10 @@ describe('Message token usage menu item', () => {
     expect(setReturnFocus).toBeTypeOf('function');
   });
 
-  it('keeps the header info button path opening the same AI run metadata details', async () => {
+  it('keeps the header info button path opening the same reply details', async () => {
     const { renderer } = await renderMessage(mindroomAiRunContent, { collapse: false });
 
-    const infoButton = getButtonByAriaLabel(renderer, 'Open AI run metadata');
+    const infoButton = getButtonByAriaLabel(renderer, 'Reply details');
 
     expect(infoButton).toBeDefined();
 
@@ -677,19 +695,14 @@ describe('Message token usage menu item', () => {
       infoButton?.props.onClick();
     });
 
-    expect(hasSpanText(renderer, 'AI Run Metadata')).toBe(true);
-    expect(hasSpanText(renderer, 'Model: fast (openai / gpt-5-mini)')).toBe(true);
-    expect(hasSpanText(renderer, 'Request Context: 65 / 100 (65.0%)')).toBe(true);
-    expect(hasSpanText(renderer, 'Request Cache: read 20 • write 5 • not read 45')).toBe(true);
-    expect(hasNodeTitle(renderer, 'Cache read: 20 tokens (20.0% of window)')).toBe(true);
-    expect(
-      hasNodeTitle(renderer, 'New input: 45 tokens (45.0% of window); cache write: 5 tokens')
-    ).toBe(true);
-    expect(hasNodeTitle(renderer, 'Reserve: 35 tokens (35.0% of window)')).toBe(true);
-    expect(hasSpanText(renderer, 'Tools: 3')).toBe(true);
-    expect(hasSpanText(renderer, 'TTFT: 42 ms')).toBe(true);
-    expect(hasSpanText(renderer, 'Run: run-123')).toBe(true);
-    expect(hasSpanText(renderer, 'Session: session-456')).toBe(true);
+    expect(hasSpanText(renderer, 'Reply details')).toBe(true);
+    expect(hasSpanText(renderer, 'openai · gpt-5-mini')).toBe(true);
+    expect(hasSpanText(renderer, '65 of 100 · 65.0%')).toBe(true);
+    expect(hasSpanText(renderer, '3 tool calls')).toBe(true);
+    expect(hasSpanText(renderer, '42 ms')).toBe(true);
+    expect(rowValue(renderer, 'Configured model')).toBe('fast');
+    expect(rowValue(renderer, 'Run ID')).toBe('run-123');
+    expect(rowValue(renderer, 'Session ID')).toBe('session-456');
   });
 });
 

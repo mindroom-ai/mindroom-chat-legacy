@@ -5,6 +5,8 @@ import {
   getEditedEvent,
   getLatestEdit,
   getLatestMessageContent,
+  isMindroomEmojiRoom,
+  isRoom,
   roomHaveUnread,
   trimReplyFromBody,
 } from './room';
@@ -557,7 +559,49 @@ describe('roomHaveUnread', () => {
     expect(roomHaveUnread(mx, room)).toBe(true);
   });
 
-  it('keeps the unread fallback when the loaded main-timeline slice still contains visible activity', () => {
+  it("ignores an agent's background state, reactions and redactions when the read position is not loaded", () => {
+    const agent = '@mindroom_mind:example.org';
+    const backgroundJobs = new MatrixEvent({
+      content: { jobs: [] },
+      event_id: '$jobs',
+      origin_server_ts: 1000,
+      room_id: '!room:example.org',
+      sender: agent,
+      state_key: agent,
+      type: 'io.mindroom.background_jobs',
+    });
+    const reaction = new MatrixEvent({
+      content: { 'm.relates_to': { rel_type: 'm.annotation', event_id: '$root', key: '👀' } },
+      event_id: '$reaction',
+      origin_server_ts: 1001,
+      room_id: '!room:example.org',
+      sender: agent,
+      type: 'm.reaction',
+    });
+    const redaction = new MatrixEvent({
+      content: { redacts: '$reaction' },
+      event_id: '$redaction',
+      origin_server_ts: 1002,
+      redacts: '$reaction',
+      room_id: '!room:example.org',
+      sender: agent,
+      type: 'm.room.redaction',
+    });
+    const room = {
+      findEventById: vi.fn(() => undefined),
+      getEventReadUpTo: vi.fn(() => null),
+      getLiveTimeline: vi.fn(() => ({
+        getEvents: () => [backgroundJobs, reaction, redaction],
+      })),
+    } as any;
+    const mx = {
+      getUserId: vi.fn(() => '@alice:example.org'),
+    } as any;
+
+    expect(roomHaveUnread(mx, room)).toBe(false);
+  });
+
+  it("counts another member's message as unread when the read position is not loaded", () => {
     const mainEvent = makeMessageEvent('$main', 1000, '@bob:example.org');
     const room = {
       findEventById: vi.fn(() => undefined),
@@ -592,5 +636,50 @@ describe('trimReplyFromBody', () => {
     expect(trimReplyFromBody(unclosedLine)).toBe(unclosedLine);
     expect(trimReplyFromBody(unclosedLines)).toBe(unclosedLines);
     expect(performance.now() - start).toBeLessThan(100);
+  });
+});
+
+/** A room whose m.room.create event has the given `type`, or none for an ordinary room. */
+const roomOfType = (type?: string) => ({
+  getLiveTimeline: () => ({
+    getState: () => ({
+      getStateEvents: (eventType: string) =>
+        eventType === 'm.room.create' ? { getContent: () => ({ type }) } : null,
+    }),
+  }),
+});
+
+describe('isRoom', () => {
+  it('counts a room without a type', () => {
+    expect(isRoom(roomOfType() as never)).toBe(true);
+  });
+
+  it('counts a voice room', () => {
+    expect(isRoom(roomOfType('org.matrix.msc3417.call') as never)).toBe(true);
+  });
+
+  it('does not count a space', () => {
+    expect(isRoom(roomOfType('m.space') as never)).toBe(false);
+  });
+
+  it('does not count the server emoji room, so it stays out of room lists', () => {
+    expect(isRoom(roomOfType('io.mindroom.emoji') as never)).toBe(false);
+  });
+});
+
+describe('isMindroomEmojiRoom', () => {
+  it('matches the server emoji room', () => {
+    expect(isMindroomEmojiRoom(roomOfType('io.mindroom.emoji') as never)).toBe(true);
+  });
+
+  it('does not match an ordinary room, a voice room or a space', () => {
+    expect(isMindroomEmojiRoom(roomOfType() as never)).toBe(false);
+    expect(isMindroomEmojiRoom(roomOfType('org.matrix.msc3417.call') as never)).toBe(false);
+    expect(isMindroomEmojiRoom(roomOfType('m.space') as never)).toBe(false);
+  });
+
+  // Pickers list joined room IDs, and `mx.getRoom` may have no room for one; `isRoom` would drop it.
+  it('does not match a room the client does not have', () => {
+    expect(isMindroomEmojiRoom(null)).toBe(false);
   });
 });

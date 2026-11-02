@@ -22,6 +22,7 @@ import { useInboxNotificationsSelected } from '../../hooks/router/useInbox';
 import { useMediaAuthentication } from '../../hooks/useMediaAuthentication';
 import { usePinchToZoom } from '../../hooks/usePinchToZoom';
 import { MindroomClientNonUIFeatures } from '../../mindroom/client/MindroomClientNonUIFeatures';
+import { playChime } from '../../mindroom/notifications/playChime';
 
 function SystemEmojiFeature() {
   const [twitterEmoji] = useSetting(settingsAtom, 'twitterEmoji');
@@ -57,7 +58,6 @@ function PinchToZoomFeature() {
 
 function MessageNotifications() {
   const { t } = useTranslation();
-  const audioRef = useRef<HTMLAudioElement>(null);
   const notifRef = useRef<Notification>();
   const unreadCacheRef = useRef<Map<string, UnreadInfo>>(new Map());
   const mx = useMatrixClient();
@@ -101,11 +101,6 @@ function MessageNotifications() {
     },
     [navigate, t]
   );
-
-  const playSound = useCallback(() => {
-    const audioElement = audioRef.current;
-    void audioElement?.play().catch(() => undefined);
-  }, []);
 
   useEffect(() => {
     const handleTimelineEvent: RoomEventHandlerMap[RoomEvent.Timeline] = (
@@ -157,7 +152,7 @@ function MessageNotifications() {
       }
 
       if (notificationSound) {
-        playSound();
+        playChime(NotificationSound).catch(() => undefined);
       }
     };
     mx.on(RoomEvent.Timeline, handleTimelineEvent);
@@ -169,18 +164,12 @@ function MessageNotifications() {
     notificationSound,
     notificationSelected,
     showNotifications,
-    playSound,
     notify,
     selectedRoomId,
     useAuthentication,
   ]);
 
-  return (
-    // eslint-disable-next-line jsx-a11y/media-has-caption
-    <audio ref={audioRef} preload="none" style={{ display: 'none' }}>
-      <source src={NotificationSound} type="audio/ogg" />
-    </audio>
-  );
+  return null;
 }
 
 type ClientNonUIFeaturesProps = {

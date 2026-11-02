@@ -34,4 +34,6 @@ export type CreateComputerSessionRequest = {
 export type ComputerAgent = {
   userId: string;
   name: string;
+  /** The server this agent published, when Chat found it there rather than in a configured URL. */
+  serverUrl?: string;
 };

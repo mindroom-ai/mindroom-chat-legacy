@@ -44,14 +44,11 @@ describe('getMindroomAiRunInfo', () => {
       modelProvider: 'openai',
       inputTokens: 100,
       outputTokens: 25,
-      totalTokens: 125,
       cacheReadTokens: 20,
-      cacheWriteTokens: 5,
       timeToFirstToken: 0.42,
       contextInputTokens: 125,
       contextWindowTokens: 4000,
       contextCacheReadInputTokens: 20,
-      contextCacheWriteInputTokens: 5,
       contextUncachedInputTokens: 105,
       toolCount: 2,
     });
@@ -69,13 +66,13 @@ describe('getMindroomAiRunInfo', () => {
           version: 1,
           status: 'cached',
           model: { config: 'new', display_name: 'New Model' },
-          usage: { total_tokens: 50 },
+          usage: { output_tokens: 50 },
         },
       },
     });
 
     expect(info?.status).toBe('cached');
-    expect(info?.totalTokens).toBe(50);
+    expect(info?.outputTokens).toBe(50);
     expect(info?.modelConfig).toBe('new');
     expect(info?.modelDisplayName).toBe('New Model');
   });
@@ -217,5 +214,45 @@ describe('isMindroomAiRunStreaming', () => {
         'io.mindroom.stream_status': 'completed',
       })
     ).toBe(true);
+  });
+});
+
+describe('getMindroomAiRunInfo reply cost', () => {
+  const withRun = (run: Record<string, unknown>) => ({
+    'io.mindroom.ai_run': { version: 1, status: 'completed', ...run },
+  });
+
+  it('parses cost.usd decimal strings', () => {
+    expect(getMindroomAiRunInfo(withRun({ cost: { usd: '0.0421' } }))?.costUsd).toBe(0.0421);
+  });
+
+  it('accepts a numeric cost', () => {
+    expect(getMindroomAiRunInfo(withRun({ cost: { usd: 1.5 } }))?.costUsd).toBe(1.5);
+  });
+
+  it('rejects malformed cost values', () => {
+    ['abc', '-1', 'NaN', 'Infinity', '', ' 1', '1e309', -1, Number.NaN, {}, null].forEach((usd) => {
+      expect(getMindroomAiRunInfo(withRun({ cost: { usd } }))?.costUsd).toBeUndefined();
+    });
+    expect(getMindroomAiRunInfo(withRun({ cost: '0.5' }))?.costUsd).toBeUndefined();
+  });
+
+  it('parses time_to_first_token strings the backend sends', () => {
+    expect(
+      getMindroomAiRunInfo(withRun({ usage: { time_to_first_token: '0.512' } }))?.timeToFirstToken
+    ).toBe(0.512);
+  });
+});
+
+describe('getMindroomAiRunInfo uncached input', () => {
+  it('reads the uncached input the backend splits from cache reads', () => {
+    expect(
+      getMindroomAiRunInfo({
+        'io.mindroom.ai_run': {
+          version: 1,
+          usage: { input_tokens: 1674, uncached_input_tokens: 266 },
+        },
+      })?.uncachedInputTokens
+    ).toBe(266);
   });
 });

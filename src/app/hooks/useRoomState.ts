@@ -36,7 +36,10 @@ export const useRoomState = (room: Room): StateTypeToState => {
 
   useEffect(() => {
     const roomState = room.getLiveTimeline().getState(Direction.Forward);
-    const handler: RoomStateEventHandlerMap[RoomStateEvent.Events] = () => {
+    const handler: RoomStateEventHandlerMap[RoomStateEvent.Events] = (event) => {
+      // Member events are left out of the state, and sync hands the sender's over again with each
+      // batch it sends in, so they would render every consumer again for nothing.
+      if (event.getType() === StateEvent.RoomMember) return;
       setState(getState());
     };
 

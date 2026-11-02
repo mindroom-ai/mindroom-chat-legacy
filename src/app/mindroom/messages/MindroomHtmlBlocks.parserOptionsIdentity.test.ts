@@ -32,14 +32,14 @@ vi.mock('./MindroomHtmlBlocks.css', () => ({
 }));
 
 // eslint-disable-next-line import/first
-import { withMindroomToolTraceMarkerParserOptions } from './MindroomHtmlBlocks';
+import { renderMarkerParserOptions } from '../../test-utils/markerParserOptions';
 
 const baseOpts: HTMLReactParserOptions = {};
 
-describe('withMindroomToolTraceMarkerParserOptions identity', () => {
+describe('useMindroomToolTraceMarkerParserOptions identity', () => {
   it('returns the base options unchanged for content without mindroom markers', () => {
     expect(
-      withMindroomToolTraceMarkerParserOptions(baseOpts, {
+      renderMarkerParserOptions(baseOpts, {
         msgtype: 'm.text',
         body: 'plain streamed text',
         format: 'org.matrix.custom.html',
@@ -49,18 +49,20 @@ describe('withMindroomToolTraceMarkerParserOptions identity', () => {
   });
 
   it('wraps options when the formatted body contains a tool ref marker', () => {
-    const opts = withMindroomToolTraceMarkerParserOptions(baseOpts, {
+    const opts = renderMarkerParserOptions(baseOpts, {
       msgtype: 'm.text',
       body: '🔧 `search` [1]',
       format: 'org.matrix.custom.html',
       formatted_body: '<p>🔧 <code>search</code> [1]</p>',
     });
     expect(opts).not.toBe(baseOpts);
-    expect(typeof opts.replace).toBe('function');
+    // A function that makes fresh options, with their per-parse state, for each parse.
+    expect(typeof opts).toBe('function');
+    expect(typeof (opts as () => HTMLReactParserOptions)().replace).toBe('function');
   });
 
   it('wraps options when only the plain body contains a tool ref marker', () => {
-    const opts = withMindroomToolTraceMarkerParserOptions(baseOpts, {
+    const opts = renderMarkerParserOptions(baseOpts, {
       msgtype: 'm.text',
       body: '🔧 `search` [1]',
     });
@@ -68,7 +70,7 @@ describe('withMindroomToolTraceMarkerParserOptions identity', () => {
   });
 
   it('wraps options when the formatted body contains a paste marker span', () => {
-    const opts = withMindroomToolTraceMarkerParserOptions(baseOpts, {
+    const opts = renderMarkerParserOptions(baseOpts, {
       msgtype: 'm.text',
       body: 'pasted',
       format: 'org.matrix.custom.html',
@@ -79,7 +81,7 @@ describe('withMindroomToolTraceMarkerParserOptions identity', () => {
   });
 
   it('wraps options for tool trace v2 content', () => {
-    const opts = withMindroomToolTraceMarkerParserOptions(baseOpts, {
+    const opts = renderMarkerParserOptions(baseOpts, {
       msgtype: 'm.text',
       body: 'ran tools',
       'io.mindroom.tool_trace': { version: 2, events: [] },
@@ -88,7 +90,7 @@ describe('withMindroomToolTraceMarkerParserOptions identity', () => {
   });
 
   it('wraps options when a message extras section contains a marker', () => {
-    const opts = withMindroomToolTraceMarkerParserOptions(baseOpts, {
+    const opts = renderMarkerParserOptions(baseOpts, {
       msgtype: 'm.text',
       body: 'with extras',
       'com.mindroom.message_extras': {

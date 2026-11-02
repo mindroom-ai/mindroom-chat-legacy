@@ -78,7 +78,7 @@ room.currentState.setStateEvents([
       model: params.has('stress') ? 'custom-model-'.repeat(40) : 'cheap',
       cron_schedule: {
         minute: params.has('stress') ? Array.from({ length: 60 }, (_, i) => i).join(',') : '30',
-        hour: '9',
+        hour: '16',
         day: '*',
         month: '*',
         weekday: '1-5',
@@ -88,7 +88,7 @@ room.currentState.setStateEvents([
       thread_id: '$inbox',
     },
     'pending',
-    'At 09:30, Monday through Friday'
+    'At 09:30, Monday through Friday (America/Los_Angeles)'
   ),
   schedule('overdue', {
     schedule_type: 'once',

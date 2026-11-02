@@ -35,13 +35,16 @@ vi.mock('../notifications/readReceipts', () => ({
 }));
 
 const Harness = ({
+  conversationHidden = false,
   hideActivity = false,
   threadId,
 }: {
+  conversationHidden?: boolean;
   hideActivity?: boolean;
   threadId?: string;
 }) => {
   useRoomEscapeReadReceipts({
+    conversationHidden,
     hideActivity,
     roomId: '!room:server',
     threadId,
@@ -62,6 +65,18 @@ describe('useRoomEscapeReadReceipts', () => {
     vi.unstubAllGlobals();
   });
 
+  it('marks nothing read while a panel covers the conversation', () => {
+    keyHotkeyMock.mockReturnValue(true);
+    create(React.createElement(Harness, { conversationHidden: true, threadId: '$thread' }));
+
+    act(() => {
+      state.handler?.({} as KeyboardEvent);
+    });
+
+    expect(markRoomAndThreadsAsReadMock).not.toHaveBeenCalled();
+    expect(markThreadAsReadMock).not.toHaveBeenCalled();
+  });
+
   it('marks the whole room read on Escape outside a thread', () => {
     keyHotkeyMock.mockReturnValue(true);
     create(React.createElement(Harness));
@@ -70,11 +85,7 @@ describe('useRoomEscapeReadReceipts', () => {
       state.handler?.({} as KeyboardEvent);
     });
 
-    expect(markRoomAndThreadsAsReadMock).toHaveBeenCalledWith(
-      state.mx,
-      '!room:server',
-      false
-    );
+    expect(markRoomAndThreadsAsReadMock).toHaveBeenCalledWith(state.mx, '!room:server', false);
     expect(markThreadAsReadMock).not.toHaveBeenCalled();
   });
 
@@ -86,12 +97,7 @@ describe('useRoomEscapeReadReceipts', () => {
       state.handler?.({} as KeyboardEvent);
     });
 
-    expect(markThreadAsReadMock).toHaveBeenCalledWith(
-      state.mx,
-      '!room:server',
-      '$thread',
-      true
-    );
+    expect(markThreadAsReadMock).toHaveBeenCalledWith(state.mx, '!room:server', '$thread', true);
     expect(markRoomAndThreadsAsReadMock).not.toHaveBeenCalled();
   });
 

@@ -8,6 +8,7 @@ import {
 } from 'matrix-js-sdk';
 import { traceDeepDiagnosticFetch } from '../diagnostics/deepTrace';
 import { bindHomeserverReachability, createHomeserverReachability } from './homeserverReachability';
+import { getCloudflareAccessToken } from '../native/cloudflareAccess';
 
 type MindroomCreateClientOpts = ICreateClientOpts & {
   threadSupport?: boolean;
@@ -42,15 +43,31 @@ const isSameOriginRequest = (input: Parameters<typeof fetch>[0]): boolean => {
   return url.origin === origin;
 };
 
+// A server behind Cloudflare Access needs its Access token on every request. Fetch would
+// carry this header across a redirect to another origin, so such requests do not follow one.
+const withCloudflareAccessToken = (
+  input: Parameters<typeof fetch>[0],
+  init?: RequestInit
+): RequestInit | undefined => {
+  const url = resolveRequestUrl(input);
+  const token = url ? getCloudflareAccessToken(url) : undefined;
+  if (!token) return init;
+  const headers = new Headers(init?.headers);
+  headers.set('cf-access-token', token);
+  return { ...init, headers, redirect: 'error' };
+};
+
 export const createMatrixFetchFn =
   (baseFetch: typeof globalThis.fetch = globalThis.fetch): typeof globalThis.fetch =>
-  (input, init) =>
-    !isSameOriginRequest(input)
-      ? traceDeepDiagnosticFetch(baseFetch, input, init)
+  (input, init) => {
+    const requestInit = withCloudflareAccessToken(input, init);
+    return !isSameOriginRequest(input)
+      ? traceDeepDiagnosticFetch(baseFetch, input, requestInit)
       : traceDeepDiagnosticFetch(baseFetch, input, {
-          ...init,
+          ...requestInit,
           credentials: 'include',
         });
+  };
 
 const MESSAGE_RETRY_WINDOW_MS = 60_000;
 const queuedAt = new WeakMap<MatrixEvent, number>();

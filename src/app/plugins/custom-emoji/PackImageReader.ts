@@ -16,6 +16,8 @@ export class PackImageReader {
   }
 
   static fromPackImage(shortcode: string, image: PackImage): PackImageReader | undefined {
+    // Pack content is whatever its editors published; skip entries that are not image objects.
+    if (typeof image !== 'object' || image === null) return undefined;
     const { url } = image;
 
     if (typeof url !== 'string') return undefined;

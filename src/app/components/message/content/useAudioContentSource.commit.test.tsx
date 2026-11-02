@@ -17,10 +17,6 @@ vi.mock('../../../hooks/useMatrixClient', () => ({
   useMatrixClient: () => ({}),
 }));
 
-vi.mock('../../../hooks/useMediaAuthentication', () => ({
-  useMediaAuthentication: () => false,
-}));
-
 vi.mock('../../../mindroom/messages/attachmentRepository', () => ({
   downloadCachedAttachment: mocks.downloadMedia,
 }));

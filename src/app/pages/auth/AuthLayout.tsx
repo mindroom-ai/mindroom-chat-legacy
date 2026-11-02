@@ -26,6 +26,7 @@ import { tryDecodeURIComponent } from '../../utils/dom';
 import { buildAuthRoutePath } from './authRouteUtils';
 import { resolveAddAccountReturnPath } from './addAccount';
 import { MINDROOM_AUTH_BRANDING } from '../../mindroom/auth/authUi';
+import { CloudflareAccessLoginGate } from '../../mindroom/native/CloudflareAccessGate';
 import {
   ParticleBackgroundSurface,
   usePersistentParticleBackground,
@@ -230,26 +231,35 @@ export function AuthLayout() {
                   >
                     {(specVersions) => (
                       <SpecVersionsProvider value={specVersions}>
-                        <AuthFlowsLoader
+                        <CloudflareAccessLoginGate
+                          baseUrl={autoDiscoveryInfo['m.homeserver'].base_url}
                           fallback={() => (
                             <AuthLayoutLoading
                               message={t('sharedUi.authLayout.loadingAuthenticationFlow')}
                             />
                           )}
-                          error={() => (
-                            <AuthLayoutError
-                              message={t(
-                                'sharedUi.authLayout.failedToGetAuthenticationFlowInformation'
-                              )}
-                            />
-                          )}
                         >
-                          {(authFlows) => (
-                            <AuthFlowsProvider value={authFlows}>
-                              <Outlet />
-                            </AuthFlowsProvider>
-                          )}
-                        </AuthFlowsLoader>
+                          <AuthFlowsLoader
+                            fallback={() => (
+                              <AuthLayoutLoading
+                                message={t('sharedUi.authLayout.loadingAuthenticationFlow')}
+                              />
+                            )}
+                            error={() => (
+                              <AuthLayoutError
+                                message={t(
+                                  'sharedUi.authLayout.failedToGetAuthenticationFlowInformation'
+                                )}
+                              />
+                            )}
+                          >
+                            {(authFlows) => (
+                              <AuthFlowsProvider value={authFlows}>
+                                <Outlet />
+                              </AuthFlowsProvider>
+                            )}
+                          </AuthFlowsLoader>
+                        </CloudflareAccessLoginGate>
                       </SpecVersionsProvider>
                     )}
                   </SpecVersionsLoader>

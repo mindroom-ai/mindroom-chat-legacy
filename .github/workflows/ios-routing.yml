@@ -28,7 +28,7 @@ permissions:
 jobs:
   routing:
     name: Native room reload and WebContent recovery
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

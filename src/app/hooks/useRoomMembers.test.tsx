@@ -74,7 +74,45 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+function UseRoomMemberNamesProbe({ mx, roomId }: UseRoomMembersProbeProps) {
+  const members = useRoomMembers(mx, roomId);
+  return <output>{members.map((member) => member.name).join(',')}</output>;
+}
+
 describe('useRoomMembers', () => {
+  it("shows a member's new display name when it changes", () => {
+    const roomId = '!room:example.org';
+    const agent = { ...createMember('@agent:example.org'), name: 'Helper' } as RoomMember;
+    const room = {
+      roomId,
+      // Like the SDK, a new array on every call.
+      getMembers: vi.fn(() => [agent]),
+      loadMembersIfNeeded: vi.fn(() => deferred<void>().promise),
+    } as unknown as Room;
+    const mx = Object.assign(new EventEmitter(), {
+      getRoom: vi.fn(() => room),
+    }) as unknown as MatrixClient;
+    let renderer: ReactTestRenderer | undefined;
+    act(() => {
+      renderer = create(<UseRoomMemberNamesProbe mx={mx} roomId={roomId} />);
+    });
+    mountedRenderers.add(renderer as ReactTestRenderer);
+    expect(readOutputText(renderer as ReactTestRenderer)).toBe('Helper');
+
+    // The SDK updates the member in place, then emits Name (and not Membership).
+    agent.name = 'Research Helper';
+    act(() => {
+      (mx as unknown as EventEmitter).emit(
+        RoomMemberEvent.Name,
+        createMembershipEvent(roomId),
+        agent,
+        'Helper'
+      );
+    });
+
+    expect(readOutputText(renderer as ReactTestRenderer)).toBe('Research Helper');
+  });
+
   it('publishes live membership updates while full member load is still pending', async () => {
     const roomId = '!room:example.org';
     const alice = createMember('@alice:example.org');

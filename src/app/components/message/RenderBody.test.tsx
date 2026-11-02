@@ -54,7 +54,7 @@ vi.mock('../../mindroom/messages/MindroomHtmlBlocks.css', () => ({
 }));
 
 // eslint-disable-next-line import/first
-import { withMindroomToolTraceMarkerParserOptions } from '../../mindroom/messages/MindroomHtmlBlocks';
+import { useMindroomToolTraceMarkerParserOptions } from '../../mindroom/messages/MindroomHtmlBlocks';
 
 // eslint-disable-next-line import/first
 import { RenderBody } from './RenderBody';
@@ -178,27 +178,35 @@ describe('RenderBody', () => {
     expect(sanitizeCustomHtmlSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('stays memoized through the mindroom parser-options wrapper for plain content', () => {
-    // Mirrors the production composition in renderMindroomMessageContent:
-    // the wrapper must keep base-options identity for marker-free content,
-    // otherwise the RenderBody memo is silently defeated on every render.
-    const content: Record<string, unknown> = {
-      msgtype: 'm.text',
-      body: 'streamed text',
-      format: 'org.matrix.custom.html',
-      formatted_body: '<p>streamed <strong>text</strong></p>',
-    };
-    const renderThroughWrapper = () => (
-      <ClientConfigProvider value={{}}>
+  it.each([
+    ['plain content', '<p>streamed <strong>text</strong></p>'],
+    ['content with a tool marker', '<p>streamed</p><p>🔧 <code>search</code> [1]</p>'],
+  ])('stays memoized through the mindroom marker parser options for %s', (_case, html) => {
+    // Mirrors the production composition in renderMindroomMessageContent: content
+    // resolved again on every render must keep the parser options, otherwise the
+    // RenderBody memo is silently defeated on every render.
+    function Body({ content }: { content: Record<string, unknown> }) {
+      return (
         <RenderBody
           body={content.body as string}
           customBody={content.formatted_body as string}
-          htmlReactParserOptions={withMindroomToolTraceMarkerParserOptions(
+          htmlReactParserOptions={useMindroomToolTraceMarkerParserOptions(
             htmlReactParserOptions,
             content
           )}
           linkifyOpts={linkifyOpts}
         />
+      );
+    }
+    const content = () => ({
+      msgtype: 'm.text',
+      body: 'streamed text',
+      format: 'org.matrix.custom.html',
+      formatted_body: html,
+    });
+    const renderThroughWrapper = () => (
+      <ClientConfigProvider value={{}}>
+        <Body content={content()} />
       </ClientConfigProvider>
     );
 

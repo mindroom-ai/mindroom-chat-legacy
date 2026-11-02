@@ -7,6 +7,7 @@ import { SidebarNav } from './SidebarNav';
 const mocks = vi.hoisted(() => ({
   simpleMode: false,
   showCanvases: true,
+  homeserverUrl: 'https://mindroom.chat',
 }));
 
 vi.mock('folds', () => ({
@@ -51,6 +52,13 @@ vi.mock('../../mindroom/sidebar/MindroomTab', () => ({
   MindroomTab: () => React.createElement('div', { 'data-tab': 'mindroom' }),
 }));
 
+vi.mock('../../hooks/useMatrixClient', () => ({
+  useMatrixClient: () => ({
+    getHomeserverUrl: () => mocks.homeserverUrl,
+    getAccessToken: () => 'token',
+  }),
+}));
+
 vi.mock('../../mindroom/settings/useMindroomAccountSettings', () => ({
   useSimpleMode: () => mocks.simpleMode,
   useShowCanvasesInSidebar: () => mocks.showCanvases,
@@ -72,6 +80,7 @@ describe('SidebarNav', () => {
   beforeEach(() => {
     mocks.simpleMode = false;
     mocks.showCanvases = true;
+    mocks.homeserverUrl = 'https://mindroom.chat';
   });
 
   it('shows Threads after Direct Messages and before spaces by default', () => {
@@ -189,6 +198,23 @@ describe('SidebarNav', () => {
     expect(hasTab(renderer, 'create')).toBe(false);
 
     renderer.unmount();
+  });
+
+  it('shows Local MindRoom only for accounts on the provisioning homeserver', () => {
+    const config = { sidebar: { mindRoomProvisioningUrl: 'https://mindroom.chat' } };
+    const onProvisioningServer = renderSidebarNav(config);
+    expect(hasTab(onProvisioningServer, 'mindroom')).toBe(true);
+    onProvisioningServer.unmount();
+
+    mocks.homeserverUrl = 'https://matrix.example.org';
+    const elsewhere = renderSidebarNav(config);
+    expect(hasTab(elsewhere, 'mindroom')).toBe(false);
+    elsewhere.unmount();
+
+    // Without a provisioning URL, every homeserver provisions its own accounts.
+    const ownProvisioning = renderSidebarNav();
+    expect(hasTab(ownProvisioning, 'mindroom')).toBe(true);
+    ownProvisioning.unmount();
   });
 
   it('renders an optional footer below the sticky navigation stack', () => {

@@ -25,6 +25,7 @@ import {
 } from 'matrix-js-sdk';
 import { getCallCapabilities } from './utils';
 import { downloadMedia, mxcUrlToHttp } from '../../utils/matrix';
+import { authenticatedMediaRequestInit } from '../../utils/mediaUrl';
 
 const TO_DEVICE_ENCRYPTION_RETRY_DELAYS_MS = [0, 250, 750, 1500, 3000] as const;
 const TO_DEVICE_BACKGROUND_RETRY_DELAYS_MS = [5000, 10_000, 20_000, 30_000] as const;
@@ -498,7 +499,9 @@ export class CallWidgetDriver extends WidgetDriver {
     if (!httpUrl) {
       throw new Error('Call widget failed to download file! No http url!');
     }
-    const blob = await downloadMedia(httpUrl);
+    // This is the client's own request, so it sends the access token itself rather than relying on
+    // the service worker, which may not control the page.
+    const blob = await downloadMedia(httpUrl, authenticatedMediaRequestInit(this.mx, httpUrl));
     return { file: blob };
   }
 

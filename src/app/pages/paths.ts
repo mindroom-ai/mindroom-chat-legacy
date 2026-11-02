@@ -89,6 +89,8 @@ export type ConnectPathSearchParams = {
 };
 export const CONNECT_PATH = '/connect';
 
+export const CONNECTIONS_PATH = '/connections';
+
 export const _NOTIFICATIONS_PATH = 'notifications/';
 export const _INVITES_PATH = 'invites/';
 export const INBOX_PATH = '/inbox/';

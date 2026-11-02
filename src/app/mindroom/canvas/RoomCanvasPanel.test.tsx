@@ -51,6 +51,7 @@ vi.mock('./useCanvasStateShare', () => ({
   },
 }));
 vi.mock('../sidebar/ResizablePanel', () => ({
+  CONVERSATION_MIN_WIDTH: 360,
   ResizablePanel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 vi.mock('../../hooks/useTheme', () => ({

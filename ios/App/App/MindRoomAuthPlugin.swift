@@ -32,6 +32,7 @@ public class MindRoomAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticatio
         }
 
         let callbackScheme = call.getString("callbackScheme")
+        let ephemeral = call.getBool("ephemeral") ?? false
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -61,7 +62,7 @@ public class MindRoomAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticatio
             }
 
             session.presentationContextProvider = self
-            session.prefersEphemeralWebBrowserSession = false
+            session.prefersEphemeralWebBrowserSession = ephemeral
             self.authSession = session
 
             if !session.start() {
@@ -72,6 +73,11 @@ public class MindRoomAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticatio
     }
 
     @objc func signInWithApple(_ call: CAPPluginCall) {
+        // Developer ID profiles do not grant native Sign in with Apple.
+        // Reuse browser SSO on Catalyst; the App Store iPad build stays native.
+        #if targetEnvironment(macCatalyst)
+        authenticate(call)
+        #else
         guard appleSignInCall == nil else {
             call.reject("A Sign in with Apple request is already in progress", "APPLE_AUTH_IN_PROGRESS")
             return
@@ -93,6 +99,7 @@ public class MindRoomAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticatio
             controller.presentationContextProvider = self
             controller.performRequests()
         }
+        #endif
     }
 
     public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {

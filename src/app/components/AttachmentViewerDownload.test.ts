@@ -75,8 +75,17 @@ vi.mock('../styles/Modal.css', () => ({
   ModalWide: 'ModalWide',
 }));
 
+vi.mock('./page', async () => {
+  const { createElement } = await import('react');
+  return {
+    PageScroll: ({ header, children }: { header?: React.ReactNode; children?: React.ReactNode }) =>
+      createElement('div', null, header, children),
+  };
+});
+
 vi.mock('../mindroom/messages/MindroomMessageControls.css', () => ({
   MenuItemText: 'MenuItemText',
+  ReplyDetailsScroll: 'ReplyDetailsScroll',
 }));
 
 vi.mock('../hooks/useZoom', () => ({
@@ -117,10 +126,6 @@ vi.mock('../utils/matrix', () => ({
 
 vi.mock('../hooks/useMatrixClient', () => ({
   useMatrixClient: () => ({}),
-}));
-
-vi.mock('../hooks/useMediaAuthentication', () => ({
-  useMediaAuthentication: () => false,
 }));
 
 vi.mock('../mindroom/native/nativeFileSave', () => ({

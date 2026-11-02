@@ -11,6 +11,8 @@ const MIN_WIDTH = 200;
 const MAX_WIDTH = 600;
 const COLLAPSE_WIDTH = MIN_WIDTH - 40;
 const COLLAPSE_HYSTERESIS = 20;
+/** The conversation column keeps at least this much room beside a resizable side panel. */
+export const CONVERSATION_MIN_WIDTH = 360;
 const clamp = (width: number, max: number) =>
   Math.min(Math.max(Math.min(MIN_WIDTH, max), width), max);
 const readWidth = (key: string, max: number): number | undefined => {

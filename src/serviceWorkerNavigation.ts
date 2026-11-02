@@ -7,6 +7,13 @@ export const NAVIGATION_FALLBACK_EXCLUDE_PARAM = 'navigation-fallback-exclude';
 export const NON_DISRUPTIVE_UPDATE_PARAM = 'non-disruptive-update';
 export const AUTHENTICATION_RECOVERY_NAVIGATION_PARAM = 'authentication-recovery-navigation';
 
+// Browser pages the MindRoom runtime serves at its origin root. When Chat
+// shares that origin, the app shell must not answer them: Chat itself opens
+// the Connections portal (and MCP consent under it) there, MCP clients send
+// the browser to the gateway's OAuth authorize endpoint, and agents share
+// published report links. No Chat route starts with these segments.
+export const RUNTIME_NAVIGATION_PATHS = ['/connections', '/mcp', '/reports'];
+
 export const isAuthenticationRecoveryNavigation = (url: string): boolean => {
   try {
     return new URL(url).searchParams.get(AUTHENTICATION_RECOVERY_NAVIGATION_PARAM) === '1';

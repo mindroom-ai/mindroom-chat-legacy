@@ -240,10 +240,6 @@ vi.mock('../../../hooks/useBlobUrlCleanup', () => ({
   useBlobUrlCleanup: () => undefined,
 }));
 
-vi.mock('../../../hooks/useMediaAuthentication', () => ({
-  useMediaAuthentication: () => false,
-}));
-
 vi.mock('../../../mindroom/messages/attachmentRepository', () => ({
   downloadCachedAttachment: mocks.downloadCachedAttachment,
 }));
@@ -347,8 +343,7 @@ describe('ImageContent', () => {
 
     expect(mocks.downloadCachedAttachment).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ mimeType: blobType }),
-      false
+      expect.objectContaining({ mimeType: blobType })
     );
   });
 

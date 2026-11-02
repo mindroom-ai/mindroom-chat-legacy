@@ -28,7 +28,6 @@ import { AsyncStatus, useAsyncCallback } from '../../../hooks/useAsyncCallback';
 import { revokeBlobUrl, useBlobUrlCleanup } from '../../../hooks/useBlobUrlCleanup';
 import { bytesToSize, millisecondsToMinutesAndSeconds } from '../../../utils/common';
 import { downloadCachedAttachment } from '../../../mindroom/messages/attachmentRepository';
-import { useMediaAuthentication } from '../../../hooks/useMediaAuthentication';
 import { validBlurHash } from '../../../utils/blurHash';
 
 type RenderVideoProps = {
@@ -73,7 +72,6 @@ export const VideoContent = as<'div', VideoContentProps>(
   ) => {
     const { t } = useTranslation();
     const mx = useMatrixClient();
-    const useAuthentication = useMediaAuthentication();
     const blurHash = validBlurHash(info.thumbnail_info?.[MATRIX_BLUR_HASH_PROPERTY_NAME]);
 
     const [load, setLoad] = useState(false);
@@ -82,18 +80,14 @@ export const VideoContent = as<'div', VideoContentProps>(
 
     const [srcState, loadSrc] = useAsyncCallback(
       useCallback(async () => {
-        const fileContent = await downloadCachedAttachment(
-          mx,
-          {
-            owner,
-            mxcUri: url,
-            mimeType,
-            encryptedFile: encInfo ? { ...encInfo, url } : undefined,
-          },
-          useAuthentication
-        );
+        const fileContent = await downloadCachedAttachment(mx, {
+          owner,
+          mxcUri: url,
+          mimeType,
+          encryptedFile: encInfo ? { ...encInfo, url } : undefined,
+        });
         return URL.createObjectURL(fileContent);
-      }, [owner, mx, url, useAuthentication, mimeType, encInfo]),
+      }, [owner, mx, url, mimeType, encInfo]),
       revokeBlobUrl
     );
     useBlobUrlCleanup(srcState);

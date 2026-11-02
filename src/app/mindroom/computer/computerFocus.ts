@@ -13,3 +13,7 @@ export const computerOwnsKeyboardEvent = (event: Event): boolean =>
 
 export const computerOwnsKeyboardFocus = (): boolean =>
   typeof document !== 'undefined' && belongsToComputerSurface(document.activeElement);
+
+/** A touch screen is the primary pointer: the touchpad, its hint and the Keyboard button need one. */
+export const hasCoarsePointer = (): boolean =>
+  window.matchMedia?.('(pointer: coarse)').matches ?? false;

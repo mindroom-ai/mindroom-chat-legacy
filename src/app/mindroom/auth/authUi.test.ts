@@ -19,9 +19,6 @@ vi.mock('@capacitor/core', () => ({
 describe('authUi', () => {
   it('exposes MindRoom Chat auth branding in one UI contract', () => {
     expect(MINDROOM_AUTH_BRANDING.appName).toBe('MindRoom Chat');
-    expect(MINDROOM_AUTH_BRANDING.chatSourceUrl).toBe(
-      'https://github.com/mindroom-ai/mindroom-chat'
-    );
     expect(MINDROOM_AUTH_BRANDING.deviceDisplayName).toBe('MindRoom Chat Web');
     expect(MINDROOM_AUTH_BRANDING.logoAlt).toBe('MindRoom Chat Logo');
   });

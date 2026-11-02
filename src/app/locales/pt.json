@@ -592,7 +592,14 @@
       "searchResults": "Resultados da pesquisa",
       "noResultsFound": "Nenhum resultado encontrado",
       "personalPack": "Pacote pessoal",
-      "unknown": "Desconhecida"
+      "unknown": "Desconhecida",
+      "addCustomEmoji": "Adicionar emoji personalizado",
+      "addCustomEmojiDescription": "É guardado no seu pacote pessoal, para o poder usar em todas as salas.",
+      "addCustomEmojiServerDescription": "Todos em {{server}} podem usá-lo em todas as salas.",
+      "addCustomEmojiFailed": "Não foi possível adicionar o emoji. Tente novamente.",
+      "addCustomEmojiNameTaken": "Esse nome já está em uso. Escolha outro.",
+      "addCustomEmojiTooLarge": "Os GIF animados têm de ter menos de {{limit}}.",
+      "add": "Adicionar"
     },
     "noStickerPacks": {
       "noStickerPacks": "Sem pacotes de stickers!",
@@ -1253,7 +1260,7 @@
       "support": "Suporte",
       "privacy": "Privacidade",
       "terms": "Termos",
-      "poweredBy": "Com tecnologia de <app>{{appName}}</app>, <matrix>Matrix</matrix> e <cinny>Cinny</cinny>"
+      "poweredBy": "Com tecnologia de <links />"
     },
     "router": {
       "join": "Entrar",
@@ -2137,6 +2144,11 @@
           "defaultPack": "Pacote predefinido",
           "view": "Ver",
           "unknown": "Desconhecida"
+        },
+        "serverPack": {
+          "title": "Emojis do servidor",
+          "description": "Todos em {{server}} podem usá-los.",
+          "permissions": "Permissões"
         }
       },
       "notifications": {
@@ -2360,11 +2372,15 @@
         "list_schedules": "Listar todas as tarefas agendadas.",
         "cancel_schedule": "Cancelar um agendamento por ID ou todos os agendamentos.",
         "edit_schedule": "Atualizar uma tarefa agendada existente.",
+        "jobs": "Listar as tarefas em segundo plano em execução aqui.",
+        "cancel_job": "Cancelar uma tarefa em segundo plano por ID ou todas as daqui.",
         "config": "Gerir a configuração do MindRoom (apenas administradores).",
         "desktop": "Gerir o seu destino Desktop.",
+        "mode": "Alternar um agente entre as ferramentas padrão e uma interface apenas com Bash.",
         "model": "Mostrar ou mudar o modelo utilizado no tópico atual.",
         "room_model": "Mostrar ou mudar o modelo predefinido da sala (definir ou repor requer um administrador da sala).",
         "thread_mode": "Mostrar ou mudar o modo de tópico utilizado na sala atual (apenas administradores da sala).",
+        "auto_approve": "Executar as suas chamadas de ferramentas neste tópico sem aprovação durante algum tempo, ou mostrar ou terminar esse período.",
         "encrypt": "Rever ou ativar a encriptação ponto a ponto para a sala atual.",
         "e2ee": "Mostrar o diagnóstico de encriptação da sala atual.",
         "hi": "Mostrar as informações de boas-vindas."
@@ -2651,27 +2667,11 @@
         "moreOptions": "Mais opções"
       },
       "mindroomMessageControls": {
-        "requestContextWindow": "Janela de contexto do pedido",
-        "aiRunMetadata": "Metadados da execução de IA",
         "close": "Fechar",
-        "status": "Estado",
-        "model": "Modelo",
-        "tokens": "Tokens",
-        "runCache": "Cache de execução",
-        "requestContext": "Contexto do pedido",
-        "requestCache": "Cache do pedido",
-        "tools": "Ferramentas",
-        "ttft": "TTFT",
-        "run": "Execução",
-        "session": "Sessão",
-        "openAiRunMetadata": "Abrir metadados da execução de IA",
-        "tokenUsage": "Utilização de tokens",
         "downloadingOriginal": "A transferir original...",
         "retryDownloadOriginal": "Tentar transferir o original novamente",
         "downloadOriginal": "Transferir original",
-        "segmentTokenCount_one": "{{label}}: {{formattedCount}} token",
-        "segmentTokenCount_other": "{{label}}: {{formattedCount}} tokens",
-        "segmentTokenCount_many": "{{label}}: {{formattedCount}} tokens"
+        "replyDetails": "Detalhes da resposta"
       },
       "mindroomMessageExtras": {
         "messageExtras": "Extras da mensagem"
@@ -2696,6 +2696,12 @@
       "mindroomThinkingPlaceholder": {
         "aiIsResponding": "A IA está a responder",
         "thinking": "A pensar…"
+      },
+      "mindroomReasoning": {
+        "thinking": "Pensando",
+        "thoughtFor_one": "Pensou por {{count}} s",
+        "thoughtFor_many": "Pensou por {{count}} s",
+        "thoughtFor_other": "Pensou por {{count}} s"
       },
       "mindroomThreadSummaryCard": {
         "aiThreadSummary": "Resumo do tópico por IA"
@@ -2823,32 +2829,40 @@
         "retry": "Tentar novamente",
         "delete": "Eliminar"
       },
-      "aiRunDisplay": {
-        "inputTokens": "entrada {{formattedCount}}",
-        "outputTokens": "saída {{formattedCount}}",
-        "totalTokens": "total {{formattedCount}}",
-        "readTokens": "lidos {{formattedCount}}",
-        "writeTokens": "escritos {{formattedCount}}",
-        "notReadTokens": "não lidos {{formattedCount}}",
-        "contextUsage": "{{input}} / {{window}} ({{percentage}}%)",
-        "contextBarTitle_one": "{{label}}: {{formattedCount}} token ({{percentage}}% da janela)",
-        "contextBarTitle_other": "{{label}}: {{formattedCount}} tokens ({{percentage}}% da janela)",
-        "contextBarTitleWithSuffix_one": "{{label}}: {{formattedCount}} token ({{percentage}}% da janela); {{suffix}}",
-        "contextBarTitleWithSuffix_other": "{{label}}: {{formattedCount}} tokens ({{percentage}}% da janela); {{suffix}}",
-        "reportedCacheRead_one": "leitura de cache comunicada: {{formattedCount}} token",
-        "reportedCacheRead_other": "leitura de cache comunicada: {{formattedCount}} tokens",
-        "cacheWrite_one": "escrita na cache: {{formattedCount}} token",
-        "cacheWrite_other": "escrita na cache: {{formattedCount}} tokens",
-        "cacheRead": "Leitura da cache",
-        "newInput": "Nova entrada",
-        "reserve": "Reserva",
-        "contextBarTitle_many": "{{label}}: {{formattedCount}} tokens ({{percentage}}% da janela)",
-        "contextBarTitleWithSuffix_many": "{{label}}: {{formattedCount}} tokens ({{percentage}}% da janela); {{suffix}}",
-        "reportedCacheRead_many": "leitura de cache comunicada: {{formattedCount}} tokens",
-        "cacheWrite_many": "escrita na cache: {{formattedCount}} tokens"
-      },
       "mindroomModelBadge": {
         "model": "Modelo: {{model}}"
+      },
+      "mindroomReplyDetails": {
+        "tokens": "Tokens",
+        "cost": "Custo",
+        "conversationSoFar": "Conversa até agora",
+        "failed": "Falhou",
+        "stopped": "Interrompida",
+        "thisReply": "Esta resposta",
+        "input": "Entrada",
+        "fromCache": "Da cache",
+        "output": "Saída",
+        "contextWindow": "Janela de contexto",
+        "contextWindowUsage": "{{input}} de {{window}} · {{percentage}}",
+        "timeToFirstToken": "Primeiro token",
+        "technicalDetails": "Detalhes técnicos",
+        "configuredModel": "Modelo configurado",
+        "runId": "ID da execução",
+        "sessionId": "ID da sessão",
+        "newInput": "Nova entrada",
+        "replyCount_one": "{{count}} resposta",
+        "replyCount_other": "{{count}} respostas",
+        "replyCount_many": "{{count}} respostas",
+        "loadedReplyCount_one": "{{count}} resposta carregada",
+        "loadedReplyCount_other": "{{count}} respostas carregadas",
+        "loadedReplyCount_many": "{{count}} respostas carregadas",
+        "atLeastCost": "≥ {{cost}}",
+        "costHistory": "Custo de cada resposta nesta conversa",
+        "costHistoryBar": "Resposta {{index}}: {{cost}}",
+        "costHistoryPosition": "Esta resposta · {{index}} de {{count}}",
+        "toolCallCount_one": "{{count}} chamada de ferramenta",
+        "toolCallCount_other": "{{count}} chamadas de ferramentas",
+        "toolCallCount_many": "{{count}} chamadas de ferramentas"
       }
     },
     "native": {
@@ -2862,6 +2876,11 @@
         "enable": "Ativar",
         "iosPushNotifications": "Notificações push do iOS",
         "permissionDenied": "A permissão de notificações foi recusada. Ative as notificações para {{appName}} nas Definições do iOS."
+      },
+      "cloudflareAccess": {
+        "signInRequired": "{{value1}} requer o início de sessão da sua organização.",
+        "continue": "Continuar",
+        "signInFailed": "O início de sessão não foi concluído. Tente novamente."
       }
     },
     "notifications": {
@@ -3144,6 +3163,21 @@
       "stopFailed": "Não foi possível parar {{tool}}. Tente novamente.",
       "stopAllFailed": "Não foi possível parar as tarefas em segundo plano. Tente novamente.",
       "inRoom": "Tarefas em segundo plano em execução"
+    },
+    "autoApprove": {
+      "label": "Aprovação automática",
+      "labelOne": "Aprovação automática: {{name}}",
+      "labelMany": "Aprovação automática: {{name}} +{{count}}",
+      "title": "Aprovação automática",
+      "intro": "Neste tópico, as chamadas de ferramentas que estas pessoas pedem são executadas sem cartões de aprovação.",
+      "you": "Você",
+      "until": "Até {{time}}",
+      "ownUntil": "Até {{time}}. Envie !auto_approve off para encerrar."
+    },
+    "notices": {
+      "dismiss": "Fechar aviso",
+      "showMore": "Mostrar mais",
+      "showLess": "Mostrar menos"
     }
   },
   "roomSchedules": {

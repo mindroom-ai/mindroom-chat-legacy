@@ -10,9 +10,8 @@ type MindroomAiRunModel = {
 type MindroomAiRunUsage = {
   input_tokens?: unknown;
   output_tokens?: unknown;
-  total_tokens?: unknown;
   cache_read_tokens?: unknown;
-  cache_write_tokens?: unknown;
+  uncached_input_tokens?: unknown;
   time_to_first_token?: unknown;
 };
 
@@ -20,12 +19,15 @@ type MindroomAiRunContext = {
   input_tokens?: unknown;
   window_tokens?: unknown;
   cache_read_input_tokens?: unknown;
-  cache_write_input_tokens?: unknown;
   uncached_input_tokens?: unknown;
 };
 
 type MindroomAiRunTools = {
   count?: unknown;
+};
+
+type MindroomAiRunCost = {
+  usd?: unknown;
 };
 
 type MindroomAiRunMetadata = {
@@ -37,6 +39,7 @@ type MindroomAiRunMetadata = {
   usage?: unknown;
   context?: unknown;
   tools?: unknown;
+  cost?: unknown;
 };
 
 export type MindroomAiRunInfo = {
@@ -50,16 +53,17 @@ export type MindroomAiRunInfo = {
   modelProvider?: string;
   inputTokens?: number;
   outputTokens?: number;
-  totalTokens?: number;
   cacheReadTokens?: number;
-  cacheWriteTokens?: number;
+  /** Input that was not read from cache, split by the backend with each provider's cache accounting. */
+  uncachedInputTokens?: number;
   timeToFirstToken?: number;
   contextInputTokens?: number;
   contextWindowTokens?: number;
   contextCacheReadInputTokens?: number;
-  contextCacheWriteInputTokens?: number;
   contextUncachedInputTokens?: number;
   toolCount?: number;
+  /** The reply's own cost in USD at the deployment's configured model prices. */
+  costUsd?: number;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -70,6 +74,15 @@ const asString = (value: unknown): string | undefined =>
 
 const asFiniteNumber = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+
+const DECIMAL_STRING = /^\d+(\.\d+)?(e[-+]?\d+)?$/i;
+
+// Matrix event JSON forbids floats, so the backend sends fractional values as decimal strings.
+const asNonNegativeDecimal = (value: unknown): number | undefined => {
+  const parsed = typeof value === 'string' && DECIMAL_STRING.test(value) ? Number(value) : value;
+  const number = asFiniteNumber(parsed);
+  return number !== undefined && number >= 0 ? number : undefined;
+};
 
 const getMindroomAiRunMetadataFromCandidate = (
   content: Record<string, unknown>
@@ -107,6 +120,7 @@ export const getMindroomAiRunInfo = (
     ? (metadata.context as MindroomAiRunContext)
     : undefined;
   const tools = isRecord(metadata.tools) ? (metadata.tools as MindroomAiRunTools) : undefined;
+  const cost = isRecord(metadata.cost) ? (metadata.cost as MindroomAiRunCost) : undefined;
 
   const info: MindroomAiRunInfo = {
     status: asString(metadata.status),
@@ -118,16 +132,15 @@ export const getMindroomAiRunInfo = (
     modelProvider: asString(model?.provider),
     inputTokens: asFiniteNumber(usage?.input_tokens),
     outputTokens: asFiniteNumber(usage?.output_tokens),
-    totalTokens: asFiniteNumber(usage?.total_tokens),
     cacheReadTokens: asFiniteNumber(usage?.cache_read_tokens),
-    cacheWriteTokens: asFiniteNumber(usage?.cache_write_tokens),
-    timeToFirstToken: asFiniteNumber(usage?.time_to_first_token),
+    uncachedInputTokens: asFiniteNumber(usage?.uncached_input_tokens),
+    timeToFirstToken: asNonNegativeDecimal(usage?.time_to_first_token),
     contextInputTokens: asFiniteNumber(context?.input_tokens),
     contextWindowTokens: asFiniteNumber(context?.window_tokens),
     contextCacheReadInputTokens: asFiniteNumber(context?.cache_read_input_tokens),
-    contextCacheWriteInputTokens: asFiniteNumber(context?.cache_write_input_tokens),
     contextUncachedInputTokens: asFiniteNumber(context?.uncached_input_tokens),
     toolCount: asFiniteNumber(tools?.count),
+    costUsd: asNonNegativeDecimal(cost?.usd),
   };
 
   const hasAnyInfo = Object.values(info).some((value) => value !== undefined);

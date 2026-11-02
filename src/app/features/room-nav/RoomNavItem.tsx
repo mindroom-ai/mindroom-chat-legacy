@@ -336,11 +336,9 @@ export function RoomNavItem({
       roomType={room.getType()}
     />
   );
-  // RoomAvatar keeps image errors in local state; remount it when a replacement URL arrives.
   const roomAvatar =
     roomAvatarUrl || showAvatar ? (
       <RoomAvatar
-        key={roomAvatarUrl}
         roomId={room.roomId}
         src={roomAvatarUrl}
         alt={roomName}

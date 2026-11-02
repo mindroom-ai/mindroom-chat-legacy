@@ -8,21 +8,21 @@ import { ClientEvent, MatrixEvent, type MatrixClient, type Room } from 'matrix-j
 import { MemoryRouter } from 'react-router-dom';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import InviteSound from '../../../../public/sound/invite.ogg';
 import { ClientConfigProvider, type ClientConfig } from '../../hooks/useClientConfig';
 import { MatrixClientProvider } from '../../hooks/useMatrixClient';
 import { createSessionId } from '../../state/sessions';
 import { allInvitesAtom } from '../../state/room-list/inviteList';
 import { Membership } from '../../../types/matrix/room';
 import { isComputerShown, listCanvases } from '../canvas/canvasIndexStore';
+import { playChime } from '../notifications/playChime';
 import { CanvasIndexFeature, MindroomInviteNotifications } from './MindroomClientNonUIFeatures';
+
+vi.mock('../notifications/playChime', () => ({ playChime: vi.fn(() => Promise.resolve()) }));
 
 type MockRoom = {
   roomId: string;
   getMyMembership: () => Membership;
-};
-
-type AudioMock = HTMLAudioElement & {
-  play: ReturnType<typeof vi.fn>;
 };
 
 const createInviteRoom = (roomId: string): MockRoom => ({
@@ -48,11 +48,7 @@ const removeInvite = (store: Store, roomId: string) => {
   store.set(allInvitesAtom, { type: 'DELETE', roomId });
 };
 
-const renderInviteNotifications = (
-  store: Store,
-  mx: MatrixClient,
-  audioElement: AudioMock
-): ReactTestRenderer =>
+const renderInviteNotifications = (store: Store, mx: MatrixClient): ReactTestRenderer =>
   create(
     React.createElement(
       Provider,
@@ -71,21 +67,15 @@ const renderInviteNotifications = (
           React.createElement(MindroomInviteNotifications)
         )
       )
-    ),
-    {
-      createNodeMock: (element) => (element.type === 'audio' ? audioElement : null),
-    }
+    )
   );
 
 describe('MindroomInviteNotifications', () => {
   let renderer: ReactTestRenderer | undefined;
-  let play: ReturnType<typeof vi.fn>;
-  let audioElement: AudioMock;
+  const play = vi.mocked(playChime);
   let notificationMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    play = vi.fn(() => Promise.resolve());
-    audioElement = { play } as unknown as AudioMock;
     notificationMock = vi.fn(() => ({ close: vi.fn() }));
     Object.defineProperty(notificationMock, 'permission', {
       configurable: true,
@@ -114,9 +104,9 @@ describe('MindroomInviteNotifications', () => {
     const mx = createMatrixClient(['!cached-a:new', '!cached-b:new']);
 
     await act(async () => {
-      renderer = renderInviteNotifications(store, mx, audioElement);
+      renderer = renderInviteNotifications(store, mx);
     });
-    expect(renderer?.root.findByType('audio').props.preload).toBe('none');
+    expect(renderer?.toJSON()).toBeNull();
 
     await act(async () => {
       setInvites(store, ['!cached-a:new', '!cached-b:new']);
@@ -131,7 +121,7 @@ describe('MindroomInviteNotifications', () => {
     const mx = createMatrixClient([]);
 
     await act(async () => {
-      renderer = renderInviteNotifications(store, mx, audioElement);
+      renderer = renderInviteNotifications(store, mx);
     });
 
     await act(async () => {
@@ -139,6 +129,7 @@ describe('MindroomInviteNotifications', () => {
     });
 
     expect(play).toHaveBeenCalledOnce();
+    expect(play).toHaveBeenCalledWith(InviteSound);
     expect(notificationMock).toHaveBeenCalledOnce();
     expect(notificationMock).toHaveBeenCalledWith(
       'Invitation',
@@ -155,7 +146,7 @@ describe('MindroomInviteNotifications', () => {
     const mx = createMatrixClient([roomId]);
 
     await act(async () => {
-      renderer = renderInviteNotifications(store, mx, audioElement);
+      renderer = renderInviteNotifications(store, mx);
     });
 
     await act(async () => {
@@ -172,7 +163,7 @@ describe('MindroomInviteNotifications', () => {
     const mx = createMatrixClient([roomId]);
 
     await act(async () => {
-      renderer = renderInviteNotifications(store, mx, audioElement);
+      renderer = renderInviteNotifications(store, mx);
     });
     await act(async () => {
       addInvite(store, roomId);
@@ -195,7 +186,7 @@ describe('MindroomInviteNotifications', () => {
     const bobMx = createMatrixClient(['!bob-cached:new']);
 
     await act(async () => {
-      renderer = renderInviteNotifications(store, aliceMx, audioElement);
+      renderer = renderInviteNotifications(store, aliceMx);
     });
     await act(async () => {
       renderer?.update(
@@ -235,7 +226,7 @@ describe('MindroomInviteNotifications', () => {
     const bobMx = createMatrixClient([]);
 
     await act(async () => {
-      renderer = renderInviteNotifications(store, aliceMx, audioElement);
+      renderer = renderInviteNotifications(store, aliceMx);
     });
     await act(async () => {
       renderer?.update(
@@ -278,7 +269,7 @@ describe('MindroomInviteNotifications', () => {
     const bobMx = createMatrixClient([]);
 
     await act(async () => {
-      renderer = renderInviteNotifications(store, aliceMx, audioElement);
+      renderer = renderInviteNotifications(store, aliceMx);
     });
     await act(async () => {
       renderer?.update(
@@ -346,9 +337,25 @@ describe('CanvasIndexFeature', () => {
       },
     });
 
+  // The planner agent publishes its MindRoom server, as a MindRoom that sets no Computers URL does.
+  const serverState = new MatrixEvent({
+    type: 'io.mindroom.server',
+    state_key: AGENT,
+    sender: AGENT,
+    room_id: ROOM_ID,
+    event_id: '$server',
+    origin_server_ts: 1,
+    content: { api_origin: 'http://localhost:8765', computer: true },
+  });
+
   const createClient = () => {
     const room = {
       roomId: ROOM_ID,
+      myUserId: VIEWER,
+      getMyMembership: () => 'join',
+      currentState: {
+        getStateEvents: (type: string) => (type === 'io.mindroom.server' ? [serverState] : []),
+      },
       getMember: (userId: string) => ({ userId, membership: 'join' }),
       getLiveTimeline: () => ({ getEvents: () => [] }),
       getThreads: () => [],
@@ -356,6 +363,7 @@ describe('CanvasIndexFeature', () => {
     } as unknown as Room;
     return Object.assign(new EventEmitter(), {
       getSafeUserId: () => VIEWER,
+      getUserId: () => VIEWER,
       getHomeserverUrl: () => HOMESERVER,
       getRoom: (roomId: string) => (roomId === ROOM_ID ? room : null),
       getRooms: () => [room],
@@ -373,7 +381,20 @@ describe('CanvasIndexFeature', () => {
   };
 
   // Canvases are off in every case; only the computer service differs.
-  const recordNoticeWith = async (mindroom: ClientConfig['mindroom']) => {
+  const recordNoticeWith = async (mindroom: ClientConfig['mindroom'], bindsTokens = false) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              versions: ['v1.11'],
+              unstable_features: { 'io.mindroom.openid_audience': bindsTokens },
+            }),
+            { status: 200 }
+          )
+      )
+    );
     const mx = createClient();
     let renderer: ReactTestRenderer | undefined;
     await act(async () => {
@@ -393,11 +414,16 @@ describe('CanvasIndexFeature', () => {
         )
       );
     });
+    // The homeserver's binding answer arrives after the first render.
+    await act(async () => {
+      await settle();
+    });
     mx.emit(ClientEvent.Event, showComputerNotice());
     await settle();
     await act(async () => {
       renderer?.unmount();
     });
+    vi.unstubAllGlobals();
     return isComputerShown(SESSION, ROOM_ID, '$thread');
   };
 
@@ -414,5 +440,9 @@ describe('CanvasIndexFeature', () => {
 
   it('records nothing with canvases and computers both off', async () => {
     expect(await recordNoticeWith({ canvas: { enabled: false } })).toBe(false);
+  });
+
+  it('records for a server the room agents publish while the homeserver binds tokens', async () => {
+    expect(await recordNoticeWith({ canvas: { enabled: false } }, true)).toBe(true);
   });
 });

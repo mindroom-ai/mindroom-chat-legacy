@@ -14,6 +14,7 @@ const client = createClient({
   userId: '@alice:example.org',
   accessToken: 'test-token',
 });
+client.getVersions = async () => ({ versions: ['v1.11'], unstable_features: {} });
 const persistThumbnail = (url: string) =>
   persistAttachmentEvents(client, [
     new MatrixEvent({
@@ -30,7 +31,6 @@ const persistThumbnail = (url: string) =>
     }),
   ]);
 vi.mock('../../../hooks/useMatrixClient', () => ({ useMatrixClient: () => client }));
-vi.mock('../../../hooks/useMediaAuthentication', () => ({ useMediaAuthentication: () => true }));
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();

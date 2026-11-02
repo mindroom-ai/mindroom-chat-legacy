@@ -31,9 +31,6 @@ const jobsEvent = (jobs: unknown, { sender = AGENT, stateKey = sender } = {}) =>
     type: MINDROOM_BACKGROUND_JOBS_EVENT,
   });
 
-const viewer = '@alice:example.org';
-const joined = () => true;
-
 describe('parseBackgroundJobsStateEvent', () => {
   it('parses each listed job', () => {
     expect(parseBackgroundJobsStateEvent(jobsEvent([job('job_1')]))).toEqual([
@@ -46,11 +43,6 @@ describe('parseBackgroundJobsStateEvent', () => {
         startedAt: '2026-10-11T00:00:01+00:00',
       },
     ]);
-  });
-
-  it('ignores state whose state key is not its sender', () => {
-    const event = jobsEvent([job('job_1')], { stateKey: '@mindroom_other:example.org' });
-    expect(parseBackgroundJobsStateEvent(event)).toEqual([]);
   });
 
   it('drops malformed items and keeps the rest', () => {
@@ -67,15 +59,6 @@ describe('parseBackgroundJobsStateEvent', () => {
 });
 
 describe('selectBackgroundJobs', () => {
-  it('ignores state from a non-agent sender', () => {
-    const event = jobsEvent([job('job_1')], { sender: '@mallory:example.org' });
-    expect(selectBackgroundJobs([event], viewer, joined)).toEqual([]);
-  });
-
-  it('ignores state from an agent that left the room', () => {
-    expect(selectBackgroundJobs([jobsEvent([job('job_1')])], viewer, () => false)).toEqual([]);
-  });
-
   it('orders jobs by start time as written, also a time without a fraction', () => {
     const events = [
       jobsEvent([
@@ -83,10 +66,7 @@ describe('selectBackgroundJobs', () => {
         job('job_1', { started_at: '2026-10-11T00:00:00+00:00' }),
       ]),
     ];
-    expect(selectBackgroundJobs(events, viewer, joined).map((item) => item.jobId)).toEqual([
-      'job_1',
-      'job_2',
-    ]);
+    expect(selectBackgroundJobs(events).map((item) => item.jobId)).toEqual(['job_1', 'job_2']);
   });
 
   it('shows a thread only its own jobs, and the main timeline every job of the room', () => {
@@ -94,7 +74,7 @@ describe('selectBackgroundJobs', () => {
       jobsEvent([job('job_1'), job('job_2', { thread_id: '$other' })]),
       jobsEvent([job('job_3', { thread_id: null })], { sender: '@mindroom_research:example.org' }),
     ];
-    const jobs = selectBackgroundJobs(events, viewer, joined);
+    const jobs = selectBackgroundJobs(events);
     const ids = (threadId: string | null) => jobsInView(jobs, threadId).map((item) => item.jobId);
     expect(ids('$thread')).toEqual(['job_1']);
     expect(ids(null)).toEqual(['job_1', 'job_2', 'job_3']);

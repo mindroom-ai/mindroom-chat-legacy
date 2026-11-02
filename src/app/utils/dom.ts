@@ -209,6 +209,8 @@ export const getThumbnail = (
       resolve(undefined);
       return;
     }
+    // Large photos shrunk to emoji size alias badly with the default low-quality smoothing.
+    context.imageSmoothingQuality = 'high';
     context.drawImage(img, 0, 0, width, height);
 
     canvas.toBlob((thumbnail) => {
@@ -261,6 +263,13 @@ const copyWithExecCommand = (text: string): boolean => {
     copyInput.remove();
   }
 };
+
+/**
+ * The browser Clipboard API, for reads and writes that must start inside the user's gesture
+ * (the computer screen's copy and paste). Undefined outside a secure context.
+ */
+export const getBrowserClipboard = (): Clipboard | undefined =>
+  typeof navigator === 'undefined' ? undefined : navigator.clipboard;
 
 export const copyToClipboard = async (text: string): Promise<boolean> => {
   if (Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('Clipboard')) {

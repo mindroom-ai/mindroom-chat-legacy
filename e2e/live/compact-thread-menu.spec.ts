@@ -215,6 +215,9 @@ test('compact thread actions update tags, summaries and status without opening t
   await page.getByRole('menuitem', { name: 'Pin thread', exact: true }).click();
   await expect(page.getByRole('menuitem', { name: 'Unpin thread', exact: true })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: 'Resolve', exact: true })).toHaveCount(0);
+  // The pin label updates optimistically before the save completes; Escape
+  // deliberately stays disabled while a thread action is still saving.
+  await expect(page.getByRole('menuitem', { name: 'Unpin thread', exact: true })).toBeEnabled();
   await page.keyboard.press('Escape');
   await expect(card).toBeFocused();
   await card.focus();
@@ -230,6 +233,7 @@ test('compact thread actions update tags, summaries and status without opening t
   await page.screenshot({ path: testInfo.outputPath('thread-context-menu-narrow.png') });
   await page.getByRole('menuitem', { name: 'Unpin thread', exact: true }).click();
   await expect(page.getByRole('menuitem', { name: 'Pin thread', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Pin thread', exact: true })).toBeEnabled();
   await page.keyboard.press('Escape');
   await card.click();
   await expect(page.locator('[data-thread-context-summary]')).toHaveText('Fresh agent summary');

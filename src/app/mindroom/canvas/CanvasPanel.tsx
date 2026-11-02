@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EventStatus, type MatrixClient, type MatrixEvent, type Room } from 'matrix-js-sdk';
-import { Box, Button, Icon, IconButton, Icons, type IconSrc, Text } from 'folds';
+import { Box, Button, Icon, IconButton, Icons, Text } from 'folds';
 import { useTranslation } from 'react-i18next';
 import {
   buildCanvasDocument,
@@ -27,6 +27,7 @@ import { useLocalEchoStatus } from '../messages/useLocalEchoStatus';
 import { uploadMindroomLongTextSidecar } from '../messages/longTextSidecarUpload';
 import * as css from './CanvasPanel.css';
 import { IconTooltip } from '../tooltip/IconTooltip';
+import { ExpandIcon, ShrinkIcon } from '../sidebar/panelIcons';
 
 /** A new snapshot cannot be sent by a click that was already on its way. */
 export const CANVAS_SEND_ARM_DELAY_MS = 500;
@@ -65,27 +66,6 @@ export type CanvasPanelProps = {
   shared?: boolean;
   onSelectVersion?: (current: number) => void;
 };
-
-const ExpandIcon: IconSrc = () => (
-  <path
-    d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  />
-);
-const ShrinkIcon: IconSrc = () => (
-  <path
-    d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  />
-);
 
 type Staged = {
   submission: CanvasSubmission;

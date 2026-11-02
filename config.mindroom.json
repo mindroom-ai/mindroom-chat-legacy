@@ -89,7 +89,7 @@
   },
 
   "messageRendering": {
-    "additionalAllowedUriSchemes": ["obsidian"]
+    "additionalAllowedUriSchemes": ["obsidian", "readdlespark"]
   },
 
   "sidebar": {

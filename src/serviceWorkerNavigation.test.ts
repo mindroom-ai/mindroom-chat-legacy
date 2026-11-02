@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTHENTICATION_RECOVERY_NAVIGATION_PARAM,
   NAVIGATION_FALLBACK_EXCLUDE_PARAM,
+  RUNTIME_NAVIGATION_PATHS,
   fetchNavigationWithShellFallback,
   isAuthenticationRecoveryNavigation,
   navigationFallbackExcludePathPattern,
@@ -56,6 +57,42 @@ describe('service worker navigation fallback exclusions', () => {
     expect(controlPanel.test('/control.panel/users')).toBe(true);
     expect(controlPanel.test('/controlXpanel/users')).toBe(false);
     expect(otherApp.test('/home/some-room')).toBe(false);
+  });
+});
+
+describe('MindRoom runtime pages on a shared origin', () => {
+  const runtimePatterns = RUNTIME_NAVIGATION_PATHS.map(navigationFallbackExcludePathPattern);
+  const excluded = (pathAndSearch: string): boolean =>
+    runtimePatterns.some((pattern) => pattern.test(pathAndSearch));
+
+  it.each([
+    // Chat opens the Connections portal on its backend's origin.
+    '/connections',
+    '/connections/',
+    '/connections/egress',
+    '/connections/mcp/authorize?state=abc',
+    // MCP clients send the user's browser to the gateway's OAuth endpoint.
+    '/mcp/oauth/authorize?client_id=abc&state=xyz',
+    // Agents share published reports, and private run reports open from links.
+    '/reports/public/weekly-summary/',
+    '/reports/public/weekly-summary/assets/app.js',
+    '/reports/private/run-id',
+  ])('leaves %s to the network', (pathAndSearch) => {
+    expect(excluded(pathAndSearch)).toBe(true);
+  });
+
+  it.each([
+    '/',
+    '/home/',
+    '/connect',
+    '/connect?code=abc',
+    '/connectionsfoo',
+    '/mcpx',
+    '/reportsfoo',
+    `/${encodeURIComponent('#reports:example.org')}/`,
+    `/${encodeURIComponent('!space:example.org')}/${encodeURIComponent('!room:example.org')}/`,
+  ])('keeps the app shell for Chat route %s', (pathAndSearch) => {
+    expect(excluded(pathAndSearch)).toBe(false);
   });
 });
 

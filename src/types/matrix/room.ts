@@ -54,6 +54,7 @@ export enum MessageEvent {
 export enum RoomType {
   Space = 'm.space',
   Call = 'org.matrix.msc3417.call',
+  MindroomEmoji = 'io.mindroom.emoji',
 }
 
 export type MSpaceChildContent = {

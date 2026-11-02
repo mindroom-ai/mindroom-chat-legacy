@@ -16,10 +16,15 @@ const mocks = vi.hoisted(() => ({
     (baseFetch: typeof globalThis.fetch, input: RequestInfo | URL, init?: RequestInit) =>
       baseFetch(input, init)
   ),
+  getCloudflareAccessToken: vi.fn<(url: string | URL) => string | undefined>(),
 }));
 
 vi.mock('../diagnostics/deepTrace', () => ({
   traceDeepDiagnosticFetch: mocks.traceDeepDiagnosticFetch,
+}));
+
+vi.mock('../native/cloudflareAccess', () => ({
+  getCloudflareAccessToken: mocks.getCloudflareAccessToken,
 }));
 
 describe('createMatrixFetchFn', () => {
@@ -66,6 +71,36 @@ describe('createMatrixFetchFn', () => {
     expect(baseFetch).toHaveBeenCalledWith('https://other.example.com/_matrix/client', {
       method: 'GET',
     });
+  });
+
+  it('sends the Cloudflare Access token only to the server it belongs to', async () => {
+    mocks.getCloudflareAccessToken.mockImplementation((url) =>
+      new URL(url).origin === 'https://hs.example' ? 'access-token' : undefined
+    );
+    const baseFetch = vi.fn().mockResolvedValue({ ok: true });
+    const fetchFn = createMatrixFetchFn(baseFetch as unknown as typeof fetch);
+
+    await fetchFn('https://hs.example/_matrix/client/v3/sync', {
+      headers: { Authorization: 'Bearer matrix-token' },
+    });
+    await fetchFn('https://other.example/_matrix/client/v3/sync', { method: 'GET' });
+
+    const headers = new Headers(baseFetch.mock.calls[0][1].headers);
+    expect(headers.get('cf-access-token')).toBe('access-token');
+    expect(headers.get('authorization')).toBe('Bearer matrix-token');
+    expect(baseFetch.mock.calls[1][1]).toEqual({ method: 'GET' });
+  });
+
+  it('refuses redirects for requests carrying the Cloudflare Access token', async () => {
+    // Fetch keeps custom headers across a cross-origin redirect.
+    mocks.getCloudflareAccessToken.mockReturnValue('access-token');
+    const baseFetch = vi.fn().mockResolvedValue({ ok: true });
+    const fetchFn = createMatrixFetchFn(baseFetch as unknown as typeof fetch);
+
+    await fetchFn('https://hs.example/_matrix/client/v3/sync');
+
+    expect(baseFetch.mock.calls[0][1].redirect).toBe('error');
+    mocks.getCloudflareAccessToken.mockReset();
   });
 
   it('keeps a captured Matrix delegate routed through dynamic tracing', async () => {

@@ -1,4 +1,4 @@
-import { type MatrixClient } from 'matrix-js-sdk';
+import { createClient, type MatrixClient } from 'matrix-js-sdk';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CallWidgetDriver } from './CallWidgetDriver';
 
@@ -350,5 +350,33 @@ describe('CallWidgetDriver.sendToDevice', () => {
     await vi.advanceTimersByTimeAsync(5000);
 
     expect(queueToDevice).not.toHaveBeenCalled();
+  });
+});
+
+describe('CallWidgetDriver.downloadFile', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sends the access token with the authenticated media request', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) =>
+      init?.headers
+        ? new Response('file bytes')
+        : new Response('Missing access token', { status: 401 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const mx = createClient({
+      baseUrl: 'https://matrix.example.org',
+      userId: '@local:example.org',
+      deviceId: 'LOCAL',
+      accessToken: 'test-token',
+    });
+    const driver = new CallWidgetDriver(mx, '!room:example.org');
+
+    const { file } = await driver.downloadFile('mxc://example.org/media');
+
+    expect(await (file as Blob).text()).toBe('file bytes');
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/_matrix/client/v1/media/download/');
+    expect(fetchMock.mock.calls[0][1]?.headers).toEqual({ Authorization: 'Bearer test-token' });
   });
 });

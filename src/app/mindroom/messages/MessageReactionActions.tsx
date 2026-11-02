@@ -11,6 +11,7 @@ import {
   Text,
   as,
   config,
+  toRem,
 } from 'folds';
 import React, { useState } from 'react';
 import FocusTrap from 'focus-trap-react';
@@ -19,6 +20,10 @@ import { Relations } from 'matrix-js-sdk/lib/models/relations';
 import { Modal, MenuItem } from '../../components/glass/GlassPrimitives';
 import { useMatrixClient } from '../../hooks/useMatrixClient';
 import { useRecentEmoji } from '../../hooks/useRecentEmoji';
+import { useRelevantImagePacks } from '../../hooks/useImagePacks';
+import { useMediaAuthentication } from '../../hooks/useMediaAuthentication';
+import { ImageUsage } from '../../plugins/custom-emoji';
+import { mxcUrlToHttp } from '../../utils/matrix';
 import * as css from '../../features/room/message/styles.css';
 import { ReactionViewer } from '../../features/room/reaction-viewer';
 import { stopPropagation } from '../../utils/keyboard';
@@ -28,11 +33,14 @@ export type ReactionHandler = (keyOrMxc: string, shortcode: string) => void;
 
 type MessageQuickReactionsProps = {
   onReaction: ReactionHandler;
+  imagePackRooms?: Room[];
 };
 export const MessageQuickReactions = as<'div', MessageQuickReactionsProps>(
-  ({ onReaction, ...props }, ref) => {
+  ({ onReaction, imagePackRooms, ...props }, ref) => {
     const mx = useMatrixClient();
-    const recentEmojis = useRecentEmoji(mx, 4);
+    const useAuthentication = useMediaAuthentication();
+    const imagePacks = useRelevantImagePacks(ImageUsage.Emoticon, imagePackRooms ?? []);
+    const recentEmojis = useRecentEmoji(mx, 4, imagePacks);
 
     if (recentEmojis.length === 0) return <span />;
     return (
@@ -45,23 +53,34 @@ export const MessageQuickReactions = as<'div', MessageQuickReactionsProps>(
           {...props}
           ref={ref}
         >
-          {recentEmojis.map((emoji) => (
-            <IconTooltip key={emoji.unicode} label={emoji.shortcode} position="Top">
-              {(triggerRef) => (
-                <IconButton
-                  ref={triggerRef}
-                  className={css.MessageQuickReaction}
-                  size="300"
-                  variant="SurfaceVariant"
-                  radii="Pill"
-                  aria-label={emoji.shortcode}
-                  onClick={() => onReaction(emoji.unicode, emoji.shortcode)}
-                >
-                  <Text size="T500">{emoji.unicode}</Text>
-                </IconButton>
-              )}
-            </IconTooltip>
-          ))}
+          {recentEmojis.map((emoji) => {
+            const key = 'url' in emoji ? emoji.url : emoji.unicode;
+            return (
+              <IconTooltip key={key} label={emoji.shortcode} position="Top">
+                {(triggerRef) => (
+                  <IconButton
+                    ref={triggerRef}
+                    className={css.MessageQuickReaction}
+                    size="300"
+                    variant="SurfaceVariant"
+                    radii="Pill"
+                    aria-label={emoji.shortcode}
+                    onClick={() => onReaction(key, emoji.shortcode)}
+                  >
+                    {'url' in emoji ? (
+                      <img
+                        src={mxcUrlToHttp(mx, emoji.url, useAuthentication) ?? ''}
+                        alt={emoji.shortcode}
+                        style={{ width: toRem(20), height: toRem(20), objectFit: 'contain' }}
+                      />
+                    ) : (
+                      <Text size="T500">{emoji.unicode}</Text>
+                    )}
+                  </IconButton>
+                )}
+              </IconTooltip>
+            );
+          })}
         </Box>
         <Line size="300" />
       </>

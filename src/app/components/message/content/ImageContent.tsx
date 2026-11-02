@@ -32,7 +32,6 @@ import { bytesToSize } from '../../../utils/common';
 import { getImageBlobSafeMimeType } from '../../../utils/mimeTypes';
 import { stopPropagation } from '../../../utils/keyboard';
 import { downloadCachedAttachment } from '../../../mindroom/messages/attachmentRepository';
-import { useMediaAuthentication } from '../../../hooks/useMediaAuthentication';
 import { imageViewerOpenAtom } from '../../../state/imageViewer';
 import { ModalWide } from '../../../styles/Modal.css';
 import { validBlurHash } from '../../../utils/blurHash';
@@ -87,7 +86,6 @@ export const ImageContent = as<'div', ImageContentProps>(
   ) => {
     const { t } = useTranslation();
     const mx = useMatrixClient();
-    const useAuthentication = useMediaAuthentication();
     const blurHash = validBlurHash(info?.[MATRIX_BLUR_HASH_PROPERTY_NAME]);
 
     const [load, setLoad] = useState(false);
@@ -98,18 +96,14 @@ export const ImageContent = as<'div', ImageContentProps>(
 
     const [srcState, loadSrc] = useAsyncCallback(
       useCallback(async () => {
-        const fileContent = await downloadCachedAttachment(
-          mx,
-          {
-            owner,
-            mxcUri: url,
-            mimeType: getImageBlobSafeMimeType(mimeType),
-            encryptedFile: encInfo ? { ...encInfo, url } : undefined,
-          },
-          useAuthentication
-        );
+        const fileContent = await downloadCachedAttachment(mx, {
+          owner,
+          mxcUri: url,
+          mimeType: getImageBlobSafeMimeType(mimeType),
+          encryptedFile: encInfo ? { ...encInfo, url } : undefined,
+        });
         return URL.createObjectURL(fileContent);
-      }, [owner, mx, url, useAuthentication, mimeType, encInfo]),
+      }, [owner, mx, url, mimeType, encInfo]),
       revokeBlobUrl
     );
     useBlobUrlCleanup(srcState);

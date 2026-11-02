@@ -7,8 +7,16 @@ const NATIVE_SSO_HOST = 'auth';
 const SUPPORTED_NATIVE_APP_PLATFORMS = new Set(['android', 'ios']);
 type StandaloneNavigator = Navigator & { standalone?: boolean };
 type MindRoomAuthPlugin = {
-  authenticate(options: { url: string; callbackScheme: string }): Promise<{ url?: string }>;
-  signInWithApple(options?: Record<string, never>): Promise<NativeAppleCredential>;
+  authenticate(options: {
+    url: string;
+    callbackScheme: string;
+    ephemeral: boolean;
+  }): Promise<{ url?: string }>;
+  signInWithApple(options: {
+    url: string;
+    callbackScheme: string;
+    ephemeral: boolean;
+  }): Promise<NativeAppleCredential>;
 };
 type NativeAppUrlPlugin = {
   addListener(
@@ -21,6 +29,7 @@ type NativeAppUrlPlugin = {
 let mindRoomAuthPlugin: MindRoomAuthPlugin | undefined;
 
 type NativeAppleCredential = {
+  url?: string;
   authorizationCode?: string;
   email?: string;
   familyName?: string;
@@ -37,8 +46,11 @@ type NativeAppleLoginResponse = {
 
 type NativeAppleLoginOptions = {
   baseUrl: string;
+  ssoUrl: string;
+  ephemeral?: boolean;
   providerId?: string;
   redirectUrl: string;
+  request?: typeof fetch;
 };
 
 const normalizePath = (path: string): string => path.replace(/\/{2,}/g, '/');
@@ -193,15 +205,23 @@ const routeLoginTokenRedirect = (redirectUrl: string, loginToken: string): void 
   window.location.replace(targetUrl);
 };
 
-export const openNativeSsoBrowser = async (url: string): Promise<void> => {
-  if (isNativeIOS() && Capacitor.isPluginAvailable('MindRoomAuth')) {
-    const result = await getMindRoomAuthPlugin().authenticate({
-      callbackScheme: NATIVE_SSO_SCHEME,
-      url,
-    });
+/**
+ * Opens `url` in an iOS authentication session and returns the callback URL it ends at.
+ * An ephemeral session starts without Safari's cookies and keeps none of its own.
+ */
+export const authenticateInNativeBrowser = async (
+  url: string,
+  callbackScheme: string,
+  ephemeral = false
+): Promise<string | undefined> =>
+  (await getMindRoomAuthPlugin().authenticate({ callbackScheme, ephemeral, url })).url;
 
-    if (result.url) {
-      routeNativeSsoCallback(result.url);
+export const openNativeSsoBrowser = async (url: string, ephemeral = false): Promise<void> => {
+  if (isNativeIOS() && Capacitor.isPluginAvailable('MindRoomAuth')) {
+    const callbackUrl = await authenticateInNativeBrowser(url, NATIVE_SSO_SCHEME, ephemeral);
+
+    if (callbackUrl) {
+      routeNativeSsoCallback(callbackUrl);
     }
 
     return;
@@ -212,20 +232,35 @@ export const openNativeSsoBrowser = async (url: string): Promise<void> => {
 
 export const signInWithNativeApple = async ({
   baseUrl,
+  ssoUrl,
+  ephemeral = false,
   providerId,
   redirectUrl,
+  request = fetch,
 }: NativeAppleLoginOptions): Promise<void> => {
   if (!isNativeIOS() || !Capacitor.isPluginAvailable('MindRoomAuth')) {
     throw new Error('Native Apple sign-in is unavailable');
   }
 
-  const credential = await getMindRoomAuthPlugin().signInWithApple({});
+  const credential = await getMindRoomAuthPlugin().signInWithApple({
+    url: ssoUrl,
+    callbackScheme: NATIVE_SSO_SCHEME,
+    ephemeral,
+  });
+  // The native shell chooses browser SSO when its signing profile cannot
+  // authorize Apple's native API. Keep platform decisions out of web code.
+  if (credential.url) {
+    if (!routeNativeSsoCallback(credential.url)) {
+      throw new Error('Apple browser sign-in returned an unsupported callback');
+    }
+    return;
+  }
 
   if (!credential.identityToken) {
     throw new Error('Native Apple sign-in did not return an identity token');
   }
 
-  const response = await fetch(
+  const response = await request(
     `${trimTrailingSlash(baseUrl)}/_matrix/client/unstable/org.mindroom.login/apple`,
     {
       body: JSON.stringify({

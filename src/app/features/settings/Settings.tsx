@@ -33,7 +33,6 @@ import { About } from './about';
 import { UseStateProvider } from '../../components/UseStateProvider';
 import { stopPropagation } from '../../utils/keyboard';
 import { LogoutDialog } from '../../components/LogoutDialog';
-import { useClientConfig } from '../../hooks/useClientConfig';
 import {
   getSettingsMenuItems,
   resolveSettingsInitialPage,
@@ -42,6 +41,7 @@ import {
 import { SettingsPage, SettingsPages, SIMPLE_MODE_HIDDEN_SETTINGS_PAGES } from './settingsPages';
 import { renderMindroomSettingsPage } from '../../mindroom/settings/settingsExtensions';
 import { useSimpleMode } from '../../mindroom/settings/useMindroomAccountSettings';
+import { useShowLocalMindroom } from '../../mindroom/local-mindroom/useShowLocalMindroom';
 
 const useSettingsMenuItems = (
   showLocalMindRoom: boolean,
@@ -63,7 +63,6 @@ type SettingsProps = {
 };
 export function Settings({ initialPage, requestClose }: SettingsProps) {
   const { t } = useTranslation();
-  const { sidebar } = useClientConfig();
   const mx = useMatrixClient();
   const useAuthentication = useMediaAuthentication();
   const userId = mx.getUserId()!;
@@ -76,7 +75,7 @@ export function Settings({ initialPage, requestClose }: SettingsProps) {
   const screenSize = useScreenSizeContext();
   const simpleMode = useSimpleMode();
   // Local MindRoom stays visible in simple mode: it is where device pairing codes are entered.
-  const showLocalMindRoom = sidebar?.showMindRoom ?? true;
+  const showLocalMindRoom = useShowLocalMindroom();
   const [activePage, setActivePage] = useState<SettingsPage | undefined>(() =>
     resolveSettingsInitialPage(initialPage, screenSize, showLocalMindRoom)
   );

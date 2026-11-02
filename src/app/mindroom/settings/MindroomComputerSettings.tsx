@@ -10,12 +10,15 @@ import {
   computerServicePreferenceAtom,
   resolveComputerServiceUrl,
 } from '../computer/computerServiceSettings';
-import { useComputerApiUrl } from '../computer/useComputerApiUrl';
+import { useComputerApiUrl, useComputerApiUrls } from '../computer/useComputerApiUrl';
 
 export function MindroomComputerSettings({ className }: { className?: string }) {
   const { t } = useTranslation();
   const [preference, savePreference] = useAtom(computerServicePreferenceAtom);
   const apiUrl = useComputerApiUrl();
+  // While the setting follows the default, the field shows the server found from the agents, if any.
+  const found = useComputerApiUrls();
+  const foundUrl = found.discovered ? found.urls[0] : undefined;
   const deploymentUrl = useClientConfig().mindroom?.computers?.apiUrl;
   const [input, setInput] = useState(apiUrl ?? '');
   const [message, setMessage] = useState<'invalidUrl' | 'saveFailed' | 'saved'>();
@@ -54,6 +57,7 @@ export function MindroomComputerSettings({ className }: { className?: string }) 
               autoCorrect="off"
               spellCheck={false}
               value={input}
+              placeholder={foundUrl}
               onChange={(event) => {
                 setInput(event.currentTarget.value);
                 setMessage(undefined);

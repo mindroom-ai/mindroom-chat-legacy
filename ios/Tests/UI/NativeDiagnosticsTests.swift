@@ -27,8 +27,10 @@ final class NativeDiagnosticsTests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Native diagnostics ")).firstMatch
     }
 
-    private func snapshot(_ app: XCUIApplication, after previous: String? = nil) async throws -> Snapshot {
-        let deadline = Date().addingTimeInterval(20)
+    private func snapshot(
+        _ app: XCUIApplication, after previous: String? = nil, timeout: TimeInterval = 20
+    ) async throws -> Snapshot {
+        let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             let button = resultButton(app)
             if button.exists, button.label != previous {
@@ -36,16 +38,20 @@ final class NativeDiagnosticsTests: XCTestCase {
             }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
-        XCTFail("The native export must answer with a fresh snapshot")
+        XCTContext.runActivity(named: "Native diagnostics readiness timeout") { activity in
+            activity.add(XCTAttachment(string: app.debugDescription))
+        }
+        XCTFail("The native export must answer with a fresh snapshot within \(timeout)s (app state: \(app.state.rawValue))")
         throw NSError(domain: "NativeDiagnosticsTests", code: 1)
     }
 
     func testEvidenceSurvivesBackgroundAndNativeRelaunch() async throws {
-        executionTimeAllowance = 120
+        executionTimeAllowance = 240
         let app = XCUIApplication(bundleIdentifier: "chat.mindroom.RoutingHost")
         app.launch()
         defer { app.terminate() }
-        let initial = try await snapshot(app)
+        // Initial launches need a cold WebKit budget; plugin refresh stays at 20s.
+        let initial = try await snapshot(app, timeout: 90)
         XCTAssertEqual(initial.readCount, 1)
         XCTAssertEqual(initial.status, "available", "Native evidence must be exportable before testing retention")
         guard initial.status == "available" else { return }
@@ -87,7 +93,7 @@ final class NativeDiagnosticsTests: XCTestCase {
         app.terminate()
         XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
         app.launch()
-        let reopened = try await snapshot(app)
+        let reopened = try await snapshot(app, timeout: 90)
         XCTAssertEqual(reopened.status, "available")
         XCTAssertNotEqual(reopened.currentSessionId, firstSession)
         XCTAssertTrue(reopened.events.contains { $0.name == "scene.background" && $0.sessionId == firstSession },

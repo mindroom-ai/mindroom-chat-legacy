@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { expect, test } from '@playwright/test';
+import { expect, test, type WebSocket } from '@playwright/test';
 import { loginWithPassword } from './helpers/auth';
 import { openSettingsFromAccountRail } from './helpers/accounts';
 
@@ -33,6 +33,11 @@ test('watch, type, resume in the originating thread, and recover on desktop/mobi
   await page.setViewportSize({ width: 1600, height: 1000 });
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  // The computer's display WebSockets, so a layout change can be checked for a reconnect.
+  const streams: WebSocket[] = [];
+  page.on('websocket', (socket) => {
+    if (new URL(socket.url()).host === new URL(fixture.api_origin).host) streams.push(socket);
+  });
   const continuations: { eventId: string; content: Record<string, unknown> }[] = [];
   page.on('response', async (response) => {
     if (!response.url().includes('/send/m.room.message/') || !response.ok()) return;
@@ -108,12 +113,15 @@ test('watch, type, resume in the originating thread, and recover on desktop/mobi
 
   await panel.getByRole('button', { name: 'Take control', exact: true }).click();
   await expect(panel.getByText('You have control', { exact: true })).toBeVisible();
-  const bounds = await canvas.boundingBox();
-  // The fixture input lies at these framebuffer coordinates, before noVNC scaling.
-  await page.mouse.click(
-    bounds!.x + (150 * bounds!.width) / 1280,
-    bounds!.y + (440 * bounds!.height) / 800
-  );
+  const clickRemoteInput = async () => {
+    const bounds = await canvas.boundingBox();
+    // The fixture input lies at these framebuffer coordinates, before noVNC scaling.
+    await page.mouse.click(
+      bounds!.x + (150 * bounds!.width) / 1280,
+      bounds!.y + (440 * bounds!.height) / 800
+    );
+  };
+  await clickRemoteInput();
   await page.keyboard.press('Control+a');
   await page.keyboard.type('typed-through-chat');
   await panel.getByRole('button', { name: 'Resume agent', exact: true }).click();
@@ -134,6 +142,73 @@ test('watch, type, resume in the originating thread, and recover on desktop/mobi
   await panel.getByRole('button', { name: 'Take control', exact: true }).click();
   await expect(panel.getByText('You have control', { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('desktop-control.png') });
+
+  // Every status the panel shows from here on, so a brief reconnect cannot slip between checks.
+  type StatusLog = { statuses: string[]; observer: MutationObserver };
+  await panel.getByRole('status').evaluate((element) => {
+    const statuses = [element.textContent ?? ''];
+    const observer = new MutationObserver(() => {
+      const text =
+        document.querySelector('[aria-label="Computer panel"] [role="status"]')?.textContent ?? '';
+      if (statuses[statuses.length - 1] !== text) statuses.push(text);
+    });
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+    (window as unknown as { computerStatusLog: StatusLog }).computerStatusLog = {
+      statuses,
+      observer,
+    };
+  });
+  const stopStatusLog = () =>
+    page.evaluate(() => {
+      const log = (window as unknown as { computerStatusLog: StatusLog }).computerStatusLog;
+      log.observer.disconnect();
+      return log.statuses;
+    });
+  expect(streams.length).toBeGreaterThan(0);
+  const streamCount = streams.length;
+  const stream = streams[streamCount - 1];
+  expect(stream.isClosed()).toBe(false);
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const writeLocalClipboard = (text: string) =>
+    page.evaluate((value) => navigator.clipboard.writeText(value), text);
+  const readLocalClipboard = () => page.evaluate(() => navigator.clipboard.readText());
+  // The check mark is outside Latin-1, so only the extended clipboard's UTF-8 can carry it.
+  const pasted = 'pasted from chat ✓';
+  await writeLocalClipboard(pasted);
+  await clickRemoteInput();
+  // The local shortcut is Cmd on a Mac, which the bridge maps to Ctrl on the Linux computer.
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('ControlOrMeta+v');
+  await page.screenshot({ path: testInfo.outputPath('desktop-pasted.png') });
+  // A different local clipboard shows that the copy below carries the computer's text back.
+  await writeLocalClipboard('local text before the copy');
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('ControlOrMeta+c');
+  await expect.poll(readLocalClipboard).toBe(pasted);
+
+  const separator = page.getByRole('separator', { name: 'Resize computer panel', exact: true });
+  const handle = await separator.boundingBox();
+  const narrowFrom = (await panel.boundingBox())!.width;
+  await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle!.x + handle!.width / 2 + 200, handle!.y + handle!.height / 2, {
+    steps: 10,
+  });
+  await page.mouse.up();
+  await expect.poll(async () => (await panel.boundingBox())!.width).toBe(narrowFrom - 200);
+  const expand = panel.getByRole('button', { name: 'Expand computer', exact: true });
+  await expand.click();
+  await expect(expand).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(async () => (await panel.boundingBox())!.width).toBeGreaterThan(narrowFrom);
+  await expect(panel.getByText('You have control', { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('desktop-expanded.png') });
+  await expand.click();
+  await expect(expand).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(async () => (await panel.boundingBox())!.width).toBe(narrowFrom - 200);
+  await expect(panel.getByText('You have control', { exact: true })).toBeVisible();
+  expect(await stopStatusLog()).toEqual(['You have control']);
+  expect(streams).toHaveLength(streamCount);
+  expect(stream.isClosed()).toBe(false);
   await expect.poll(() => continuations.length).toBe(1);
   const continuation = continuations[0];
   expect(continuation.content['m.mentions']).toEqual({ user_ids: [fixture.agent_user_id] });

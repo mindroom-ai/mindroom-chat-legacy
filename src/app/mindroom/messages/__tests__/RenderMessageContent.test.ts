@@ -130,9 +130,7 @@ vi.mock('../MindroomToolApprovalCard', () => ({
   },
 }));
 
-vi.mock('../../../plugins/react-custom-html-parser', () => ({
-  withMindroomToolTraceMarkerParserOptions: (options: unknown) => options,
-}));
+vi.mock('../../../plugins/react-custom-html-parser', () => ({}));
 
 vi.mock('../../../hooks/useMatrixClient', () => ({
   useMatrixClient: () => ({ getUserId: () => '@viewer:example.org' }),

@@ -10,8 +10,14 @@ declare module '@novnc/novnc' {
 
     viewOnly: boolean;
 
+    focusOnClick: boolean;
+
     disconnect(): void;
 
     focus(options?: FocusOptions): void;
+
+    clipboardPasteFrom(text: string): void;
+
+    sendKey(keysym: number, code: string | null, down?: boolean): void;
   }
 }

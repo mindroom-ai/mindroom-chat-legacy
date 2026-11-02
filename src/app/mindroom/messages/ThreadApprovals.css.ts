@@ -71,6 +71,22 @@ export const Chip = style({
   fontSize: 12,
   whiteSpace: 'nowrap',
 });
+// A thread header status chip, sized like the tags beside it; in a header too narrow for it, it ends in an ellipsis.
+export const HeaderChip = style([
+  Chip,
+  {
+    // The tags' padding, less the border they do not have.
+    padding: 'calc(0.1rem - 1px) calc(0.4rem - 1px)',
+    borderRadius: '0.5rem',
+    fontSize: '0.65rem',
+    fontWeight: 500,
+    lineHeight: 1.4,
+    minWidth: 0,
+    maxWidth: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+]);
 export const Receipt = style([
   disclosure.Surface,
   { selectors: { '&:not(:first-child)': { marginBlockStart: config.space.S100 } } },

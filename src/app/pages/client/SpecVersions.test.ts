@@ -405,6 +405,80 @@ describe('SpecVersions', () => {
     expect(specVersions).not.toHaveBeenCalled();
   });
 
+  it('keeps loaded versions when cached content becomes available after a fresh login', async () => {
+    vi.mocked(useActiveSession).mockReturnValue({
+      sessionId: 'session-a',
+      baseUrl: 'https://example.com',
+      userId: '@alice:example.com',
+      deviceId: 'DEVICE',
+      accessToken: 'token',
+      lastUsedAt: 1,
+    });
+    loadedSpecVersions = { versions: ['v1.11'] };
+    vi.mocked(specVersions).mockReturnValue(
+      new Promise(() => {
+        // The background refresh stays pending, so only the loaded versions can be provided.
+      })
+    );
+    const Client = () =>
+      React.createElement('main', { 'data-versions': useSpecVersions().versions.join(',') });
+    const render = (allowCachedContent: boolean) =>
+      React.createElement(
+        SpecVersions,
+        { baseUrl: 'https://example.com', allowCachedContent },
+        React.createElement(Client)
+      );
+    let renderer!: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(render(false));
+    });
+    expect(renderer.root.findByType('main').props['data-versions']).toBe('v1.11');
+
+    // The first sync adds rooms, so ClientRoot allows cached content; the client must not lose the versions it loaded.
+    await act(async () => {
+      renderer.update(render(true));
+    });
+    expect(renderer.root.findByType('main').props['data-versions']).toBe('v1.11');
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('does not refresh again when cached content becomes allowed', async () => {
+    vi.mocked(useActiveSession).mockReturnValue({
+      sessionId: 'session-a',
+      baseUrl: 'https://example.com',
+      userId: '@alice:example.com',
+      deviceId: 'DEVICE',
+      accessToken: 'token',
+      lastUsedAt: 1,
+    });
+    writeCachedSpecVersions('https://example.com', '@alice:example.com', { versions: ['v1.10'] });
+    vi.mocked(specVersions).mockReturnValue(
+      new Promise(() => {
+        // Keep the refresh pending; only the number of requests matters here.
+      })
+    );
+    const render = (allowCachedContent: boolean) =>
+      React.createElement(
+        SpecVersions,
+        { baseUrl: 'https://example.com', allowCachedContent },
+        React.createElement('div', null, 'child')
+      );
+    let renderer!: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(render(false));
+    });
+    await act(async () => {
+      renderer.update(render(true));
+    });
+
+    expect(specVersions).toHaveBeenCalledTimes(1);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('does not cache the empty versions fallback used after an ignored loader error', async () => {
     specVersionsLoaderMode = 'error';
     vi.mocked(useActiveSession).mockReturnValue({

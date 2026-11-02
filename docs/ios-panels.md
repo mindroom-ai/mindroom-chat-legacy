@@ -6,10 +6,12 @@ The app reads `capacitor://localhost/config.json` from its bundle on each launch
 It does not fetch the web deployment's configuration.
 
 `config.mindroom.ios.json` overlays the ordinary `config.mindroom.json` for this hosted iOS build.
-It enables canvases and jsDelivr npm libraries; computers remain disabled until a service is configured.
-Only agents managed by the configured computer service can open computers there.
-In **Settings → General → Computers**, enter the origin of your trusted compatible backend, then choose **Save computer service**.
-On a fresh installation of the shipped app, the URL field starts empty, with no suggested server or built-in deployment preset.
+It enables canvases and jsDelivr npm libraries, and ships no computer service.
+On a homeserver that binds OpenID tokens, such as mindroom.chat, each agent publishes its MindRoom server in its rooms, and with no saved service the app opens computers there and shows the server as the URL field's placeholder.
+Only agents that publish a worker computer can then open computers; with a saved service, the agents it manages can.
+A published `localhost` server would be the phone itself, so the app ignores it.
+In **Settings → General → Computers**, enter the origin of your trusted compatible backend to choose it yourself, then choose **Save computer service**.
+On a fresh installation of the shipped app, the URL field starts empty, with no built-in deployment preset.
 URLs users have explicitly saved remain active after an upgrade.
 HTTP is also accepted for localhost, literal private IPv4 addresses (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), and IPv6 unique-local addresses (`fc00::/7`).
 The form shows an unencrypted-traffic notice before saving an HTTP service; use it only on a trusted local network.
@@ -35,7 +37,7 @@ See [the computer deployment guide](https://docs.mindroom.chat/tools/worker-comp
 
 Canvases retain their opaque sandbox, restrictive CSP, and two-frame navigation containment.
 Library loading permits only `https://cdn.jsdelivr.net/npm/` scripts, styles, and fonts.
-Phones use the existing full-screen panel, including safe-area padding and a close button; the hidden canvas conversation is unmounted.
+Phones use the existing full-screen panel, including safe-area padding and a close button; the conversation under a canvas or computer is unmounted.
 Long canvas titles shrink while the version controls and close button keep their full width, verified at a 320px viewport.
 The native bridge checks WebKit's frame metadata before plugin/Cordova messages or synchronous cookie/HTTP prompts, and Capacitor injects bridge scripts only into the main frame.
 Android also requires its frame-aware bridge; legacy bridge fallbacks and synchronous interfaces are disabled, with SystemBars viewport handling invoked from a native page-commit callback.

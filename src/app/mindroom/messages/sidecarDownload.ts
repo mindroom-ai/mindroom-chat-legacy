@@ -8,9 +8,8 @@ import {
 export const downloadMindroomSidecarBlob = async (
   mx: MatrixClient,
   source: { mxcUri: string; encryptedFile?: IEncryptedFile },
-  useAuthentication: boolean,
   mimeType = 'application/json',
   options: CachedAttachmentDownloadOptions = {}
 ): Promise<Blob> => {
-  return downloadCachedAttachment(mx, { ...source, mimeType }, useAuthentication, options);
+  return downloadCachedAttachment(mx, { ...source, mimeType }, options);
 };

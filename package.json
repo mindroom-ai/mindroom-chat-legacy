@@ -112,6 +112,7 @@
     "katex": "0.16.44",
     "linkify-react": "4.3.2",
     "linkifyjs": "4.3.2",
+    "markdown-it": "14.3.3",
     "matrix-js-sdk": "41.7.0",
     "matrix-widget-api": "1.16.1",
     "millify": "6.1.0",
@@ -145,6 +146,7 @@
     "@types/chroma-js": "3.1.1",
     "@types/file-saver": "2.0.5",
     "@types/is-hotkey": "0.1.10",
+    "@types/markdown-it": "14.2.0",
     "@types/node": "18.11.18",
     "@types/prismjs": "1.26.0",
     "@types/react": "18.2.39",
@@ -176,9 +178,9 @@
     "vite": "5.4.19",
     "vite-plugin-pwa": "0.20.5",
     "vite-plugin-static-copy": "1.0.4",
-    "vite-plugin-top-level-await": "1.4.4",
     "vitest": "2.1.8",
     "workbox-precaching": "7.3.0",
-    "workbox-routing": "7.3.0"
+    "workbox-routing": "7.3.0",
+    "yaml": "1.10.2"
   }
 }

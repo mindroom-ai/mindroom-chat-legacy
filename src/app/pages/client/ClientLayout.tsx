@@ -1,10 +1,11 @@
 import React, { ReactNode, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Box } from 'folds';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { useMatrixClient } from '../../hooks/useMatrixClient';
 import { useActiveSession } from '../../hooks/useSessionStore';
 import { updateSessionLastPath } from '../../state/sessions';
 import { buildSessionLastKnownPath } from './sessionRouteRestore';
+import { CONNECTIONS_PATH } from '../paths';
 import {
   canonicalizeSessionPathname,
   pathnameContainsAliasRoute,
@@ -69,7 +70,8 @@ export function ClientLayout({ nav, children }: ClientLayoutProps) {
   }, [activeSession, hash, mx, navigate, pathname, pathnameHasAliasRoute, search]);
 
   useEffect(() => {
-    if (!activeSession) return;
+    // `/connections` hands the tab to the Connections portal, so restoring it would leave Chat again.
+    if (!activeSession || matchPath(CONNECTIONS_PATH, pathname)) return;
 
     updateSessionLastPath(
       activeSession.sessionId,

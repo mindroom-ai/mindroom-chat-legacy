@@ -29,11 +29,14 @@ export function ThreadActivity({
   icon,
   title,
   detail,
+  preview,
   children,
 }: {
   icon: ReactNode;
   title: string;
   detail?: string;
+  // Shown under the line whether or not the panel is open.
+  preview?: ReactNode;
   children?: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -58,6 +61,7 @@ export function ThreadActivity({
           aria-hidden
         />
       </button>
+      {preview}
       {expanded && (
         <div id={panelId} className={css.Panel}>
           {children}

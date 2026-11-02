@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import React, { ReactNode, useContext, useState } from 'react';
+import React, { ReactNode, useContext, useMemo, useState } from 'react';
 import { Element, HTMLReactParserOptions, Text as DOMText, domToReact } from 'html-react-parser';
 import { ChildNode } from 'domhandler';
 import { Box, Icon, IconSrc, Icons, Text } from 'folds';
@@ -20,9 +20,10 @@ import {
 import { MINDROOM_MESSAGE_EXTRAS_KEY } from './messageExtrasData';
 import { MindroomPasteMarker, parseMindroomPasteMarker } from './pasteAttachmentMarker';
 import {
+  MINDROOM_TOOL_TRACE_KEY,
   MindroomToolTraceEvent,
   MindroomToolMetadataStatus,
-  getMindroomToolTraceEvents,
+  getMindroomToolTraceV2Events,
   isMindroomToolTraceV2,
 } from './toolTrace';
 import * as css from './MindroomHtmlBlocks.css';
@@ -40,6 +41,7 @@ import { ApprovalArgumentFields } from './ApprovalArgumentFields';
 import { toToolArgumentFields } from './argumentFields';
 import { useAppLanguageCode } from '../../hooks/useAppLanguageCode';
 import { useGlassHighlight } from '../../components/glass/liquid/useLiquidGlass';
+import type { HtmlReactParserOptionsSource } from '../../utils/htmlReactParserOptions';
 
 type MindroomTagName = 'think' | 'debug' | 'system' | 'plan' | 'analysis' | 'research';
 
@@ -185,10 +187,20 @@ type MindroomToolBlockRenderData = {
   argsPreview?: string;
   result?: string;
   resultInline: boolean;
+  progress?: string;
 };
+
+// How many of a running call's last output lines show under its tool calls.
+const TOOL_OUTPUT_LINES = 6;
 
 const asToolTraceText = (value: unknown): string | undefined =>
   typeof value === 'string' ? value.trim() || undefined : undefined;
+
+// Output drops leading blank lines but keeps its first line's indentation, as in YAML or a tree listing.
+const asToolOutput = (value: unknown): string | undefined =>
+  typeof value === 'string'
+    ? value.replace(/^(?:[ \t\r]*\n)+/, '').trimEnd() || undefined
+    : undefined;
 
 const buildToolRefRenderData = (
   toolRef: MindroomToolRefParseResult,
@@ -223,6 +235,7 @@ const buildToolRefRenderData = (
       toolName: traceToolName,
       argsPreview,
       resultInline: false,
+      progress: asToolOutput(eventRaw?.progress),
     };
   }
 
@@ -323,6 +336,8 @@ function MindroomToolRefGroupBlock({
     approvals
   );
   const summary = summarizeToolCalls(parsedTools, states);
+  const running = loadedTools.filter((tool, index) => states[index] === 'running');
+  const outputTool = running.filter((tool) => tool.progress).at(-1);
   // Without the trace details the calls' states are unknown, so only count them.
   const icon = metadataStatus
     ? { src: Icons.Terminal, tone: 'neutral' as const }
@@ -343,6 +358,18 @@ function MindroomToolRefGroupBlock({
           : t(TOOL_STATE_TITLE[summary.state], { count: summary.count })
       }
       detail={summary.names}
+      preview={
+        outputTool?.progress && (
+          <>
+            {running.length > 1 && (
+              <div className={activityCss.OutputLabel}>{outputTool.command}</div>
+            )}
+            <pre className={activityCss.Output}>
+              {outputTool.progress.split('\n').slice(-TOOL_OUTPUT_LINES).join('\n')}
+            </pre>
+          </>
+        )
+      }
     >
       {loadedTools.map((parsedTool, index) => (
         <MindroomToolRefGroupItem
@@ -443,22 +470,11 @@ const contentHasMindroomMarkerCandidate = (content: Record<string, unknown>): bo
   return false;
 };
 
-export const withMindroomToolTraceMarkerParserOptions = (
+const createMindroomToolTraceMarkerParserOptions = (
   baseOpts: HTMLReactParserOptions,
-  content: Record<string, unknown>,
+  traceEvents: MindroomToolTraceEvent[] | undefined,
   metadataStatus?: MindroomToolMetadataStatus
 ): HTMLReactParserOptions => {
-  // The wrapped options carry per-parse state and a fresh identity, which
-  // defeats parse memoization downstream. Most messages carry no mindroom
-  // markers, so keep the stable base options for them.
-  if (!contentHasMindroomMarkerCandidate(content)) {
-    return baseOpts;
-  }
-
-  const traceEvents = isMindroomToolTraceV2(content)
-    ? getMindroomToolTraceEvents(content)
-    : undefined;
-
   const baseReplace = baseOpts.replace;
   const baseTransform = baseOpts.transform;
   const consumedToolIndexes = new Set<number>();
@@ -640,4 +656,26 @@ export const withMindroomToolTraceMarkerParserOptions = (
     },
   };
   return nextOpts;
+};
+
+/**
+ * The marker parser options for one message, as a function that makes fresh ones for each parse
+ * (they keep state while they parse). The function stays the same while the base options, whether
+ * the content has markers, its tool trace and the metadata status do, so a memoized parse of a
+ * message that did not change is kept when the timeline renders again, as it does for every
+ * streamed edit of another message.
+ */
+export const useMindroomToolTraceMarkerParserOptions = (
+  baseOpts: HTMLReactParserOptions,
+  content: Record<string, unknown>,
+  metadataStatus?: MindroomToolMetadataStatus
+): HtmlReactParserOptionsSource => {
+  const hasMarkers = contentHasMindroomMarkerCandidate(content);
+  const toolTrace = content[MINDROOM_TOOL_TRACE_KEY];
+  return useMemo(() => {
+    // Most messages carry no markers, and the base options keep the same identity.
+    if (!hasMarkers) return baseOpts;
+    const traceEvents = getMindroomToolTraceV2Events(toolTrace);
+    return () => createMindroomToolTraceMarkerParserOptions(baseOpts, traceEvents, metadataStatus);
+  }, [baseOpts, hasMarkers, toolTrace, metadataStatus]);
 };

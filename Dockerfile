@@ -23,6 +23,8 @@ FROM nginx:1.31.2-alpine
 
 COPY --from=builder /src/dist /app
 COPY --from=builder /src/dist/runtime-config.js /opt/mindroom/runtime-config.js
+# Operators replace this empty list by mounting a directory here (README, Notices).
+COPY --from=builder /src/dist/notices.json /opt/mindroom/notices/notices.json
 COPY --from=builder /src/docker-nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker-entrypoint.d/99-runtime-config.sh /docker-entrypoint.d/99-runtime-config.sh
 

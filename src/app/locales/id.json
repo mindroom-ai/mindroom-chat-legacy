@@ -589,7 +589,14 @@
       "searchResults": "Hasil pencarian",
       "noResultsFound": "Tidak ada hasil ditemukan",
       "personalPack": "Paket pribadi",
-      "unknown": "Tidak diketahui"
+      "unknown": "Tidak diketahui",
+      "addCustomEmoji": "Tambahkan emoji kustom",
+      "addCustomEmojiDescription": "Emoji disimpan di paket pribadi Anda, jadi bisa dipakai di setiap ruang.",
+      "addCustomEmojiServerDescription": "Semua orang di {{server}} bisa memakainya di setiap ruang.",
+      "addCustomEmojiFailed": "Gagal menambahkan emoji. Coba lagi.",
+      "addCustomEmojiNameTaken": "Nama itu sudah dipakai. Pilih nama lain.",
+      "addCustomEmojiTooLarge": "GIF animasi harus berukuran di bawah {{limit}}.",
+      "add": "Tambah"
     },
     "noStickerPacks": {
       "noStickerPacks": "Tidak ada paket stiker!",
@@ -1242,7 +1249,7 @@
       "support": "Dukungan",
       "privacy": "Privasi",
       "terms": "Ketentuan",
-      "poweredBy": "Didukung oleh <app>{{appName}}</app>, <matrix>Matrix</matrix>, <cinny>Cinny</cinny>"
+      "poweredBy": "Didukung oleh <links />"
     },
     "router": {
       "join": "Bergabung",
@@ -2109,6 +2116,11 @@
           "defaultPack": "Paket bawaan",
           "view": "Lihat",
           "unknown": "Tidak diketahui"
+        },
+        "serverPack": {
+          "title": "Emoji server",
+          "description": "Semua orang di {{server}} bisa memakainya.",
+          "permissions": "Izin"
         }
       },
       "notifications": {
@@ -2332,11 +2344,15 @@
         "list_schedules": "Tampilkan semua tugas terjadwal.",
         "cancel_schedule": "Batalkan satu jadwal berdasarkan ID atau semua jadwal.",
         "edit_schedule": "Perbarui tugas terjadwal yang ada.",
+        "jobs": "Tampilkan daftar tugas latar belakang yang berjalan di sini.",
+        "cancel_job": "Batalkan satu tugas latar belakang berdasarkan ID atau semuanya di sini.",
         "config": "Kelola konfigurasi MindRoom (khusus admin).",
         "desktop": "Kelola target Desktop Anda.",
+        "mode": "Alihkan satu agen antara alat standar dan antarmuka khusus Bash.",
         "model": "Tampilkan atau ganti model yang digunakan dalam utas saat ini.",
         "room_model": "Tampilkan atau ganti model bawaan ruang (menetapkan/mengatur ulang memerlukan admin ruang).",
         "thread_mode": "Tampilkan atau ganti mode utas yang digunakan di ruang saat ini (khusus admin ruang).",
+        "auto_approve": "Jalankan panggilan alat Anda di utas ini tanpa persetujuan untuk sementara, atau tampilkan atau akhiri jangka waktu itu.",
         "encrypt": "Tinjau atau aktifkan enkripsi ujung ke ujung untuk ruang saat ini.",
         "e2ee": "Tampilkan diagnostik enkripsi untuk ruang saat ini.",
         "hi": "Tampilkan informasi sambutan."
@@ -2605,26 +2621,11 @@
         "moreOptions": "Opsi lainnya"
       },
       "mindroomMessageControls": {
-        "requestContextWindow": "Jendela konteks permintaan",
-        "aiRunMetadata": "Metadata eksekusi AI",
         "close": "Tutup",
-        "status": "Status",
-        "model": "Model",
-        "tokens": "Token",
-        "runCache": "Cache eksekusi",
-        "requestContext": "Konteks permintaan",
-        "requestCache": "Cache permintaan",
-        "tools": "Alat",
-        "ttft": "Waktu ke token pertama",
-        "run": "Eksekusi",
-        "session": "Sesi",
-        "openAiRunMetadata": "Buka metadata eksekusi AI",
-        "tokenUsage": "Penggunaan token",
         "downloadingOriginal": "Mengunduh berkas asli...",
         "retryDownloadOriginal": "Coba lagi mengunduh berkas asli",
         "downloadOriginal": "Unduh berkas asli",
-        "segmentTokenCount_one": "{{label}}: {{formattedCount}} token",
-        "segmentTokenCount_other": "{{label}}: {{formattedCount}} token"
+        "replyDetails": "Detail balasan"
       },
       "mindroomMessageExtras": {
         "messageExtras": "Tambahan pesan"
@@ -2648,6 +2649,10 @@
       "mindroomThinkingPlaceholder": {
         "aiIsResponding": "AI sedang merespons",
         "thinking": "Berpikir…"
+      },
+      "mindroomReasoning": {
+        "thinking": "Berpikir",
+        "thoughtFor_other": "Berpikir selama {{count}} dtk"
       },
       "mindroomThreadSummaryCard": {
         "aiThreadSummary": "Ringkasan utas AI"
@@ -2756,28 +2761,37 @@
         "retry": "Coba lagi",
         "delete": "Hapus"
       },
-      "aiRunDisplay": {
-        "inputTokens": "masuk {{formattedCount}}",
-        "outputTokens": "keluar {{formattedCount}}",
-        "totalTokens": "total {{formattedCount}}",
-        "readTokens": "baca {{formattedCount}}",
-        "writeTokens": "tulis {{formattedCount}}",
-        "notReadTokens": "tidak dibaca {{formattedCount}}",
-        "contextUsage": "{{input}} / {{window}} ({{percentage}}%)",
-        "contextBarTitle_one": "{{label}}: {{formattedCount}} token ({{percentage}}% jendela)",
-        "contextBarTitle_other": "{{label}}: {{formattedCount}} token ({{percentage}}% jendela)",
-        "contextBarTitleWithSuffix_one": "{{label}}: {{formattedCount}} token ({{percentage}}% jendela); {{suffix}}",
-        "contextBarTitleWithSuffix_other": "{{label}}: {{formattedCount}} token ({{percentage}}% jendela); {{suffix}}",
-        "reportedCacheRead_one": "pembacaan cache yang dilaporkan: {{formattedCount}} token",
-        "reportedCacheRead_other": "pembacaan cache yang dilaporkan: {{formattedCount}} token",
-        "cacheWrite_one": "penulisan cache: {{formattedCount}} token",
-        "cacheWrite_other": "penulisan cache: {{formattedCount}} token",
-        "cacheRead": "Pembacaan cache",
-        "newInput": "Input baru",
-        "reserve": "Cadangan"
-      },
       "mindroomModelBadge": {
         "model": "Model: {{model}}"
+      },
+      "mindroomReplyDetails": {
+        "tokens": "Token",
+        "cost": "Biaya",
+        "conversationSoFar": "Percakapan sejauh ini",
+        "failed": "Gagal",
+        "stopped": "Dihentikan",
+        "thisReply": "Balasan ini",
+        "input": "Masukan",
+        "fromCache": "Dari cache",
+        "output": "Keluaran",
+        "contextWindow": "Jendela konteks",
+        "contextWindowUsage": "{{input}} dari {{window}} · {{percentage}}",
+        "timeToFirstToken": "Token pertama",
+        "technicalDetails": "Detail teknis",
+        "configuredModel": "Model yang dikonfigurasi",
+        "runId": "ID proses",
+        "sessionId": "ID sesi",
+        "newInput": "Input baru",
+        "replyCount_one": "{{count}} balasan",
+        "replyCount_other": "{{count}} balasan",
+        "loadedReplyCount_one": "{{count}} balasan dimuat",
+        "loadedReplyCount_other": "{{count}} balasan dimuat",
+        "atLeastCost": "≥ {{cost}}",
+        "costHistory": "Biaya setiap balasan dalam percakapan ini",
+        "costHistoryBar": "Balasan {{index}}: {{cost}}",
+        "costHistoryPosition": "Balasan ini · {{index}} dari {{count}}",
+        "toolCallCount_one": "{{count}} panggilan alat",
+        "toolCallCount_other": "{{count}} panggilan alat"
       }
     },
     "native": {
@@ -2791,6 +2805,11 @@
         "enable": "Aktifkan",
         "iosPushNotifications": "Notifikasi push iOS",
         "permissionDenied": "Izin notifikasi ditolak. Aktifkan notifikasi untuk {{appName}} di Pengaturan iOS."
+      },
+      "cloudflareAccess": {
+        "signInRequired": "{{value1}} memerlukan login organisasi Anda.",
+        "continue": "Lanjutkan",
+        "signInFailed": "Login belum selesai. Coba lagi."
       }
     },
     "notifications": {
@@ -3066,6 +3085,21 @@
       "stopFailed": "Tidak dapat menghentikan {{tool}}. Coba lagi.",
       "stopAllFailed": "Tidak dapat menghentikan tugas latar belakang. Coba lagi.",
       "inRoom": "Tugas latar belakang sedang berjalan"
+    },
+    "autoApprove": {
+      "label": "Persetujuan otomatis",
+      "labelOne": "Persetujuan otomatis: {{name}}",
+      "labelMany": "Persetujuan otomatis: {{name}} +{{count}}",
+      "title": "Persetujuan otomatis",
+      "intro": "Di utas ini, panggilan alat yang diminta orang-orang ini berjalan tanpa kartu persetujuan.",
+      "you": "Anda",
+      "until": "Hingga {{time}}",
+      "ownUntil": "Hingga {{time}}. Kirim !auto_approve off untuk mengakhirinya."
+    },
+    "notices": {
+      "dismiss": "Tutup pemberitahuan",
+      "showMore": "Tampilkan lebih banyak",
+      "showLess": "Tampilkan lebih sedikit"
     }
   },
   "roomSchedules": {

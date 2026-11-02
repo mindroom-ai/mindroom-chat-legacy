@@ -589,7 +589,14 @@
       "searchResults": "Zoekresultaten",
       "noResultsFound": "Geen resultaten gevonden",
       "personalPack": "Persoonlijk pakket",
-      "unknown": "Onbekend"
+      "unknown": "Onbekend",
+      "addCustomEmoji": "Eigen emoji toevoegen",
+      "addCustomEmojiDescription": "Deze wordt opgeslagen in je persoonlijke pakket, zodat je hem in elke kamer kunt gebruiken.",
+      "addCustomEmojiServerDescription": "Iedereen op {{server}} kan hem in elke kamer gebruiken.",
+      "addCustomEmojiFailed": "Kon de emoji niet toevoegen. Probeer het opnieuw.",
+      "addCustomEmojiNameTaken": "Die naam is al in gebruik. Kies een andere.",
+      "addCustomEmojiTooLarge": "Geanimeerde GIF's moeten kleiner zijn dan {{limit}}.",
+      "add": "Toevoegen"
     },
     "noStickerPacks": {
       "noStickerPacks": "Geen stickerpakketten!",
@@ -1246,7 +1253,7 @@
       "support": "Ondersteuning",
       "privacy": "Privacy",
       "terms": "Voorwaarden",
-      "poweredBy": "Mogelijk gemaakt door <app>{{appName}}</app>, <matrix>Matrix</matrix>, <cinny>Cinny</cinny>"
+      "poweredBy": "Mogelijk gemaakt door <links />"
     },
     "router": {
       "join": "Deelnemen",
@@ -2109,6 +2116,11 @@
           "defaultPack": "Standaardpakket",
           "view": "Bekijken",
           "unknown": "Onbekend"
+        },
+        "serverPack": {
+          "title": "Serveremoji's",
+          "description": "Iedereen op {{server}} kan ze gebruiken.",
+          "permissions": "Bevoegdheden"
         }
       },
       "notifications": {
@@ -2332,11 +2344,15 @@
         "list_schedules": "Alle geplande taken weergeven.",
         "cancel_schedule": "Annuleer één planning op ID of alle planningen.",
         "edit_schedule": "Werk een bestaande geplande taak bij.",
+        "jobs": "Toon de achtergrondtaken die hier draaien.",
+        "cancel_job": "Annuleer één achtergrondtaak op ID of alle taken hier.",
         "config": "Beheer de MindRoom-configuratie (alleen beheerders).",
         "desktop": "Beheer je Desktop-doel.",
+        "mode": "Wissel één agent tussen standaardgereedschap en een interface met alleen Bash.",
         "model": "Toon of wijzig het model dat in de huidige thread wordt gebruikt.",
         "room_model": "Toon of wijzig het standaardmodel van de kamer (instellen/herstellen vereist een kamerbeheerder).",
         "thread_mode": "Toon of wijzig de threadmodus die in de huidige kamer wordt gebruikt (alleen kamerbeheerders).",
+        "auto_approve": "Voer je gereedschapsaanroepen in deze thread een tijdje uit zonder goedkeuring, of toon of beëindig die periode.",
         "encrypt": "Controleer of schakel end-to-endversleuteling in voor de huidige kamer.",
         "e2ee": "Toon versleutelingsdiagnostiek voor de huidige kamer.",
         "hi": "Welkomstinformatie weergeven."
@@ -2611,26 +2627,11 @@
         "moreOptions": "Meer opties"
       },
       "mindroomMessageControls": {
-        "requestContextWindow": "Contextvenster van verzoek",
-        "aiRunMetadata": "Metadata van AI-run",
         "close": "Sluiten",
-        "status": "Status",
-        "model": "Model",
-        "tokens": "Tokens",
-        "runCache": "Run-cache",
-        "requestContext": "Verzoekcontext",
-        "requestCache": "Verzoekcache",
-        "tools": "Gereedschappen",
-        "ttft": "TTFT",
-        "run": "Run",
-        "session": "Sessie",
-        "openAiRunMetadata": "Metadata van AI-run openen",
-        "tokenUsage": "Tokengebruik",
         "downloadingOriginal": "Origineel downloaden...",
         "retryDownloadOriginal": "Download van origineel opnieuw proberen",
         "downloadOriginal": "Origineel downloaden",
-        "segmentTokenCount_one": "{{label}}: {{formattedCount}} token",
-        "segmentTokenCount_other": "{{label}}: {{formattedCount}} tokens"
+        "replyDetails": "Antwoorddetails"
       },
       "mindroomMessageExtras": {
         "messageExtras": "Berichtextra's"
@@ -2654,6 +2655,11 @@
       "mindroomThinkingPlaceholder": {
         "aiIsResponding": "AI antwoordt",
         "thinking": "Denken…"
+      },
+      "mindroomReasoning": {
+        "thinking": "Denkt na",
+        "thoughtFor_one": "{{count}} s nagedacht",
+        "thoughtFor_other": "{{count}} s nagedacht"
       },
       "mindroomThreadSummaryCard": {
         "aiThreadSummary": "AI-threadsamenvatting"
@@ -2768,28 +2774,37 @@
         "retry": "Opnieuw proberen",
         "delete": "Verwijderen"
       },
-      "aiRunDisplay": {
-        "inputTokens": "in {{formattedCount}}",
-        "outputTokens": "uit {{formattedCount}}",
-        "totalTokens": "totaal {{formattedCount}}",
-        "readTokens": "gelezen {{formattedCount}}",
-        "writeTokens": "geschreven {{formattedCount}}",
-        "notReadTokens": "niet gelezen {{formattedCount}}",
-        "contextUsage": "{{input}} / {{window}} ({{percentage}}%)",
-        "contextBarTitle_one": "{{label}}: {{formattedCount}} token ({{percentage}}% van venster)",
-        "contextBarTitle_other": "{{label}}: {{formattedCount}} tokens ({{percentage}}% van venster)",
-        "contextBarTitleWithSuffix_one": "{{label}}: {{formattedCount}} token ({{percentage}}% van venster); {{suffix}}",
-        "contextBarTitleWithSuffix_other": "{{label}}: {{formattedCount}} tokens ({{percentage}}% van venster); {{suffix}}",
-        "reportedCacheRead_one": "gerapporteerd uit cache gelezen: {{formattedCount}} token",
-        "reportedCacheRead_other": "gerapporteerd uit cache gelezen: {{formattedCount}} tokens",
-        "cacheWrite_one": "naar cache geschreven: {{formattedCount}} token",
-        "cacheWrite_other": "naar cache geschreven: {{formattedCount}} tokens",
-        "cacheRead": "Uit cache gelezen",
-        "newInput": "Nieuwe invoer",
-        "reserve": "Reserve"
-      },
       "mindroomModelBadge": {
         "model": "Model: {{model}}"
+      },
+      "mindroomReplyDetails": {
+        "tokens": "Tokens",
+        "cost": "Kosten",
+        "conversationSoFar": "Gesprek tot nu toe",
+        "failed": "Mislukt",
+        "stopped": "Gestopt",
+        "thisReply": "Dit antwoord",
+        "input": "Invoer",
+        "fromCache": "Uit cache",
+        "output": "Uitvoer",
+        "contextWindow": "Contextvenster",
+        "contextWindowUsage": "{{input}} van {{window}} · {{percentage}}",
+        "timeToFirstToken": "Eerste token",
+        "technicalDetails": "Technische details",
+        "configuredModel": "Geconfigureerd model",
+        "runId": "Run-ID",
+        "sessionId": "Sessie-ID",
+        "newInput": "Nieuwe invoer",
+        "replyCount_one": "{{count}} antwoord",
+        "replyCount_other": "{{count}} antwoorden",
+        "loadedReplyCount_one": "{{count}} geladen antwoord",
+        "loadedReplyCount_other": "{{count}} geladen antwoorden",
+        "atLeastCost": "≥ {{cost}}",
+        "costHistory": "Kosten van elk antwoord in dit gesprek",
+        "costHistoryBar": "Antwoord {{index}}: {{cost}}",
+        "costHistoryPosition": "Dit antwoord · {{index}} van {{count}}",
+        "toolCallCount_one": "{{count}} gereedschapsaanroep",
+        "toolCallCount_other": "{{count}} gereedschapsaanroepen"
       }
     },
     "native": {
@@ -2803,6 +2818,11 @@
         "enable": "Inschakelen",
         "iosPushNotifications": "iOS-pushmeldingen",
         "permissionDenied": "Toestemming voor meldingen is geweigerd. Schakel meldingen voor {{appName}} in via de iOS-instellingen."
+      },
+      "cloudflareAccess": {
+        "signInRequired": "{{value1}} vereist aanmelding via je organisatie.",
+        "continue": "Doorgaan",
+        "signInFailed": "Aanmelden is niet voltooid. Probeer het opnieuw."
       }
     },
     "notifications": {
@@ -3078,6 +3098,21 @@
       "stopFailed": "Kon {{tool}} niet stoppen. Probeer het opnieuw.",
       "stopAllFailed": "Kon de achtergrondtaken niet stoppen. Probeer het opnieuw.",
       "inRoom": "Achtergrondtaken actief"
+    },
+    "autoApprove": {
+      "label": "Automatische goedkeuring",
+      "labelOne": "Automatische goedkeuring: {{name}}",
+      "labelMany": "Automatische goedkeuring: {{name}} +{{count}}",
+      "title": "Automatische goedkeuring",
+      "intro": "In deze thread lopen toolaanroepen die deze mensen vragen zonder goedkeuringskaarten.",
+      "you": "Jij",
+      "until": "Tot {{time}}",
+      "ownUntil": "Tot {{time}}. Stuur !auto_approve off om dit te beëindigen."
+    },
+    "notices": {
+      "dismiss": "Melding sluiten",
+      "showMore": "Meer tonen",
+      "showLess": "Minder tonen"
     }
   },
   "roomSchedules": {

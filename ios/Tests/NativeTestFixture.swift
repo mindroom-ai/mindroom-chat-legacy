@@ -4,9 +4,10 @@ import XCTest
 
 @MainActor
 private func waitForNativeDocument(
-    _ controller: MindRoomBridgeViewController, after previous: String? = nil
+    _ controller: MindRoomBridgeViewController, after previous: String? = nil,
+    timeout: TimeInterval = 15
 ) async -> (webView: WKWebView, bootID: String)? {
-    let deadline = Date().addingTimeInterval(15)
+    let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
         // Cold startup can still replace or navigate the controller's initial view.
         if let webView = controller.webView, !webView.isLoading,
@@ -15,6 +16,14 @@ private func waitForNativeDocument(
             return (webView, bootID)
         }
         try? await Task.sleep(nanoseconds: 100_000_000)
+    }
+    if let webView = controller.webView {
+        let nativeState = "url=\(webView.url?.absoluteString ?? "nil"), loading=\(webView.isLoading), progress=\(webView.estimatedProgress)"
+        let diagnostic = "Native fixture readiness timed out after \(timeout)s: \(nativeState)"
+        print(diagnostic)
+        XCTContext.runActivity(named: "Native fixture readiness timeout") { activity in
+            activity.add(XCTAttachment(string: diagnostic))
+        }
     }
     return nil
 }
@@ -25,7 +34,9 @@ func loadNativeTestFixture() async throws -> (MindRoomBridgeViewController, WKWe
     let controller = try XCTUnwrap(UIApplication.shared.connectedScenes
         .compactMap { $0 as? UIWindowScene }.flatMap { $0.windows }
         .compactMap { $0.rootViewController as? MindRoomBridgeViewController }.first)
-    let initialDocument = await waitForNativeDocument(controller)
+    // Fresh CI simulators can take over a minute to launch WebKit processes.
+    // Only initial startup gets this budget; controlled navigation stays at 15s.
+    let initialDocument = await waitForNativeDocument(controller, timeout: 90)
     let initial = try XCTUnwrap(initialDocument, "The bundled app must finish startup before fixture navigation")
     initial.webView.load(URLRequest(url: URL(string: "capacitor://localhost/")!))
     let freshDocument = await waitForNativeDocument(controller, after: initial.bootID)

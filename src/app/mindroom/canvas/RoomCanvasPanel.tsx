@@ -5,7 +5,7 @@ import { ThemeKind, useTheme } from '../../hooks/useTheme';
 import { ScreenSize, useScreenSizeContext } from '../../hooks/useScreenSize';
 import { getMxIdLocalPart } from '../../utils/matrix';
 import { getMemberDisplayName, isEventOrderedAfter } from '../../utils/room';
-import { ResizablePanel } from '../sidebar/ResizablePanel';
+import { CONVERSATION_MIN_WIDTH, ResizablePanel } from '../sidebar/ResizablePanel';
 import { readChatUiAction, type ChatUiCanvas } from '../ui-actions/chatUiProtocol';
 import { CanvasPanel } from './CanvasPanel';
 import { readCanvasTheme } from './canvasTheme';
@@ -36,7 +36,6 @@ type ShowCanvas = {
 // Dashboards need room: the panel may grow wide while the conversation keeps a usable column.
 const CANVAS_DEFAULT_WIDTH = 560;
 const CANVAS_MAX_WIDTH = 1600;
-const CONVERSATION_MIN_WIDTH = 360;
 
 function LoadedCanvasPanel({
   mx,

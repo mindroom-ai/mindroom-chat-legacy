@@ -57,6 +57,7 @@ vi.mock('./ThreadApprovals.css', () => ({
   ReviewButtonPending: 'ReviewButtonPending',
   ReviewPulse: 'ReviewPulse',
   Chip: 'Chip',
+  HeaderChip: 'HeaderChip',
   ReceiptHeader: 'ReceiptHeader',
   ReceiptLabel: 'ReceiptLabel',
   ReceiptMeta: 'ReceiptMeta',

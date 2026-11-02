@@ -14,7 +14,8 @@ import {
   LINKIFY_OPTS,
 } from '../../src/app/plugins/react-custom-html-parser';
 import { sanitizeCustomHtml } from '../../src/app/utils/sanitize';
-import { withMindroomToolTraceMarkerParserOptions } from '../../src/app/mindroom/messages/MindroomHtmlBlocks';
+import { useMindroomToolTraceMarkerParserOptions } from '../../src/app/mindroom/messages/MindroomHtmlBlocks';
+import { resolveHtmlReactParserOptions } from '../../src/app/utils/htmlReactParserOptions';
 
 const params = new URLSearchParams(window.location.search);
 const dark = params.has('dark');
@@ -50,9 +51,9 @@ function Fixture() {
       )
     : '';
   const formattedBody = toolPrefix + html;
-  const options = withMindroomToolTraceMarkerParserOptions(parser, {
-    formatted_body: formattedBody,
-  });
+  const options = resolveHtmlReactParserOptions(
+    useMindroomToolTraceMarkerParserOptions(parser, { formatted_body: formattedBody })
+  );
 
   return (
     <main style={{ padding: 16, color: color.Surface.OnContainer, fontSize: 16, lineHeight: 1.5 }}>
