@@ -939,6 +939,7 @@
   A fifth card and unit case end the name with NEL, U+2029 and RLM; without the paragraph-separator stripping the card fails in Arabic.
   A sixth card and unit case use a name of more than 6,000 characters; without the cut the card fails in both locales.
   A unit test checks that "Mayra Andersson — Senior Coordinator, International Research Association", cut to "…Research Ass…", is not spam.
+  A unit test renders `Maya (@maya:matrix.localhost)////////{{sender}}`: with the i18next patch (#544) the label shows twice, the real ID close after the name; without it, 1,000 times.
 
 ### Soft, outlined buttons everywhere (2026-10-20)
 

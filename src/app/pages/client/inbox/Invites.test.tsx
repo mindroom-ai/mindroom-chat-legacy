@@ -110,3 +110,27 @@ it('checks the whole display name for bad words, not the shortened label', () =>
   expect(invite.senderName).toContain('Ass…');
   expect(hasBadWords(invite)).toBe(false);
 });
+
+it('shows a name holding the label placeholder with the real ID close after it', () => {
+  // i18next used to insert this escaped name up to 1000 times (patches/i18next+23.12.2.patch);
+  // Trans still interpolates the label's text once more, so it shows twice.
+  const label = `${FSI}Maya (@maya:matrix.localhost)////////{{sender}}${PDI} (${LRI}@mallory:evil.example${PDI})`;
+  const renderer = create(
+    <MatrixClientProvider value={mx}>
+      <InviteCard
+        invite={makeInviteData(
+          mx,
+          inviteRoom('@mallory:evil.example', 'Maya (@maya:matrix.localhost)////////{{sender}}'),
+          false
+        )}
+        hour24Clock={false}
+        dateFormatString="D MMM YYYY"
+        onNavigate={vi.fn()}
+        hideAvatar={false}
+      />
+    </MatrixClientProvider>
+  );
+
+  const sender = renderer.root.find((node) => node.type === 'b' && node.props.title !== undefined);
+  expect(sender.children).toEqual([label.replace('{{sender}}', label)]);
+});
