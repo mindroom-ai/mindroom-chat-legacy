@@ -6,7 +6,7 @@ import { create } from 'react-test-renderer';
 import { expect, it, vi } from 'vitest';
 
 import { MatrixClientProvider } from '../../../hooks/useMatrixClient';
-import { InviteCard, makeInviteData } from './Invites';
+import { hasBadWords, InviteCard, makeInviteData } from './Invites';
 
 vi.mock('../../../components/page', () => ({}));
 vi.mock('../../../components/sequence-card', () => ({
@@ -20,6 +20,32 @@ vi.mock('../../../components/message', () => ({ Time: () => null }));
 const FSI = '\u2068';
 const LRI = '\u2066';
 const PDI = '\u2069';
+
+const myUserId = '@me:matrix.localhost';
+const mx = createClient({ baseUrl: 'https://matrix.example', userId: myUserId });
+
+// Stripped invite state: the server includes the inviter's member event.
+const inviteRoom = (inviterId: string, displayname: string): Room => {
+  const roomId = '!invite:matrix.localhost';
+  const room = new Room(roomId, mx, myUserId);
+  room.currentState.setStateEvents([
+    new MatrixEvent({
+      room_id: roomId,
+      type: 'm.room.member',
+      state_key: inviterId,
+      sender: inviterId,
+      content: { membership: 'join', displayname },
+    }),
+    new MatrixEvent({
+      room_id: roomId,
+      type: 'm.room.member',
+      state_key: myUserId,
+      sender: inviterId,
+      content: { membership: 'invite' },
+    }),
+  ]);
+  return room;
+};
 
 it.each([
   [
@@ -60,32 +86,10 @@ it.each([
     )} …${PDI} (${LRI}@mallory:evil.example${PDI})`,
   ],
 ])('shows an inviter with %s next to the real ID', (_case, inviterId, displayname, expected) => {
-  const myUserId = '@me:matrix.localhost';
-  const mx = createClient({ baseUrl: 'https://matrix.example', userId: myUserId });
-  const roomId = '!invite:matrix.localhost';
-  const room = new Room(roomId, mx, myUserId);
-  // Stripped invite state: the server includes the inviter's member event.
-  room.currentState.setStateEvents([
-    new MatrixEvent({
-      room_id: roomId,
-      type: 'm.room.member',
-      state_key: inviterId,
-      sender: inviterId,
-      content: { membership: 'join', displayname },
-    }),
-    new MatrixEvent({
-      room_id: roomId,
-      type: 'm.room.member',
-      state_key: myUserId,
-      sender: inviterId,
-      content: { membership: 'invite' },
-    }),
-  ]);
-
   const renderer = create(
     <MatrixClientProvider value={mx}>
       <InviteCard
-        invite={makeInviteData(mx, room, false)}
+        invite={makeInviteData(mx, inviteRoom(inviterId, displayname), false)}
         hour24Clock={false}
         dateFormatString="D MMM YYYY"
         onNavigate={vi.fn()}
@@ -97,4 +101,12 @@ it.each([
   const sender = renderer.root.find((node) => node.type === 'b' && node.props.title !== undefined);
   expect(sender.children).toEqual([expected]);
   expect(sender.props.title).toBe(inviterId);
+});
+
+it('checks the whole display name for bad words, not the shortened label', () => {
+  // Cut at 64 characters, this name would end in "Ass…".
+  const displayname = 'Mayra Andersson — Senior Coordinator, International Research Association';
+  const invite = makeInviteData(mx, inviteRoom('@mayra:matrix.localhost', displayname), false);
+  expect(invite.senderName).toContain('Ass…');
+  expect(hasBadWords(invite)).toBe(false);
 });

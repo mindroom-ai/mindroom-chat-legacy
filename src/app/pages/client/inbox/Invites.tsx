@@ -81,6 +81,8 @@ type InviteData = {
   roomAlias?: string;
 
   senderId: string;
+  // The whole display name, for the spam filter; senderName is the shortened card label.
+  senderDisplayName?: string;
   senderName: string;
   inviteTs?: number;
   reason?: string;
@@ -112,10 +114,11 @@ export const makeInviteData = (
   const content = memberEvent?.getContent();
   const senderId = memberEvent?.getSender();
 
-  const senderNameChars = Array.from(
-    (senderId && getMemberDisplayName(room, senderId)?.replace(BIDI_CONTROLS, '')) || ''
-  );
-  const senderDisplayName =
+  const senderDisplayName = senderId
+    ? getMemberDisplayName(room, senderId)?.replace(BIDI_CONTROLS, '')
+    : undefined;
+  const senderNameChars = Array.from(senderDisplayName ?? '');
+  const shownSenderName =
     senderNameChars.slice(0, MAX_SENDER_NAME_LENGTH).join('') +
     (senderNameChars.length > MAX_SENDER_NAME_LENGTH ? '…' : '');
   const inviteTs = memberEvent?.getTs();
@@ -133,11 +136,12 @@ export const makeInviteData = (
     roomAlias: room.getCanonicalAlias() ?? undefined,
 
     senderId: senderId ?? 'Unknown',
+    senderDisplayName,
     // A display name can claim any name or ID, so the real ID always shows next to it.
     // The name is isolated (FSI...PDI) and the ID kept left-to-right (LRI...PDI), so neither
     // the name's direction nor an RTL locale can reorder the ID.
-    senderName: senderDisplayName
-      ? `\u2068${senderDisplayName}\u2069 (\u2066${senderId}\u2069)`
+    senderName: shownSenderName
+      ? `\u2068${shownSenderName}\u2069 (\u2066${senderId}\u2069)`
       : senderId ?? 'Unknown',
     inviteTs,
     reason,
@@ -148,10 +152,10 @@ export const makeInviteData = (
   };
 };
 
-const hasBadWords = (invite: InviteData): boolean =>
+export const hasBadWords = (invite: InviteData): boolean =>
   testBadWords(invite.roomName) ||
   testBadWords(invite.roomTopic ?? '') ||
-  testBadWords(invite.senderName) ||
+  testBadWords(invite.senderDisplayName ?? '') ||
   testBadWords(invite.senderId) ||
   testBadWords(invite.reason || '');
 
