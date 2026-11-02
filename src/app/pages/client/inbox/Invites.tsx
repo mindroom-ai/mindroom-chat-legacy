@@ -69,6 +69,8 @@ const COMPACT_CARD_WIDTH = 548;
 // Embedding, override and isolate controls, and paragraph separators (C0/C1
 // controls such as NEL, and U+2029) that would end the isolates around the name.
 const BIDI_CONTROLS = /[\p{Cc}\u2029\u202A-\u202E\u2066-\u2069]/gu;
+// A longer name would push the real ID after it off-screen.
+const MAX_SENDER_NAME_LENGTH = 64;
 
 type InviteData = {
   room: Room;
@@ -110,9 +112,12 @@ export const makeInviteData = (
   const content = memberEvent?.getContent();
   const senderId = memberEvent?.getSender();
 
-  const senderDisplayName = senderId
-    ? getMemberDisplayName(room, senderId)?.replace(BIDI_CONTROLS, '')
-    : undefined;
+  const senderNameChars = Array.from(
+    (senderId && getMemberDisplayName(room, senderId)?.replace(BIDI_CONTROLS, '')) || ''
+  );
+  const senderDisplayName =
+    senderNameChars.slice(0, MAX_SENDER_NAME_LENGTH).join('') +
+    (senderNameChars.length > MAX_SENDER_NAME_LENGTH ? '…' : '');
   const inviteTs = memberEvent?.getTs();
   const reason =
     content && 'reason' in content && typeof content.reason === 'string'

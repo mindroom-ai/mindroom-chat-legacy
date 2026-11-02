@@ -915,13 +915,15 @@
   An ID-shaped name still gets the real ID after it, and the `<b>` keeps the ID as its `title`.
   The name loses its bidi embedding, override and isolate controls (js-sdk's `rawDisplayName` strips only LRO and RLO), and the card builds `FSI name PDI (LRI id PDI)`.
   It also loses C0 and C1 controls and U+2029, because a paragraph separator such as NEL or U+2029 ends every isolate around it: in Arabic, "Maya (@maya:matrix.localhost)" followed by U+2029 and RLM put the fake ID next to "من:" and the real ID at the far end of the line.
+  The name is cut at 64 characters, with "…", because a long name (no homeserver needs to cap it) pushed the real ID after it off-screen.
   Without that, a name such as `RLI "Maya (@maya:matrix.localhost)"` from `@mallory:evil.example` rendered the real ID mangled in front, "(mallory:evil.example@) Maya (@maya:matrix.localhost)", and a stray PDI in a name would close a plain wrapper early.
   In Arabic, the locale's single isolate around `{{sender}}` took an Arabic name's direction and reversed the ID to "(maya:matrix.localhost@)"; the inner isolates keep the ID left to right, after the name, in either direction.
   The combined text still goes into `{{sender}}`, so the locale strings are unchanged.
 - Tests: `Invites.test.tsx` builds invites from stripped state and expects the isolated "Maya (@maya:matrix.localhost)", the plain ID without a display name, "@maya:matrix.localhost (@mallory:evil.example)" for an ID-shaped name, and a name with RLI, RLE and a leading PDI stripped and isolated (all but the plain ID fail on the previous version).
-  `e2e/invite-cards.spec.ts` renders the four cards of `e2e/fixtures/invite-cards.html` in English and Arabic in Chromium and measures each character of the real ID: it reads left to right and starts after every character before it.
+  `e2e/invite-cards.spec.ts` renders the six cards of `e2e/fixtures/invite-cards.html` in English and Arabic in Chromium and measures each character of the real ID: it reads left to right and starts after every character before it.
   On the previous version it fails for the RLI name in English and the Arabic name in Arabic.
   A fifth card and unit case end the name with NEL, U+2029 and RLM; without the paragraph-separator stripping the card fails in Arabic.
+  A sixth card and unit case use a name of more than 6,000 characters; without the cut the card fails in both locales.
 
 ### Soft, outlined buttons everywhere (2026-10-20)
 

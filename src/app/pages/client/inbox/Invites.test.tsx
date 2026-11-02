@@ -50,6 +50,15 @@ it.each([
     'Maya (@maya:matrix.localhost)\u0085\u2029\u200F',
     `${FSI}Maya (@maya:matrix.localhost)\u200F${PDI} (${LRI}@mallory:evil.example${PDI})`,
   ],
+  // A long name would push the real ID off-screen; it is cut at 64 characters.
+  [
+    'a long name',
+    '@mallory:evil.example',
+    `Maya (@maya:matrix.localhost)${' \u2800'.repeat(3000)}`,
+    `${FSI}Maya (@maya:matrix.localhost)${' \u2800'.repeat(
+      17
+    )} …${PDI} (${LRI}@mallory:evil.example${PDI})`,
+  ],
 ])('shows an inviter with %s next to the real ID', (_case, inviterId, displayname, expected) => {
   const myUserId = '@me:matrix.localhost';
   const mx = createClient({ baseUrl: 'https://matrix.example', userId: myUserId });

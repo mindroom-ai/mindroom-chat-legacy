@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test';
 
 // The fixture's inviters, in card order: a plain name, an Arabic name, two
-// names whose bidi controls would move or reverse the real ID, and a name whose
-// paragraph separators would end the isolates around it.
+// names whose bidi controls would move or reverse the real ID, a name whose
+// paragraph separators would end the isolates around it, and a name long
+// enough to push the real ID off-screen.
 const realIds = [
   '@maya:matrix.localhost',
   '@maya:matrix.localhost',
+  '@mallory:evil.example',
   '@mallory:evil.example',
   '@mallory:evil.example',
   '@mallory:evil.example',

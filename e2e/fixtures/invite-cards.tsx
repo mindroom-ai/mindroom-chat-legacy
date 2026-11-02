@@ -26,6 +26,7 @@ const inviters: Array<[userId: string, displayName: string]> = [
   ['@mallory:evil.example', '⁧Maya (@maya:matrix.localhost)‎‏'],
   ['@mallory:evil.example', '⁩‫Maya (@maya:matrix.localhost)'],
   ['@mallory:evil.example', 'Maya (@maya:matrix.localhost)\u0085\u2029\u200F'],
+  ['@mallory:evil.example', `Maya (@maya:matrix.localhost)${' \u2800'.repeat(3000)}`],
 ];
 
 const invites = inviters.map(([inviterId, displayname], index) => {
