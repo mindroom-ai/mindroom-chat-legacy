@@ -13,26 +13,16 @@ import { useMatrixClient } from '../../hooks/useMatrixClient';
 import { useRoomTypingMember } from '../../hooks/useRoomTypingMembers';
 import { IconButton } from '../../components/glass/GlassPrimitives';
 import { IconTooltip } from '../../mindroom/tooltip/IconTooltip';
-import { isMindroomAgentUserId } from '../../mindroom/matrix/agentIdentity';
-import { useThreadStreamingSenders } from '../../mindroom/threads/useThreadStreamingState';
 
 export type RoomViewTypingProps = {
   room: Room;
-  threadId?: string;
 };
 export const RoomViewTyping = as<'div', RoomViewTypingProps>(
-  ({ className, room, threadId, ...props }, ref) => {
+  ({ className, room, ...props }, ref) => {
     const { t } = useTranslation();
     const setTypingMembers = useSetAtom(roomIdToTypingMembersAtom);
     const mx = useMatrixClient();
-    const roomTypingMembers = useRoomTypingMember(room.roomId);
-    const threadStreamingSenders = useThreadStreamingSenders(room, threadId);
-    // `m.typing` names no thread, so a thread lists only the agents streaming in it.
-    const typingMembers = threadId
-      ? roomTypingMembers.filter(
-          ({ userId }) => isMindroomAgentUserId(userId) && threadStreamingSenders.has(userId)
-        )
-      : roomTypingMembers;
+    const typingMembers = useRoomTypingMember(room.roomId);
 
     const typingNames = typingMembers
       .filter((receipt) => receipt.userId !== mx.getUserId())

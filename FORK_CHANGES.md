@@ -2,15 +2,14 @@
 
 ## Runbook
 
-### List only the agents streaming in the open thread in its typing bar (2026-11-03)
+### Hide the room-wide typing bar in thread views (2026-11-03)
 
 - Why: with a thread open, the typing bar above the composer listed everyone typing anywhere in the room, so a reader of one thread saw someone typing in another (#547).
-  `m.typing` names no thread, and `RoomViewTyping` read the room's typing members with no thread at all.
-- Change: `MindroomRoomView` passes the open thread to `RoomViewTyping`.
-  In a thread, the bar keeps a typing member only when `isMindroomAgentUserId` says it is an agent and the thread's tail has a streaming reply from it; human typing is not shown there, since it cannot be placed in a thread.
-  `useThreadStreamingState.ts` now also collects the senders of the streaming tail events and exposes them as `useThreadStreamingSenders`; `useThreadStreamingState` and `getThreadStreamingState` keep their result.
-  The main timeline lists everyone typing in the room, as before, and the Drop Typing Status button drops what the bar lists.
-- Tests: `RoomViewTyping.test.tsx` covers the main timeline, a person typing while a thread is open, an agent streaming in the open thread (and dropping it), and an agent streaming in another thread.
+  `m.typing` names no thread, so no typing member can be placed in a thread.
+- Change: `MindroomRoomView` mounts `RoomViewTyping` only on the main timeline.
+  In a thread, an agent's own streaming reply already shows that it is working.
+  The main timeline lists everyone typing in the room, as before.
+- Tests: `RoomViewApprovalLifecycle.test.tsx` checks that the bar is absent in a thread view and present on the main timeline.
 - Next: none.
 
 ### Insert an escaped translation value once, even when it holds its own placeholder (2026-11-02)

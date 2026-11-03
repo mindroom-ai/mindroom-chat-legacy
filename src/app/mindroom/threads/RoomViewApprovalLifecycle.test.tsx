@@ -5,6 +5,7 @@ import { createClient, Room } from 'matrix-js-sdk';
 import { createEditor } from 'slate';
 import { expect, it, vi } from 'vitest';
 import { RoomView } from './MindroomRoomView';
+import { RoomViewTyping } from '../../features/room/RoomViewTyping';
 import { useRoomInputSendSessionController } from './useRoomInputSendSessionController';
 import { TUploadItem } from '../../state/room/roomInputDrafts';
 import { Upload, UploadStatus } from '../../state/upload';
@@ -242,6 +243,22 @@ it('gives the jobs bar the open thread and whether the viewer may send a cancel'
     expect(jobsBar.props.at(-1)).toEqual({ threadId: null, canCancel: false });
   } finally {
     jobsBar.canCancel = true;
+    act(() => renderer?.unmount());
+  }
+});
+
+it('shows the room-wide typing bar on the main timeline only', async () => {
+  let renderer!: ReturnType<typeof create>;
+  try {
+    await act(async () => {
+      renderer = create(<RoomView room={room} threadId="$thread" />);
+    });
+    expect(renderer.root.findAllByType(RoomViewTyping)).toHaveLength(0);
+    await act(async () => {
+      renderer.update(<RoomView room={room} />);
+    });
+    expect(renderer.root.findAllByType(RoomViewTyping)).toHaveLength(1);
+  } finally {
     act(() => renderer?.unmount());
   }
 });
