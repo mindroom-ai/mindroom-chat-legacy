@@ -18,6 +18,8 @@ import { useThreadEventRefresh } from './useThreadEventRefresh';
 
 type ThreadStreamingSnapshot = {
   isStreaming: boolean;
+  /** The senders of the streaming tail events. */
+  streamingSenders: ReadonlySet<string>;
   trackedEvents: MatrixEvent[];
   trackedRelations: Relations[];
 };
@@ -124,12 +126,13 @@ const getThreadStreamingSnapshot = (
 ): ThreadStreamingSnapshot => {
   const trackedEvents = getThreadStreamingEvents(room, threadRootId);
   if (!room || !threadRootId || trackedEvents.length === 0) {
-    return { isStreaming: false, trackedEvents, trackedRelations: [] };
+    return { isStreaming: false, streamingSenders: new Set(), trackedEvents, trackedRelations: [] };
   }
 
   const thread = room.getThread(threadRootId);
   const timelineSet = thread?.getUnfilteredTimelineSet?.() ?? room.getUnfilteredTimelineSet();
   const trackedRelations: Relations[] = [];
+  const streamingSenders = new Set<string>();
   let isStreaming = false;
 
   trackedEvents.forEach((mEvent) => {
@@ -139,12 +142,13 @@ const getThreadStreamingSnapshot = (
       trackedRelations.push(relations);
     }
 
-    if (!isStreaming && isEventStreaming(mEvent, relations, timelineSet)) {
-      isStreaming = true;
-    }
+    if (!isEventStreaming(mEvent, relations, timelineSet)) return;
+    isStreaming = true;
+    const sender = mEvent.getSender();
+    if (sender) streamingSenders.add(sender);
   });
 
-  return { isStreaming, trackedEvents, trackedRelations };
+  return { isStreaming, streamingSenders, trackedEvents, trackedRelations };
 };
 
 export const getThreadStreamingState = (
@@ -152,10 +156,10 @@ export const getThreadStreamingState = (
   threadRootId: string | undefined
 ): boolean => getThreadStreamingSnapshot(room, threadRootId).isStreaming;
 
-export const useThreadStreamingState = (
+const useThreadStreamingSnapshot = (
   room: Room | undefined,
   threadRootId: string | undefined
-): boolean => {
+): ThreadStreamingSnapshot => {
   const thread = room && threadRootId ? room.getThread(threadRootId) ?? undefined : undefined;
   const [snapshot, setSnapshot] = useState(() => getThreadStreamingSnapshot(room, threadRootId));
   const refresh = useCallback(() => {
@@ -182,5 +186,16 @@ export const useThreadStreamingState = (
     };
   }, [refresh, snapshot.trackedRelations]);
 
-  return snapshot.isStreaming;
+  return snapshot;
 };
+
+export const useThreadStreamingState = (
+  room: Room | undefined,
+  threadRootId: string | undefined
+): boolean => useThreadStreamingSnapshot(room, threadRootId).isStreaming;
+
+/** The users whose replies in the thread's tail are streaming. */
+export const useThreadStreamingSenders = (
+  room: Room | undefined,
+  threadRootId: string | undefined
+): ReadonlySet<string> => useThreadStreamingSnapshot(room, threadRootId).streamingSenders;

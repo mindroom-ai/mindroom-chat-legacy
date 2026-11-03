@@ -281,7 +281,7 @@ export function RoomView({
         direction="Column"
         data-room-footer="true"
       >
-        <RoomViewTyping room={room} />
+        <RoomViewTyping room={room} threadId={effectiveThreadId} />
         <div ref={setApprovalQueueHost} />
         <BackgroundJobsBar
           room={room}
