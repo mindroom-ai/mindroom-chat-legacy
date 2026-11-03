@@ -540,6 +540,27 @@ describe('ClientRoot', () => {
     expect(hasRenderedText(renderer, 'Remove Account')).toBe(false);
   });
 
+  it('shows the error when removing an account whose login the server ended fails', async () => {
+    currentSession = {
+      sessionId: 'session-a',
+      baseUrl: 'https://example.com',
+      userId: '@alice:example.com',
+      deviceId: 'DEVICE_A',
+      accessToken: 'token-a',
+      lastUsedAt: 1,
+    };
+    vi.mocked(useActiveSession).mockImplementation(() => currentSession);
+    vi.mocked(initClient).mockRejectedValue(new SignedOutDeviceError('ended'));
+    vi.mocked(removeSignedOutSessionAndReload).mockRejectedValueOnce(new Error('blocked write'));
+
+    await act(async () => {
+      renderer = create(renderClientRoot());
+      await flushEffects();
+    });
+
+    expect(hasRenderedText(renderer, 'Remove Account')).toBe(true);
+  });
+
   it('retries startup with the latest rotated session credentials', async () => {
     const firstClient = createMockClient();
     const retryClient = createMockClient();

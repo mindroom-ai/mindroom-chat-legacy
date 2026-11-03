@@ -9,6 +9,7 @@ import {
   ClientBootstrapSession,
   DeviceIdentityVerificationError,
   MissingCryptoStoreError,
+  SignedOutDeviceError,
   inspectCryptoStoreContinuity,
   serverHasDeviceIdentity,
 } from '../app/mindroom/matrix/cryptoStoreContinuity';
@@ -78,14 +79,22 @@ export const initClient = async (session: ClientBootstrapSession): Promise<Matri
   // already knows keys for this device ID while its local database is absent,
   // or this device already set up the store that is now gone, creating Rust
   // crypto would replace that identity. Decide before opening the Rust store
-  // so no generated keys or cleanup paths are involved. A login the server
-  // ended has no identity left to protect: that check throws
-  // SignedOutDeviceError, and the caller removes the account.
-  if (
-    cryptoStoreExists === false &&
-    ((await serverHasDeviceIdentity(mx, session)) || hasInitializedCryptoStore(session.sessionId))
-  ) {
-    throw new MissingCryptoStoreError(session.userId);
+  // so no generated keys or cleanup paths are involved.
+  if (cryptoStoreExists === false) {
+    const storeWasSetUp = hasInitializedCryptoStore(session.sessionId);
+    let serverKnowsDevice: boolean;
+    try {
+      serverKnowsDevice = await serverHasDeviceIdentity(mx, session);
+    } catch (error) {
+      // A login the server ended (SignedOutDeviceError) cannot continue on
+      // this device, so the caller removes its record and a new device signs
+      // in. Any other failure keeps refusing a store this device had set up.
+      if (storeWasSetUp && !(error instanceof SignedOutDeviceError)) {
+        throw new MissingCryptoStoreError(session.userId);
+      }
+      throw error;
+    }
+    if (serverKnowsDevice || storeWasSetUp) throw new MissingCryptoStoreError(session.userId);
   }
 
   const initializationResults = await Promise.allSettled([

@@ -122,9 +122,14 @@ export const serverHasDeviceIdentity = async (
       }
     );
   } catch (error) {
-    // The SDK throws M_UNKNOWN_TOKEN only after a token refresh could not
-    // renew the login, its own definition of a logged-out session.
-    if (error instanceof MatrixError && error.errcode === 'M_UNKNOWN_TOKEN') {
+    // The SDK passes M_UNKNOWN_TOKEN on once no refresh can renew the token.
+    // Without soft_logout the server ended the login itself; a soft logout
+    // keeps the device on the server, so it is no proof.
+    if (
+      error instanceof MatrixError &&
+      error.errcode === 'M_UNKNOWN_TOKEN' &&
+      error.data.soft_logout !== true
+    ) {
       throw new SignedOutDeviceError(session.userId);
     }
     throw new DeviceIdentityVerificationError(session.userId);

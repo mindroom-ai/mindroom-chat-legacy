@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
-import { MatrixError, createClient as createSdkClient } from 'matrix-js-sdk';
+import { MatrixError, TokenRefreshError, createClient as createSdkClient } from 'matrix-js-sdk';
 import { Feature, ServerSupport } from 'matrix-js-sdk/lib/feature';
 import { IndexedDBCryptoStore } from 'matrix-js-sdk/lib/crypto/store/indexeddb-crypto-store';
 import { IndexedDBStore } from 'matrix-js-sdk/lib/store/indexeddb';
@@ -479,7 +479,18 @@ describe('initClient', () => {
     expect(startup).not.toHaveBeenCalled();
   });
 
-  it('asks for a retry when the server cannot be asked about a store that is gone', async () => {
+  it.each([
+    [
+      'a soft logout, which keeps the device on the server',
+      () =>
+        new MatrixError(
+          { errcode: 'M_UNKNOWN_TOKEN', error: 'Expired access token.', soft_logout: true },
+          401
+        ),
+    ],
+    ['a token refresh that failed for now', () => new TokenRefreshError(new Error('rate limited'))],
+    ['an unreachable server', () => new Error('offline')],
+  ])('keeps refusing a marked store that is gone after %s', async (_case, error) => {
     const { storage } = createStorageMock();
     const session = putSession(
       {
@@ -494,14 +505,60 @@ describe('initClient', () => {
     markCryptoStoreInitialized(session, storage);
     vi.stubGlobal('localStorage', storage);
     vi.stubGlobal('indexedDB', { databases: vi.fn().mockResolvedValue([]) });
-    const { initRustCrypto } = mockUnstartedClient(vi.fn().mockRejectedValue(new Error('offline')));
+    const { initRustCrypto } = mockUnstartedClient(vi.fn().mockRejectedValue(error()));
 
-    await expect(initClient(session)).rejects.toBeInstanceOf(DeviceIdentityVerificationError);
+    await expect(initClient(session)).rejects.toBeInstanceOf(MissingCryptoStoreError);
 
     expect(initRustCrypto).not.toHaveBeenCalled();
   });
 
-  it('keeps refusing a store that is gone while the server still knows the device', async () => {
+  it.each([
+    // Tuwunel answers a deleted device's token and refresh token without soft_logout.
+    ['a login the server ended', false, SignedOutDeviceError],
+    // An expired token keeps the device, and so does a refresh token past its lifetime.
+    ['a soft logout', true, MissingCryptoStoreError],
+  ])('decides through the SDK refresh for %s', async (_case, softLogout, expected) => {
+    const { storage } = createStorageMock();
+    const session = putSession(
+      {
+        baseUrl: 'https://example.com',
+        userId: '@user:example.com',
+        deviceId: 'DEVICE',
+        accessToken: 'token',
+        refreshToken: 'refresh',
+      },
+      undefined,
+      storage
+    );
+    markCryptoStoreInitialized(session, storage);
+    vi.stubGlobal('localStorage', storage);
+    vi.stubGlobal('indexedDB', { databases: vi.fn().mockResolvedValue([]) });
+    vi.mocked(IndexedDBStore).mockImplementation(
+      () => ({ startup: vi.fn() } as unknown as IndexedDBStore)
+    );
+    vi.mocked(IndexedDBCryptoStore).mockImplementation(
+      () => ({} as unknown as IndexedDBCryptoStore)
+    );
+    const fetchFn = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ errcode: 'M_UNKNOWN_TOKEN', error: 'token', soft_logout: softLogout }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+    // The real SDK client and refresh path, without the mocked stores.
+    vi.mocked(createMatrixClient).mockImplementation(
+      ({ store, cryptoStore, ...opts }) =>
+        createSdkClient({ ...opts, fetchFn: fetchFn as typeof fetch }) as never
+    );
+
+    await expect(initClient(session)).rejects.toBeInstanceOf(expected);
+
+    const paths = fetchFn.mock.calls.map(([input]) => new URL(String(input)).pathname);
+    expect(paths).toEqual(['/_matrix/client/v3/keys/query', '/_matrix/client/v3/refresh']);
+  });
+
+  it('keeps refusing a marked store that is gone while its login is still valid', async () => {
     const { storage } = createStorageMock();
     const session = putSession(
       {
@@ -2432,14 +2489,14 @@ describe('removeSignedOutSessionAndReload', () => {
   const originalIndexedDB = globalThis.indexedDB;
   const originalWindow = globalThis.window;
 
+  const deleteDatabase = vi.fn();
+
   const install = (storage: Storage) => {
     const reload = vi.fn();
+    deleteDatabase.mockClear();
     Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true });
     Object.defineProperty(globalThis, 'indexedDB', {
-      value: {
-        databases: vi.fn().mockResolvedValue([]),
-        deleteDatabase: createDeleteDatabaseMock(),
-      },
+      value: { databases: vi.fn().mockResolvedValue([]), deleteDatabase },
       configurable: true,
     });
     Object.defineProperty(globalThis, 'window', {
@@ -2485,6 +2542,9 @@ describe('removeSignedOutSessionAndReload', () => {
     await removeSignedOutSessionAndReload(session);
 
     expect(getSessionStore(storage).sessions).toEqual([]);
+    // Its store is already gone; deleting the account's databases could hit a
+    // newer device of the account that another tab is signing in.
+    expect(deleteDatabase).not.toHaveBeenCalled();
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
