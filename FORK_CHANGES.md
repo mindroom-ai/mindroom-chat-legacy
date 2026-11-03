@@ -2,7 +2,7 @@
 
 ## Runbook
 
-### Stop open tabs rewriting the account list on each other's writes (2026-11-03)
+### Stop route saves ping-ponging the account list between open tabs (2026-11-03)
 
 - Why: after signing out with several tabs open, the next start could stop at "Failed to start account ... The encryption storage for ... is missing while its existing Matrix device login is still present."
   Retry and Clear Cache and Reload kept the error, because both keep the account record; deleting the site's data cleared it, as Remove Account does.
@@ -16,7 +16,7 @@
 - Not covered: the race itself remains, because the list has no cross-tab lock; with the constant writes gone, a removed account comes back only when another write (a route change, a token refresh, a profile update) lands at the moment of a sign-out.
   Such an account still stops at the error above, and Remove Account recovers it.
   `SettingsTab` still writes avatar fields back and forth between tabs whose live profiles disagree (for example after the avatar changed on another device), so it can still cause such a write.
-- Tried and dropped on this branch: marker keys for signed-out devices, and removing an account at start-up when the homeserver rejects its token.
+- Tried and dropped during review: marker keys for signed-out devices, and removing an account at start-up when the homeserver rejects its token.
   Reviews found write orders that defeated the markers, and Tuwunel answers a deleted device and a live device whose expired token it already discarded the same way (`M_UNKNOWN_TOKEN`, then `M_FORBIDDEN` from `/refresh`), so the client cannot tell when removal is safe.
 - Tests: `ClientLayout.test.tsx` subscribes to the store as the app does and keeps a route another tab saved; `sessions.test.ts` marks crypto only for the device whose store was opened; both fail before the change.
 - Check: a page in headless Chromium replaying the old route saves wrote about 5,600 times a second per tab with two idle tabs, and with three tabs a removed account came back in 17 of 20 sign-outs.
