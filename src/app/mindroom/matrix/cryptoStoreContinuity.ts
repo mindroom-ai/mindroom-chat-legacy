@@ -1,5 +1,5 @@
 import type { MatrixClient } from 'matrix-js-sdk/lib/client';
-import { MatrixError, Method } from 'matrix-js-sdk/lib/http-api';
+import { Method } from 'matrix-js-sdk/lib/http-api';
 
 import { StoredSession, getSessionRustCryptoStoreNames } from '../../state/sessions';
 
@@ -26,13 +26,6 @@ export class DeviceIdentityVerificationError extends Error {
         'Check your connection and browser storage access, then retry. No encryption keys were changed.'
     );
     this.name = 'DeviceIdentityVerificationError';
-  }
-}
-
-export class SignedOutDeviceError extends Error {
-  constructor(userId: string) {
-    super(`The homeserver ended the Matrix login for ${userId}.`);
-    this.name = 'SignedOutDeviceError';
   }
 }
 
@@ -121,17 +114,7 @@ export const serverHasDeviceIdentity = async (
         },
       }
     );
-  } catch (error) {
-    // The SDK passes M_UNKNOWN_TOKEN on once no refresh can renew the token.
-    // Without soft_logout the server ended the login itself; a soft logout
-    // keeps the device on the server, so it is no proof.
-    if (
-      error instanceof MatrixError &&
-      error.errcode === 'M_UNKNOWN_TOKEN' &&
-      error.data.soft_logout !== true
-    ) {
-      throw new SignedOutDeviceError(session.userId);
-    }
+  } catch {
     throw new DeviceIdentityVerificationError(session.userId);
   }
 

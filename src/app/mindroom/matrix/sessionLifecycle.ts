@@ -236,25 +236,6 @@ export const removeCurrentClientSessionAndReload = async (
   window.location.reload();
 };
 
-// Removes the record of a login the server ended. Only the record: this
-// device's crypto store is already gone, and the account-wide teardown of
-// Remove Account could delete the stores of a newer device of the account
-// that another tab is signing in. Signing the same account in again replaces
-// the record with that newer device, which keeps it.
-export const removeSignedOutSessionAndReload = async (
-  session: SessionCleanupContext
-): Promise<void> => {
-  const stored = listSessions().find((item) => item.sessionId === session.sessionId);
-  if (stored?.deviceId === session.deviceId) {
-    try {
-      removeSession(session.sessionId);
-    } finally {
-      clearLegacySessionStorage();
-    }
-  }
-  window.location.reload();
-};
-
 export const removeStoredSession = async (session: StoredSession): Promise<void> => {
   const activeSession = getActiveSession();
   if (activeSession?.sessionId === session.sessionId) {

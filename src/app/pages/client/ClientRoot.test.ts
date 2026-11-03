@@ -13,14 +13,12 @@ import {
   clearAllCacheAndReload,
   initClient,
   removeCurrentClientSessionAndReload,
-  removeSignedOutSessionAndReload,
   startClient,
 } from '../../../client/initMatrix';
 import { clearSecretStorageKeys } from '../../../client/secretStorageKeys';
 
-const { passthrough, SignedOutDeviceError } = vi.hoisted(() => ({
+const { passthrough } = vi.hoisted(() => ({
   passthrough: 'div',
-  SignedOutDeviceError: class SignedOutDeviceError extends Error {},
 }));
 
 vi.mock('folds', async (importOriginal) => {
@@ -68,8 +66,6 @@ vi.mock('../../../client/initMatrix', () => ({
   logoutClient: vi.fn().mockResolvedValue(undefined),
   removeCurrentClientSessionAndReload: vi.fn().mockResolvedValue(undefined),
   removeSessionAndReload: vi.fn().mockResolvedValue(undefined),
-  removeSignedOutSessionAndReload: vi.fn().mockResolvedValue(undefined),
-  SignedOutDeviceError,
   startClient: vi.fn(),
 }));
 
@@ -515,50 +511,6 @@ describe('ClientRoot', () => {
     });
 
     expect(vi.mocked(clearAllCacheAndReload)).toHaveBeenCalledWith(client);
-  });
-
-  it('removes an account whose login the server ended instead of offering recovery', async () => {
-    currentSession = {
-      sessionId: 'session-a',
-      baseUrl: 'https://example.com',
-      userId: '@alice:example.com',
-      deviceId: 'DEVICE_A',
-      accessToken: 'token-a',
-      lastUsedAt: 1,
-    };
-    vi.mocked(useActiveSession).mockImplementation(() => currentSession);
-    vi.mocked(initClient).mockRejectedValue(new SignedOutDeviceError('ended'));
-
-    await act(async () => {
-      renderer = create(renderClientRoot());
-      await flushEffects();
-    });
-
-    expect(vi.mocked(removeSignedOutSessionAndReload)).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionId: 'session-a', deviceId: 'DEVICE_A' })
-    );
-    expect(hasRenderedText(renderer, 'Remove Account')).toBe(false);
-  });
-
-  it('shows the error when removing an account whose login the server ended fails', async () => {
-    currentSession = {
-      sessionId: 'session-a',
-      baseUrl: 'https://example.com',
-      userId: '@alice:example.com',
-      deviceId: 'DEVICE_A',
-      accessToken: 'token-a',
-      lastUsedAt: 1,
-    };
-    vi.mocked(useActiveSession).mockImplementation(() => currentSession);
-    vi.mocked(initClient).mockRejectedValue(new SignedOutDeviceError('ended'));
-    vi.mocked(removeSignedOutSessionAndReload).mockRejectedValueOnce(new Error('blocked write'));
-
-    await act(async () => {
-      renderer = create(renderClientRoot());
-      await flushEffects();
-    });
-
-    expect(hasRenderedText(renderer, 'Remove Account')).toBe(true);
   });
 
   it('retries startup with the latest rotated session credentials', async () => {
