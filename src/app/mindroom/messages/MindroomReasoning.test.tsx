@@ -271,16 +271,17 @@ describe('MindroomReasoning', () => {
     };
     const expanded = () => header(renderer!.root).props['aria-expanded'];
 
-    // The browser's resize callback for the open body, fired by hand.
+    // The browser's resize callback for the open body, fired by hand, and the observers still attached.
     let resize = () => {};
+    const observing = new Set<ResizeObserverStub>();
     class ResizeObserverStub {
       constructor(callback: () => void) {
         resize = callback;
       }
 
-      observe = vi.fn();
+      observe = () => observing.add(this);
 
-      disconnect = vi.fn();
+      disconnect = () => observing.delete(this);
     }
 
     beforeEach(() => {
@@ -292,17 +293,30 @@ describe('MindroomReasoning', () => {
       vi.unstubAllGlobals();
     });
 
-    it('folds live reasoning once it grows past eight lines', () => {
+    it('folds live reasoning once a new frame grows it past eight lines', () => {
       bodyHeight = 8 * 24;
       const view = mount('Short');
       expect(expanded()).toBe(true);
 
-      // Growth without a new frame, such as the Markdown renderer loading or a narrower window.
+      bodyHeight = 9 * 24;
+      act(() => view.update(live('Short\nand longer')));
+
+      expect(expanded()).toBe(false);
+      expect(view.root.findAll((node) => node.props.className === 'ReasoningBody')).toHaveLength(0);
+      expect(observing.size).toBe(0);
+    });
+
+    it('folds live reasoning that grows past eight lines without a new frame', () => {
+      bodyHeight = 8 * 24;
+      mount('Short');
+      expect(observing.size).toBe(1);
+
+      // Such as the Markdown renderer loading or a narrower window.
       bodyHeight = 9 * 24;
       act(() => resize());
 
       expect(expanded()).toBe(false);
-      expect(view.root.findAll((node) => node.props.className === 'ReasoningBody')).toHaveLength(0);
+      expect(observing.size).toBe(0);
     });
 
     it('starts live reasoning folded when it is already past eight lines', () => {
@@ -319,9 +333,9 @@ describe('MindroomReasoning', () => {
 
       bodyHeight = 30 * 24;
       act(() => view.update(live('Already long\nand longer')));
-      act(() => resize());
 
       expect(expanded()).toBe(true);
+      expect(observing.size).toBe(0);
     });
   });
 
