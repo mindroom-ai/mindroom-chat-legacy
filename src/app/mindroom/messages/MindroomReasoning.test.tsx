@@ -271,8 +271,21 @@ describe('MindroomReasoning', () => {
     };
     const expanded = () => header(renderer!.root).props['aria-expanded'];
 
+    // The browser's resize callback for the open body, fired by hand.
+    let resize = () => {};
+    class ResizeObserverStub {
+      constructor(callback: () => void) {
+        resize = callback;
+      }
+
+      observe = vi.fn();
+
+      disconnect = vi.fn();
+    }
+
     beforeEach(() => {
       vi.stubGlobal('getComputedStyle', () => ({ lineHeight: '24px' }));
+      vi.stubGlobal('ResizeObserver', ResizeObserverStub);
     });
 
     afterEach(() => {
@@ -284,8 +297,9 @@ describe('MindroomReasoning', () => {
       const view = mount('Short');
       expect(expanded()).toBe(true);
 
+      // Growth without a new frame, such as the Markdown renderer loading or a narrower window.
       bodyHeight = 9 * 24;
-      act(() => view.update(live('Short\nand longer')));
+      act(() => resize());
 
       expect(expanded()).toBe(false);
       expect(view.root.findAll((node) => node.props.className === 'ReasoningBody')).toHaveLength(0);
@@ -305,6 +319,7 @@ describe('MindroomReasoning', () => {
 
       bodyHeight = 30 * 24;
       act(() => view.update(live('Already long\nand longer')));
+      act(() => resize());
 
       expect(expanded()).toBe(true);
     });

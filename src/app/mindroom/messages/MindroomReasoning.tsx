@@ -1,5 +1,6 @@
 import React, { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon, Icons, Text } from 'folds';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { HTMLReactParserOptions } from 'html-react-parser';
 import type { Opts } from 'linkifyjs';
@@ -89,13 +90,21 @@ function MindroomReasoningDisclosure({
   const expanded = chosen ?? (defaultExpanded && !tall);
   const bodyRef = useRef<HTMLDivElement>(null);
 
-  // Measured whenever the reasoning changes, before paint, so growing reasoning folds without a flash.
+  // Measured before the first paint, so reasoning that mounts tall never shows open, then on every
+  // size change: new frames, the Markdown renderer loading, or a narrower window. Resize callbacks run
+  // before paint too, and `flushSync` folds the block in that same frame.
   useLayoutEffect(() => {
     const body = bodyRef.current;
-    if (chosen !== undefined || !body) return;
-    const lineHeight = parseFloat(getComputedStyle(body).lineHeight);
-    if (body.clientHeight > MAX_OPEN_LINES * lineHeight) setTall(true);
-  }, [chosen, children]);
+    if (chosen !== undefined || !body) return undefined;
+    const foldIfTall = () => {
+      const lineHeight = parseFloat(getComputedStyle(body).lineHeight);
+      if (body.clientHeight > MAX_OPEN_LINES * lineHeight) setTall(true);
+    };
+    foldIfTall();
+    const observer = new ResizeObserver(() => flushSync(foldIfTall));
+    observer.observe(body);
+    return () => observer.disconnect();
+  }, [chosen, expanded]);
 
   return (
     <div className={css.Reasoning}>
