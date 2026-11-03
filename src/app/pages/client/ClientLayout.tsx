@@ -22,13 +22,17 @@ export function ClientLayout({ nav, children }: ClientLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { hash, pathname, search } = location;
-  const activeSession = useActiveSession();
+  // The effects below key on the session ID, not the record: every write to the
+  // account list in another tab replaces the record object here. Saving this
+  // tab's route again on that ping-pongs whole account lists between tabs, so
+  // a stale copy can restore an account another tab just signed out.
+  const activeSessionId = useActiveSession()?.sessionId;
   const pathnameHasAliasRoute = useMemo(() => pathnameContainsAliasRoute(pathname), [pathname]);
   const [isCanonicalizingCurrentRoute, setIsCanonicalizingCurrentRoute] =
     useState(pathnameHasAliasRoute);
 
   useLayoutEffect(() => {
-    if (!activeSession) {
+    if (!activeSessionId) {
       setIsCanonicalizingCurrentRoute(false);
       return;
     }
@@ -67,21 +71,21 @@ export function ClientLayout({ nav, children }: ClientLayoutProps) {
     return () => {
       disposed = true;
     };
-  }, [activeSession, hash, mx, navigate, pathname, pathnameHasAliasRoute, search]);
+  }, [activeSessionId, hash, mx, navigate, pathname, pathnameHasAliasRoute, search]);
 
   useEffect(() => {
     // `/connections` hands the tab to the Connections portal, so restoring it would leave Chat again.
-    if (!activeSession || matchPath(CONNECTIONS_PATH, pathname)) return;
+    if (!activeSessionId || matchPath(CONNECTIONS_PATH, pathname)) return;
 
     updateSessionLastPath(
-      activeSession.sessionId,
+      activeSessionId,
       buildSessionLastKnownPath({
         pathname: canonicalizeSessionPathname(mx, pathname),
         search,
         hash,
       })
     );
-  }, [activeSession, hash, mx, pathname, search]);
+  }, [activeSessionId, hash, mx, pathname, search]);
 
   return (
     <Box grow="Yes">

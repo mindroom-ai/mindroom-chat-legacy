@@ -296,7 +296,7 @@ describe('initClient', () => {
       undefined,
       storage
     );
-    markCryptoStoreInitialized(session.sessionId, storage);
+    markCryptoStoreInitialized(session, storage);
     const [, optionalMetaStoreName] = getSessionRustCryptoStoreNames(session);
     const databases = vi.fn().mockResolvedValue([{ name: optionalMetaStoreName }]);
     Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
@@ -334,7 +334,7 @@ describe('initClient', () => {
       undefined,
       storage
     );
-    markCryptoStoreInitialized(session.sessionId, storage);
+    markCryptoStoreInitialized(session, storage);
     const [cryptoStoreName] = getSessionRustCryptoStoreNames(session);
     const databases = vi.fn().mockResolvedValue([{ name: cryptoStoreName }]);
     vi.stubGlobal('localStorage', storage);
@@ -408,7 +408,7 @@ describe('initClient', () => {
       undefined,
       storage
     );
-    markCryptoStoreInitialized(session.sessionId, storage);
+    markCryptoStoreInitialized(session, storage);
     vi.stubGlobal('localStorage', storage);
     vi.stubGlobal('indexedDB', factory);
 

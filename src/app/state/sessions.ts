@@ -403,12 +403,15 @@ export const hasInitializedCryptoStore = (
     ?.cryptoStoreInitialized === true;
 
 export const markCryptoStoreInitialized = (
-  sessionId: string,
+  { sessionId, deviceId }: Pick<StoredSession, 'sessionId' | 'deviceId'>,
   storage: LocalStorageLike | undefined = getSafeLocalStorage()
 ): StoredSession | undefined => {
   const store = getSessionStore(storage);
   const session = store.sessions.find((item) => item.sessionId === sessionId);
-  if (!session || session.cryptoStoreInitialized) return session;
+  // A newer login of this account may have replaced the record while this
+  // device started; that login's own store does not exist yet.
+  if (!session || session.deviceId !== deviceId) return undefined;
+  if (session.cryptoStoreInitialized) return session;
 
   const nextSession: StoredSession = {
     ...session,

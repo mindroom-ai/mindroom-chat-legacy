@@ -103,7 +103,7 @@ export const initClient = async (session: ClientBootstrapSession): Promise<Matri
     throw initializationFailure.reason;
   }
 
-  markCryptoStoreInitialized(session.sessionId);
+  markCryptoStoreInitialized(session);
 
   mx.setMaxListeners(50);
 
