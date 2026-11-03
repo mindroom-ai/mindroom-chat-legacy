@@ -281,7 +281,8 @@ export function RoomView({
         direction="Column"
         data-room-footer="true"
       >
-        <RoomViewTyping room={room} />
+        {/* `m.typing` names no thread, so room-wide typing would mislead inside one. */}
+        {!effectiveThreadId && <RoomViewTyping room={room} />}
         <div ref={setApprovalQueueHost} />
         <BackgroundJobsBar
           room={room}

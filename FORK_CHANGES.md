@@ -2,6 +2,16 @@
 
 ## Runbook
 
+### Hide the room-wide typing bar in thread views (2026-11-03)
+
+- Why: with a thread open, the typing bar above the composer listed everyone typing anywhere in the room, so a reader of one thread saw someone typing in another (#547).
+  `m.typing` names no thread, so no typing member can be placed in a thread.
+- Change: `MindroomRoomView` mounts `RoomViewTyping` only on the main timeline.
+  In a thread, an agent's own streaming reply already shows that it is working.
+  The main timeline lists everyone typing in the room, as before.
+- Tests: `RoomViewApprovalLifecycle.test.tsx` checks that the bar is absent in a thread view and present on the main timeline.
+- Next: none.
+
 ### Stop route saves ping-ponging the account list between open tabs (2026-11-03)
 
 - Why: after signing out with several tabs open, the next start could stop at "Failed to start account ... The encryption storage for ... is missing while its existing Matrix device login is still present."
