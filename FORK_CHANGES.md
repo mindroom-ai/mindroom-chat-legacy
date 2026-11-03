@@ -2,6 +2,19 @@
 
 ## Runbook
 
+### Fold live reasoning once it grows past eight lines (2026-11-03)
+
+- Why: live reasoning shows open above a streaming reply, and some models stream very tall reasoning; one model put a line break after nearly every word, so the open block pushed the answer far down and disrupted reading.
+- Change: `MindroomReasoningDisclosure` folds its open body once it is taller than eight of its lines (`clientHeight` over the computed `line-height`, `T300`, 20px), so it counts wrapped lines as well as line breaks.
+  A layout effect measures the body before paint on every render, so reasoning that mounts tall or grows with a new frame never shows open.
+  A `ResizeObserver` on the open body catches growth without a render, such as the Markdown renderer loading or a narrower window, and folds it with an ordinary state update a frame later.
+  Folding inside the resize callback with `flushSync` was tried and dropped: the timeline observes the body's ancestors in the same pass, so removing the body there raised `ResizeObserver loop completed with undelivered notifications`, which `e2e/live/thread-banner-height-anchor.spec.ts` treats as a bug.
+  Once the person toggles the block, their choice holds and nothing is measured again; reopened reasoning stays open while it keeps growing.
+  Final reasoning still starts collapsed (`key` per state), so the measurement only acts on live reasoning.
+- Tests: `MindroomReasoning.test.tsx` gives the body a measured height through `createNodeMock` and stubs `getComputedStyle` and `ResizeObserver`: reasoning that a new frame grows from eight to nine lines folds, reasoning that grows without a render folds on the resize callback, reasoning that mounts at nine lines starts folded, and reasoning the person reopens stays open at 30 lines; the fold and reopen tests check that no observer stays attached once the block folds or the person toggles it.
+  A Chromium harness with the real CSS and Markdown renderer folded one word per line at line 9 (160px open), seven `##` lines once the renderer loaded, and a three-line paragraph whose container narrowed to 180px in the DOM without a React render, with an observer on the reply container and no `ResizeObserver loop` error.
+- Next: none.
+
 ### Insert an escaped translation value once, even when it holds its own placeholder (2026-11-02)
 
 - Why: a display name such as `Maya////////{{userName}}` turned one member-event line ("<b>{{userName}}</b> joined the room") into 1,000 copies of the name, and invite cards hit the same once they show display names (#491).
