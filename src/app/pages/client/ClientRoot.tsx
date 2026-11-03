@@ -25,6 +25,8 @@ import {
   logoutClient,
   removeCurrentClientSessionAndReload,
   removeSessionAndReload,
+  removeSignedOutSessionAndReload,
+  SignedOutDeviceError,
   startClient,
 } from '../../../client/initMatrix';
 import { clearSecretStorageKeys } from '../../../client/secretStorageKeys';
@@ -336,12 +338,21 @@ function ClientSessionRoot({ children, activeSession, loadingMessages }: ClientS
         }
         if (disposed) return;
 
-        setClientState({
-          status: 'error',
-          session: clientBootstrapSession,
-          error: error instanceof Error ? error : new Error('Failed to initialize Matrix client.'),
-          mx: nextClient,
-        });
+        const showError = () =>
+          setClientState({
+            status: 'error',
+            session: clientBootstrapSession,
+            error:
+              error instanceof Error ? error : new Error('Failed to initialize Matrix client.'),
+            mx: nextClient,
+          });
+        // Nothing is left to recover for a login the server ended: remove the
+        // account and show sign-in. Only a failed removal shows the error.
+        if (error instanceof SignedOutDeviceError) {
+          removeSignedOutSessionAndReload(clientBootstrapSession).catch(showError);
+          return;
+        }
+        showError();
       }
     };
 

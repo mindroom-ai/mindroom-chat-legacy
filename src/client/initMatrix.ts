@@ -30,6 +30,7 @@ export {
 export {
   DeviceIdentityVerificationError,
   MissingCryptoStoreError,
+  SignedOutDeviceError,
 } from '../app/mindroom/matrix/cryptoStoreContinuity';
 export type { ClientBootstrapSession } from '../app/mindroom/matrix/cryptoStoreContinuity';
 export {
@@ -37,6 +38,7 @@ export {
   logoutClient,
   removeCurrentClientSessionAndReload,
   removeSessionAndReload,
+  removeSignedOutSessionAndReload,
   removeStoredSession,
 } from '../app/mindroom/matrix/sessionLifecycle';
 
@@ -45,10 +47,6 @@ export const initClient = async (session: ClientBootstrapSession): Promise<Matri
   if (cryptoStoreExists === undefined) {
     throw new DeviceIdentityVerificationError(session.userId);
   }
-  if (cryptoStoreExists === false && hasInitializedCryptoStore(session.sessionId)) {
-    throw new MissingCryptoStoreError(session.userId);
-  }
-
   const storeNames = getSessionStoreName(session);
   const indexedDBStore = new IndexedDBStore({
     indexedDB: global.indexedDB,
@@ -78,9 +76,15 @@ export const initClient = async (session: ClientBootstrapSession): Promise<Matri
 
   // A new Matrix login has no uploaded device keys yet. If the homeserver
   // already knows keys for this device ID while its local database is absent,
-  // creating Rust crypto would replace that identity. Decide before opening
-  // the Rust store so no generated keys or cleanup paths are involved.
-  if (cryptoStoreExists === false && (await serverHasDeviceIdentity(mx, session))) {
+  // or this device already set up the store that is now gone, creating Rust
+  // crypto would replace that identity. Decide before opening the Rust store
+  // so no generated keys or cleanup paths are involved. A login the server
+  // ended has no identity left to protect: that check throws
+  // SignedOutDeviceError, and the caller removes the account.
+  if (
+    cryptoStoreExists === false &&
+    ((await serverHasDeviceIdentity(mx, session)) || hasInitializedCryptoStore(session.sessionId))
+  ) {
     throw new MissingCryptoStoreError(session.userId);
   }
 

@@ -236,6 +236,19 @@ export const removeCurrentClientSessionAndReload = async (
   window.location.reload();
 };
 
+// Removes an account whose login the server ended. Signing the same account
+// in again replaces the record with a newer device, which keeps it.
+export const removeSignedOutSessionAndReload = async (
+  session: SessionCleanupContext
+): Promise<void> => {
+  const stored = listSessions().find((item) => item.sessionId === session.sessionId);
+  if (stored && stored.deviceId !== session.deviceId) {
+    window.location.reload();
+    return;
+  }
+  await removeSessionAndReload(session);
+};
+
 export const removeStoredSession = async (session: StoredSession): Promise<void> => {
   const activeSession = getActiveSession();
   if (activeSession?.sessionId === session.sessionId) {

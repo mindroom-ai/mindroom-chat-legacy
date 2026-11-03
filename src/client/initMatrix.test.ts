@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
-import { createClient as createSdkClient } from 'matrix-js-sdk';
+import { MatrixError, createClient as createSdkClient } from 'matrix-js-sdk';
 import { Feature, ServerSupport } from 'matrix-js-sdk/lib/feature';
 import { IndexedDBCryptoStore } from 'matrix-js-sdk/lib/crypto/store/indexeddb-crypto-store';
 import { IndexedDBStore } from 'matrix-js-sdk/lib/store/indexeddb';
@@ -11,7 +11,9 @@ import {
   LARGE_SYNC_ARCHIVE_TIMELINE_LIMIT,
   logoutClient,
   MissingCryptoStoreError,
+  SignedOutDeviceError,
   removeCurrentClientSessionAndReload,
+  removeSignedOutSessionAndReload,
   removeStoredSession,
   STARTUP_SYNC_TIMELINE_LIMIT,
   startClient,
@@ -206,6 +208,31 @@ const createDatabase = async (factory: IDBFactory, name: string): Promise<void> 
   });
 };
 
+const serverDeviceKeys = {
+  device_keys: {
+    '@user:example.com': {
+      DEVICE: {
+        keys: {
+          'ed25519:DEVICE': 'server-ed-key',
+          'curve25519:DEVICE': 'server-curve-key',
+        },
+      },
+    },
+  },
+};
+
+const mockUnstartedClient = (authedRequest: ReturnType<typeof vi.fn>) => {
+  const startup = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(IndexedDBStore).mockImplementation(() => ({ startup } as unknown as IndexedDBStore));
+  vi.mocked(IndexedDBCryptoStore).mockImplementation(() => ({} as unknown as IndexedDBCryptoStore));
+  const initRustCrypto = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(createMatrixClient).mockReturnValue({
+    initRustCrypto,
+    http: { authedRequest },
+  } as never);
+  return { initRustCrypto, startup };
+};
+
 describe('initClient', () => {
   beforeEach(() => {
     // Most initClient tests exercise behavior after an existing crypto store
@@ -304,12 +331,15 @@ describe('initClient', () => {
       configurable: true,
       value: { databases },
     });
+    const { initRustCrypto, startup } = mockUnstartedClient(
+      vi.fn().mockResolvedValue(serverDeviceKeys)
+    );
 
     try {
       await expect(initClient(session)).rejects.toBeInstanceOf(MissingCryptoStoreError);
       expect(databases).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(createMatrixClient)).not.toHaveBeenCalled();
-      expect(vi.mocked(IndexedDBStore)).not.toHaveBeenCalled();
+      expect(initRustCrypto).not.toHaveBeenCalled();
+      expect(startup).not.toHaveBeenCalled();
     } finally {
       Object.defineProperty(globalThis, 'localStorage', {
         configurable: true,
@@ -411,11 +441,87 @@ describe('initClient', () => {
     markCryptoStoreInitialized(session, storage);
     vi.stubGlobal('localStorage', storage);
     vi.stubGlobal('indexedDB', factory);
+    const { initRustCrypto } = mockUnstartedClient(vi.fn().mockResolvedValue(serverDeviceKeys));
 
     await expect(initClient(session)).rejects.toBeInstanceOf(MissingCryptoStoreError);
 
-    expect(vi.mocked(createMatrixClient)).not.toHaveBeenCalled();
+    expect(initRustCrypto).not.toHaveBeenCalled();
     await expect(listDatabases()).resolves.toEqual([]);
+  });
+
+  it('reports a signed-out device when its store is gone and the server ended its login', async () => {
+    const { storage } = createStorageMock();
+    const session = putSession(
+      {
+        baseUrl: 'https://example.com',
+        userId: '@user:example.com',
+        deviceId: 'DEVICE',
+        accessToken: 'token',
+      },
+      undefined,
+      storage
+    );
+    markCryptoStoreInitialized(session, storage);
+    vi.stubGlobal('localStorage', storage);
+    vi.stubGlobal('indexedDB', { databases: vi.fn().mockResolvedValue([]) });
+    // The SDK throws M_UNKNOWN_TOKEN only once a refresh could not renew the token.
+    const { initRustCrypto, startup } = mockUnstartedClient(
+      vi
+        .fn()
+        .mockRejectedValue(
+          new MatrixError({ errcode: 'M_UNKNOWN_TOKEN', error: 'Unknown token' }, 401)
+        )
+    );
+
+    await expect(initClient(session)).rejects.toBeInstanceOf(SignedOutDeviceError);
+
+    expect(initRustCrypto).not.toHaveBeenCalled();
+    expect(startup).not.toHaveBeenCalled();
+  });
+
+  it('asks for a retry when the server cannot be asked about a store that is gone', async () => {
+    const { storage } = createStorageMock();
+    const session = putSession(
+      {
+        baseUrl: 'https://example.com',
+        userId: '@user:example.com',
+        deviceId: 'DEVICE',
+        accessToken: 'token',
+      },
+      undefined,
+      storage
+    );
+    markCryptoStoreInitialized(session, storage);
+    vi.stubGlobal('localStorage', storage);
+    vi.stubGlobal('indexedDB', { databases: vi.fn().mockResolvedValue([]) });
+    const { initRustCrypto } = mockUnstartedClient(vi.fn().mockRejectedValue(new Error('offline')));
+
+    await expect(initClient(session)).rejects.toBeInstanceOf(DeviceIdentityVerificationError);
+
+    expect(initRustCrypto).not.toHaveBeenCalled();
+  });
+
+  it('keeps refusing a store that is gone while the server still knows the device', async () => {
+    const { storage } = createStorageMock();
+    const session = putSession(
+      {
+        baseUrl: 'https://example.com',
+        userId: '@user:example.com',
+        deviceId: 'DEVICE',
+        accessToken: 'token',
+      },
+      undefined,
+      storage
+    );
+    markCryptoStoreInitialized(session, storage);
+    vi.stubGlobal('localStorage', storage);
+    vi.stubGlobal('indexedDB', { databases: vi.fn().mockResolvedValue([]) });
+    // A valid token with no uploaded keys still belongs to a device this store had set up.
+    const { initRustCrypto } = mockUnstartedClient(vi.fn().mockResolvedValue({ device_keys: {} }));
+
+    await expect(initClient(session)).rejects.toBeInstanceOf(MissingCryptoStoreError);
+
+    expect(initRustCrypto).not.toHaveBeenCalled();
   });
 
   it('initializes a new device only after confirming the homeserver has no identity', async () => {
@@ -2318,5 +2424,84 @@ describe('removeStoredSession', () => {
     expect(getSessionStore().sessions).toEqual([activeSession]);
     expect(getSessionStore().activeSessionId).toBe(activeSession.sessionId);
     expect(reload).not.toHaveBeenCalled();
+  });
+});
+
+describe('removeSignedOutSessionAndReload', () => {
+  const originalLocalStorage = globalThis.localStorage;
+  const originalIndexedDB = globalThis.indexedDB;
+  const originalWindow = globalThis.window;
+
+  const install = (storage: Storage) => {
+    const reload = vi.fn();
+    Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true });
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: {
+        databases: vi.fn().mockResolvedValue([]),
+        deleteDatabase: createDeleteDatabaseMock(),
+      },
+      configurable: true,
+    });
+    Object.defineProperty(globalThis, 'window', {
+      value: {
+        localStorage: storage,
+        dispatchEvent: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        location: { reload },
+      },
+      configurable: true,
+    });
+    return reload;
+  };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: originalLocalStorage,
+      configurable: true,
+    });
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: originalIndexedDB,
+      configurable: true,
+    });
+    Object.defineProperty(globalThis, 'window', { value: originalWindow, configurable: true });
+  });
+
+  it('removes the account whose login the server ended', async () => {
+    const { storage } = createStorageMock();
+    const session = putSession(
+      {
+        baseUrl: 'https://example.com',
+        userId: '@alice:example.com',
+        deviceId: 'DEVICE_A',
+        accessToken: 'token-a',
+      },
+      undefined,
+      storage
+    );
+    const reload = install(storage);
+
+    await removeSignedOutSessionAndReload(session);
+
+    expect(getSessionStore(storage).sessions).toEqual([]);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a newer login of the same account in place', async () => {
+    const { storage } = createStorageMock();
+    const login = {
+      baseUrl: 'https://example.com',
+      userId: '@alice:example.com',
+      accessToken: 'token',
+    };
+    const ended = putSession({ ...login, deviceId: 'DEVICE_A' }, undefined, storage);
+    const newer = putSession({ ...login, deviceId: 'DEVICE_B' }, undefined, storage);
+    const reload = install(storage);
+
+    await removeSignedOutSessionAndReload(ended);
+
+    expect(getSessionStore(storage).sessions).toEqual([newer]);
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });

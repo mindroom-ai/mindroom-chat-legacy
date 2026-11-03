@@ -1,7 +1,6 @@
 import {
   MINDROOM_SESSION_STORE_EVENT,
   MINDROOM_SESSION_STORE_KEY,
-  MINDROOM_SIGNED_OUT_DEVICE_KEY_PREFIX,
 } from '../mindroom/cache/sessionStoreConfig';
 import {
   getSafeLocalStorage,
@@ -59,8 +58,6 @@ type LocalStorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 type SessionStoreListener = () => void;
 type SessionStoreSnapshot = {
   raw: string | null;
-  // Signed-out markers read for this snapshot, as [key, value] pairs.
-  signedOutMarkers?: [string, string | null][];
   store: SessionStore;
   activeSession?: StoredSession;
   sessions: StoredSession[];
@@ -168,22 +165,7 @@ const toStoredSession = (value: unknown): StoredSession | undefined => {
   };
 };
 
-type SignedOutDevice = Pick<StoredSession, 'sessionId' | 'deviceId'>;
-
-// Every writer rewrites the whole account list from its tab's copy, and a tab
-// can still hold a copy from before another tab removed a device. Each removed
-// device gets its own marker key, written once and never read-modified-written,
-// so no stale copy of any value can drop it; readers drop a device it names.
-// Only signing that device in again removes its marker.
-export const getSignedOutDeviceKey = ({ sessionId, deviceId }: SignedOutDevice): string =>
-  `${MINDROOM_SIGNED_OUT_DEVICE_KEY_PREFIX}${sessionId}${SESSION_DB_PREFIX}${encodeURIComponent(
-    deviceId
-  )}`;
-
-const sanitizeSessionStore = (
-  value: unknown,
-  isSignedOut: (device: SignedOutDevice) => boolean = () => false
-): SessionStore => {
+const sanitizeSessionStore = (value: unknown): SessionStore => {
   if (
     !isRecord(value) ||
     value.version !== SESSION_STORE_VERSION ||
@@ -196,26 +178,18 @@ const sanitizeSessionStore = (
   }
 
   const sessionMap = new Map<string, StoredSession>();
-  let activeSignedOut = false;
   value.sessions.forEach((item) => {
     const session = toStoredSession(item);
     if (!session) return;
-    if (isSignedOut(session)) {
-      activeSignedOut ||= session.sessionId === value.activeSessionId;
-      return;
-    }
     sessionMap.set(session.sessionId, session);
   });
 
   const sessions = Array.from(sessionMap.values());
-  let activeSessionId =
+  const activeSessionId =
     typeof value.activeSessionId === 'string' &&
     sessions.some((session) => session.sessionId === value.activeSessionId)
       ? value.activeSessionId
       : undefined;
-  // As removeSession does, a signed-out active account hands over to the most
-  // recently used one that remains.
-  if (activeSignedOut && !activeSessionId) activeSessionId = selectNextActiveSessionId(sessions);
 
   return {
     version: SESSION_STORE_VERSION,
@@ -247,8 +221,7 @@ const writeSessionStoreOrThrow = (
 
 const createSessionStoreSnapshot = (
   raw: string | null,
-  store: SessionStore,
-  signedOutMarkers?: [string, string | null][]
+  store: SessionStore
 ): SessionStoreSnapshot => {
   const activeSession = store.activeSessionId
     ? store.sessions.find((session) => session.sessionId === store.activeSessionId)
@@ -264,7 +237,6 @@ const createSessionStoreSnapshot = (
 
   return {
     raw,
-    signedOutMarkers,
     store,
     activeSession,
     sessions,
@@ -281,23 +253,12 @@ const getSessionStoreSnapshot = (
   try {
     const raw = storage.getItem(SESSION_STORE_KEY);
     const cachedSnapshot = sessionStoreSnapshotCache.get(storage);
-    if (
-      cachedSnapshot &&
-      cachedSnapshot.raw === raw &&
-      cachedSnapshot.signedOutMarkers?.every(([key, value]) => storage.getItem(key) === value)
-    ) {
+    if (cachedSnapshot && cachedSnapshot.raw === raw) {
       return cachedSnapshot;
     }
 
-    const signedOutMarkers: [string, string | null][] = [];
-    const isSignedOut = (device: SignedOutDevice): boolean => {
-      const key = getSignedOutDeviceKey(device);
-      const value = storage.getItem(key);
-      signedOutMarkers.push([key, value]);
-      return value !== null;
-    };
-    const store = raw ? sanitizeSessionStore(JSON.parse(raw), isSignedOut) : EMPTY_SESSION_STORE;
-    const snapshot = createSessionStoreSnapshot(raw, store, signedOutMarkers);
+    const store = raw ? sanitizeSessionStore(JSON.parse(raw)) : EMPTY_SESSION_STORE;
+    const snapshot = createSessionStoreSnapshot(raw, store);
     sessionStoreSnapshotCache.set(storage, snapshot);
     return snapshot;
   } catch {
@@ -370,9 +331,6 @@ export const putSession = (
     lastKnownAvatarUrl: input.lastKnownAvatarUrl ?? existing?.lastKnownAvatarUrl,
     lastKnownAvatarDataUrl: input.lastKnownAvatarDataUrl ?? existing?.lastKnownAvatarDataUrl,
   };
-
-  // Signing a removed device in again is deliberate.
-  removeStorageItemSafe(storage, getSignedOutDeviceKey(nextSession));
 
   writeSessionStoreOrThrow(
     {
@@ -547,13 +505,6 @@ export const removeSession = (
   storage: LocalStorageLike | undefined = getSafeLocalStorage()
 ): SessionStore => {
   const store = getSessionStore(storage);
-  const removed = store.sessions.find((session) => session.sessionId === sessionId);
-  // Recorded before the list changes, so no tab can read the new list without
-  // it. Without the marker a stale copy could restore the account, so a failed
-  // write stops the removal like a failed list write does.
-  if (removed && !setStorageItemSafe(storage, getSignedOutDeviceKey(removed), '1')) {
-    throw new SessionStoreWriteError();
-  }
   const sessions = store.sessions.filter((session) => session.sessionId !== sessionId);
   const activeSessionId =
     store.activeSessionId === sessionId
@@ -574,13 +525,7 @@ export const subscribeToSessionStore = (listener: SessionStoreListener): (() => 
 
   const handleWindowEvent = () => listener();
   const handleStorage = (event: StorageEvent) => {
-    if (
-      event.key &&
-      event.key !== SESSION_STORE_KEY &&
-      !event.key.startsWith(MINDROOM_SIGNED_OUT_DEVICE_KEY_PREFIX)
-    ) {
-      return;
-    }
+    if (event.key && event.key !== SESSION_STORE_KEY) return;
     listener();
   };
 

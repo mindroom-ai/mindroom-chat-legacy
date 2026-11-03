@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   LEGACY_SESSION_STORAGE_KEYS,
-  SESSION_STORE_KEY,
   SessionStoreWriteError,
   clearLegacySessionStorage,
   createSessionId,
@@ -11,7 +10,6 @@ import {
   getSessionRustCryptoStorePrefix,
   getSessionStore,
   getSessionStoreName,
-  getSignedOutDeviceKey,
   getSessionScopedStorageKey,
   hasInitializedCryptoStore,
   hasStoredSessions,
@@ -205,141 +203,6 @@ describe('sessions', () => {
 
     markCryptoStoreInitialized(newer, storage);
     expect(hasInitializedCryptoStore(newer.sessionId, storage)).toBe(true);
-  });
-
-  it('keeps a signed-out device removed when another tab writes an older copy back', () => {
-    const storage = createStorage();
-    const session = putSession(
-      {
-        baseUrl: 'https://example.com',
-        userId: '@alice:example.com',
-        deviceId: 'DEVICE_A',
-        accessToken: 'token-a',
-      },
-      undefined,
-      storage
-    );
-    markCryptoStoreInitialized(session, storage);
-    const copyReadBeforeSignOut = storage.getItem(SESSION_STORE_KEY)!;
-
-    removeSession(session.sessionId, storage);
-    // Another tab saves its route from the list it read before the sign-out.
-    storage.setItem(SESSION_STORE_KEY, copyReadBeforeSignOut);
-
-    expect(listSessions(storage)).toEqual([]);
-    expect(getActiveSession(storage)).toBeUndefined();
-    expect(hasInitializedCryptoStore(session.sessionId, storage)).toBe(false);
-    // The marker key names the device; it holds no credentials.
-    expect(storage.getItem(getSignedOutDeviceKey(session))).toBe('1');
-  });
-
-  it('keeps both accounts removed when two tabs remove different ones from the same copy', () => {
-    const storage = createStorage();
-    const login = { baseUrl: 'https://example.com', deviceId: 'DEVICE', accessToken: 'token' };
-    const bob = putSession({ ...login, userId: '@bob:example.com' }, undefined, storage);
-    const alice = putSession({ ...login, userId: '@alice:example.com' }, undefined, storage);
-    const copyReadBeforeSignOut = storage.getItem(SESSION_STORE_KEY)!;
-
-    removeSession(bob.sessionId, storage);
-    // The other tab removes Alice from the copy it read before Bob's removal.
-    storage.setItem(SESSION_STORE_KEY, copyReadBeforeSignOut);
-    removeSession(alice.sessionId, storage);
-
-    expect(listSessions(storage)).toEqual([]);
-  });
-
-  it('keeps an early sign-out removed after many later ones', () => {
-    const storage = createStorage();
-    const login = { baseUrl: 'https://example.com', accessToken: 'token' };
-    const first = putSession(
-      { ...login, userId: '@alice:example.com', deviceId: 'D0' },
-      undefined,
-      storage
-    );
-    const copyReadBeforeSignOut = storage.getItem(SESSION_STORE_KEY)!;
-    removeSession(first.sessionId, storage);
-    for (let index = 1; index <= 25; index += 1) {
-      const next = putSession(
-        { ...login, userId: '@bob:example.com', deviceId: `D${index}` },
-        undefined,
-        storage
-      );
-      removeSession(next.sessionId, storage);
-    }
-
-    storage.setItem(SESSION_STORE_KEY, copyReadBeforeSignOut);
-
-    expect(listSessions(storage)).toEqual([]);
-  });
-
-  it('keeps the account when its sign-out cannot be recorded', () => {
-    const storage = createStorage();
-    const session = putSession(
-      {
-        baseUrl: 'https://example.com',
-        userId: '@alice:example.com',
-        deviceId: 'DEVICE_A',
-        accessToken: 'token-a',
-      },
-      undefined,
-      storage
-    );
-    storage.setItem.mockImplementation((key: string) => {
-      if (key === getSignedOutDeviceKey(session))
-        throw new DOMException('full', 'QuotaExceededError');
-    });
-
-    expect(() => removeSession(session.sessionId, storage)).toThrow(SessionStoreWriteError);
-    expect(listSessions(storage).map((item) => item.deviceId)).toEqual(['DEVICE_A']);
-  });
-
-  it('makes the other account active when a stale copy brings back the signed-out one', () => {
-    const storage = createStorage();
-    const bob = putSession(
-      {
-        baseUrl: 'https://example.com',
-        userId: '@bob:example.com',
-        deviceId: 'DEVICE_B',
-        accessToken: 'token-b',
-      },
-      undefined,
-      storage
-    );
-    const alice = putSession(
-      {
-        baseUrl: 'https://example.com',
-        userId: '@alice:example.com',
-        deviceId: 'DEVICE_A',
-        accessToken: 'token-a',
-      },
-      undefined,
-      storage
-    );
-    const copyReadBeforeSignOut = storage.getItem(SESSION_STORE_KEY)!;
-
-    removeSession(alice.sessionId, storage);
-    storage.setItem(SESSION_STORE_KEY, copyReadBeforeSignOut);
-
-    expect(listSessions(storage).map((session) => session.sessionId)).toEqual([bob.sessionId]);
-    expect(getActiveSession(storage)?.sessionId).toBe(bob.sessionId);
-  });
-
-  it('keeps a new login of an account whose earlier device signed out', () => {
-    const storage = createStorage();
-    const login = {
-      baseUrl: 'https://example.com',
-      userId: '@alice:example.com',
-      accessToken: 'token-a',
-    };
-    const older = putSession({ ...login, deviceId: 'DEVICE_A' }, undefined, storage);
-    removeSession(older.sessionId, storage);
-
-    putSession({ ...login, deviceId: 'DEVICE_B' }, undefined, storage);
-    expect(listSessions(storage).map((session) => session.deviceId)).toEqual(['DEVICE_B']);
-
-    // Signing in again with a device that signed out earlier is deliberate.
-    putSession({ ...login, deviceId: 'DEVICE_A' }, undefined, storage);
-    expect(getActiveSession(storage)?.deviceId).toBe('DEVICE_A');
   });
 
   it('can set a different session active and keeps the session list sorted by lastUsedAt', () => {
