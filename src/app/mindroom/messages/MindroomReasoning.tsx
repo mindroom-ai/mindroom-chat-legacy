@@ -1,4 +1,4 @@
-import React, { useMemo, useState, type ReactNode } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon, Icons, Text } from 'folds';
 import { useTranslation } from 'react-i18next';
 import type { HTMLReactParserOptions } from 'html-react-parser';
@@ -70,6 +70,9 @@ function MindroomReasoningText({
   );
 }
 
+/** Open reasoning taller than this many lines folds itself, so it does not push the answer away. */
+const MAX_OPEN_LINES = 8;
+
 /** A small text toggle over the reasoning, so it stays out of the way of the answer. */
 function MindroomReasoningDisclosure({
   label,
@@ -80,14 +83,27 @@ function MindroomReasoningDisclosure({
   defaultExpanded: boolean;
   children: ReactNode;
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  // Unset until the person toggles the block; from then on their choice holds.
+  const [chosen, setChosen] = useState<boolean>();
+  const [tall, setTall] = useState(false);
+  const expanded = chosen ?? (defaultExpanded && !tall);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  // Measured whenever the reasoning changes, before paint, so growing reasoning folds without a flash.
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    if (chosen !== undefined || !body) return;
+    const lineHeight = parseFloat(getComputedStyle(body).lineHeight);
+    if (body.clientHeight > MAX_OPEN_LINES * lineHeight) setTall(true);
+  }, [chosen, children]);
+
   return (
     <div className={css.Reasoning}>
       <button
         type="button"
         className={css.Toggle}
         aria-expanded={expanded}
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => setChosen(!expanded)}
       >
         <Icon size="50" src={Icons.Bulb} aria-hidden />
         <span className={css.Label}>{label}</span>
@@ -98,12 +114,19 @@ function MindroomReasoningDisclosure({
           aria-hidden
         />
       </button>
-      {expanded && <div className={css.Body}>{children}</div>}
+      {expanded && (
+        <div ref={bodyRef} className={css.Body}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
 
-/** Model reasoning: open while it streams, then collapsed with how long the model thought. */
+/**
+ * Model reasoning: open while it streams until it grows past eight lines, then collapsed with how
+ * long the model thought.
+ */
 function MindroomReasoning({
   reasoning,
   htmlReactParserOptions,

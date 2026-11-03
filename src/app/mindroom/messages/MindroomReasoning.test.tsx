@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import React from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HTMLReactParserOptions } from 'html-react-parser';
 import { ClientConfigProvider } from '../../hooks/useClientConfig';
 import { loadLiveMarkdown, renderLiveMarkdown, useLiveMarkdownReady } from '../live/liveMarkdown';
@@ -233,6 +233,81 @@ describe('MindroomReasoning', () => {
     expect(renderer.root.findAll((node) => node.props.className === 'ReasoningBody')).toHaveLength(
       0
     );
+  });
+
+  describe('with a measured height', () => {
+    // The reasoning body's rendered height, read through its ref, at 24px lines.
+    let bodyHeight = 0;
+    const createNodeMock = (node: React.ReactElement<{ className?: string }>) =>
+      node.props.className === 'ReasoningBody'
+        ? {
+            get clientHeight() {
+              return bodyHeight;
+            },
+          }
+        : null;
+    const live = (reasoning: string) => (
+      <ClientConfigProvider value={{}}>
+        {renderMindroomMessageContent({
+          displayName: 'Agent',
+          msgType: 'm.text',
+          content: {
+            msgtype: 'm.text',
+            body: 'Partial',
+            'io.mindroom.stream_status': 'streaming',
+            'io.mindroom.live_reasoning': reasoning,
+          },
+          htmlReactParserOptions,
+          linkifyOpts: {},
+        })}
+      </ClientConfigProvider>
+    );
+    const mount = (reasoning: string) => {
+      act(() => {
+        renderer = create(live(reasoning), { createNodeMock });
+      });
+      if (!renderer) throw new Error('Nothing rendered');
+      return renderer;
+    };
+    const expanded = () => header(renderer!.root).props['aria-expanded'];
+
+    beforeEach(() => {
+      vi.stubGlobal('getComputedStyle', () => ({ lineHeight: '24px' }));
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('folds live reasoning once it grows past eight lines', () => {
+      bodyHeight = 8 * 24;
+      const view = mount('Short');
+      expect(expanded()).toBe(true);
+
+      bodyHeight = 9 * 24;
+      act(() => view.update(live('Short\nand longer')));
+
+      expect(expanded()).toBe(false);
+      expect(view.root.findAll((node) => node.props.className === 'ReasoningBody')).toHaveLength(0);
+    });
+
+    it('starts live reasoning folded when it is already past eight lines', () => {
+      bodyHeight = 9 * 24;
+      mount('Already long');
+
+      expect(expanded()).toBe(false);
+    });
+
+    it('keeps live reasoning open once the person opens it', () => {
+      bodyHeight = 9 * 24;
+      const view = mount('Already long');
+      act(() => header(view.root).props.onClick());
+
+      bodyHeight = 30 * 24;
+      act(() => view.update(live('Already long\nand longer')));
+
+      expect(expanded()).toBe(true);
+    });
   });
 
   it('rounds a short reasoning time up to one second', () => {
