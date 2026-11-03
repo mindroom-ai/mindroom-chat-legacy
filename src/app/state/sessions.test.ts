@@ -146,7 +146,7 @@ describe('sessions', () => {
     );
 
     expect(hasInitializedCryptoStore(initial.sessionId, storage)).toBe(false);
-    markCryptoStoreInitialized(initial.sessionId, storage);
+    markCryptoStoreInitialized(initial, storage);
     expect(hasInitializedCryptoStore(initial.sessionId, storage)).toBe(true);
 
     putSession(
@@ -172,6 +172,37 @@ describe('sessions', () => {
       storage
     );
     expect(hasInitializedCryptoStore(initial.sessionId, storage)).toBe(false);
+  });
+
+  it('marks crypto continuity only for the device whose store was opened', () => {
+    const storage = createStorage();
+    const older = putSession(
+      {
+        baseUrl: 'https://example.com',
+        userId: '@alice:example.com',
+        deviceId: 'DEVICE_A',
+        accessToken: 'token-a',
+      },
+      undefined,
+      storage
+    );
+    // A newer login replaces the record while a tab still starts the older device.
+    const newer = putSession(
+      {
+        baseUrl: older.baseUrl,
+        userId: older.userId,
+        deviceId: 'DEVICE_B',
+        accessToken: 'token-b',
+      },
+      undefined,
+      storage
+    );
+
+    markCryptoStoreInitialized(older, storage);
+    expect(hasInitializedCryptoStore(newer.sessionId, storage)).toBe(false);
+
+    markCryptoStoreInitialized(newer, storage);
+    expect(hasInitializedCryptoStore(newer.sessionId, storage)).toBe(true);
   });
 
   it('can set a different session active and keeps the session list sorted by lastUsedAt', () => {
