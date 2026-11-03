@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon, Icons, Text } from 'folds';
 import { useSetAtom } from 'jotai';
@@ -69,16 +69,9 @@ export function SettingsTab() {
   const lastKnownAvatarHttpUrl = lastKnownAvatarUrl
     ? mxcUrlToHttp(mx, lastKnownAvatarUrl, useAuthentication, 96, 96, 'crop') ?? undefined
     : undefined;
-  // The profile save below reads the stored avatar through this ref so it runs
-  // when this tab's profile changes, not on every write from another tab:
-  // writing this tab's profile back there ping-pongs whole account lists
-  // between tabs whose profiles disagree.
-  const storedAvatarRef = useRef({ lastKnownAvatarUrl, lastKnownAvatarDataUrl });
-  storedAvatarRef.current = { lastKnownAvatarUrl, lastKnownAvatarDataUrl };
 
   useEffect(() => {
     if (!activeSessionId) return;
-    const stored = storedAvatarRef.current;
 
     const update: {
       lastKnownDisplayName?: string;
@@ -96,7 +89,7 @@ export function SettingsTab() {
       // cache guard forever. This applies to UNRESOLVED urls too (the
       // mx.getUser mount seed) — the persist above already recorded them,
       // so skipping the invalidation here would pin the stale thumbnail.
-      if (profile.avatarUrl !== stored.lastKnownAvatarUrl && stored.lastKnownAvatarDataUrl) {
+      if (profile.avatarUrl !== lastKnownAvatarUrl && lastKnownAvatarDataUrl) {
         update.lastKnownAvatarDataUrl = undefined;
       }
     }
@@ -104,6 +97,8 @@ export function SettingsTab() {
   }, [
     activeSessionId,
     displayName,
+    lastKnownAvatarDataUrl,
+    lastKnownAvatarUrl,
     profile.avatarUrl,
     profile.displayName,
     profile.isAvatarResolved,

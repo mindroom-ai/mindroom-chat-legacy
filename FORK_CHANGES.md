@@ -10,16 +10,20 @@
 - Cause: every writer of the account list rewrites the whole list from its tab's copy, and Chrome can hand a tab a copy that does not yet hold another tab's write.
   A tab that wrote just after another tab signed out wrote the removed account back, still marked `cryptoStoreInitialized`, while the sign-out deleted its Rust crypto store; the next start then refused the account, as designed.
   `ClientLayout` made such writes constant: it saved the tab's route whenever the `activeSession` record changed, every write replaces that record in all other tabs through the `storage` event, so tabs on different routes saved their routes back and forth without end.
-- Change: `removeSession` records the signed-out device, its session ID and device ID only, under its own key `mindroom_signed_out_devices` before it rewrites the list, and every read of the list drops a recorded device.
-  A stale write that brings the account back is ignored, and the next write from any tab removes it from the list.
-  Only sign-out adds to that key and only signing the same device in again removes from it, so the stale copies that rewrite the account list never rewrite it; it keeps the last 20 devices.
+- Change: before `removeSession` rewrites the list, it writes a marker key for the removed device, `mindroom_signed_out_device::<session ID>::<device ID>` with the value `1`, and every read of the list through `sessions.ts` drops a device that has a marker.
+  A stale write that brings the account back is ignored, and the next write from any tab removes it from the list; if it was the active account, the most recently used remaining account becomes active, as after a normal sign-out.
+  Each marker is its own key, written once and never read and rewritten, so no stale copy of any value can drop it, and two tabs removing different accounts cannot lose each other's markers.
+  Only removing an account (sign-out or Remove Account) writes a marker and only signing the same device in again removes it; there is no cap, so one small key stays per removed device.
+  If the marker cannot be written, the removal throws `SessionStoreWriteError` and keeps the account, as a failed list write already does.
 - Change: `ClientLayout` keys its effects on the active session ID, so a tab saves its route only when its own route or account changes, and an alias route no longer resolves again on every write from another tab.
-- Change: `SettingsTab` saves the tab's profile when its own profile changes and reads the stored avatar through a ref, so two tabs whose live profiles disagree (for example after the avatar changed on another device) no longer write their avatars back and forth.
 - Adjacent race, not this incident's cause: `initClient` marked the store by account only, so a tab still starting an older device could mark a newer login of the same account (for example through Add account) whose store did not exist yet, and that login's next start failed the same way.
   `markCryptoStoreInitialized` now takes the session and device and marks only the record of that device.
-- An account restored before this change has no signed-out record and still needs Remove Account.
-- Tests: `sessions.test.ts` writes a copy read before a sign-out back after it and finds no account, no active account and no crypto mark, with only IDs in the signed-out list (fails before the change); it keeps a new login of the same account and a deliberate sign-in of the earlier device, and marks only the device whose store was opened.
-  `ClientLayout.test.tsx` subscribes to the store as the app does and keeps a route another tab saved; `SettingsTab.test.ts` keeps an avatar another tab saved; both fail before the change.
+- Not covered: an account restored before this change has no marker and still needs Remove Account.
+  A restored record stays hidden in the stored list until the next write from any tab rewrites it.
+  `SettingsTab` still writes avatar fields back and forth between tabs whose live profiles disagree (for example after the avatar changed on another device); with the markers that can no longer restore a removed account, and it needs its own fix for which tab owns the cached thumbnail.
+- Tests: `sessions.test.ts` writes a copy read before a sign-out back after it and finds no account, no active account and no crypto mark; with two accounts the remaining one becomes active; both fail before the change.
+  It keeps both accounts removed when two tabs remove different ones from the same copy, keeps an early sign-out removed after 25 later ones, keeps the account when the marker write fails, keeps a new login of the same account and a deliberate sign-in of the earlier device, and marks only the device whose store was opened.
+  `ClientLayout.test.tsx` subscribes to the store as the app does and keeps a route another tab saved; it fails before the change.
 - Check: a page in headless Chromium replaying the old route saves wrote about 5,600 times a second per tab with two idle tabs, and with three tabs a removed account came back in 17 of 20 sign-outs.
   The app itself was not run with several tabs.
 - Next: none.
