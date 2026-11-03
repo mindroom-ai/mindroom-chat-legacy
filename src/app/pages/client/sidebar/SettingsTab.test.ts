@@ -443,6 +443,49 @@ describe('SettingsTab', () => {
     });
   });
 
+  it('leaves an avatar another tab saved instead of writing its own back', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<never>(() => {}))
+    );
+    vi.mocked(useUserProfile).mockReturnValue({
+      displayName: 'Alice',
+      avatarUrl: 'mxc://mindroom.chat/old',
+      isAvatarResolved: true,
+      isDisplayNameResolved: true,
+    });
+    let session = {
+      ...activeSession,
+      lastKnownAvatarUrl: 'mxc://mindroom.chat/old',
+      lastKnownAvatarDataUrl: 'data:image/png;base64,old',
+    };
+    vi.mocked(useActiveSession).mockImplementation(() => session);
+    vi.mocked(useStoredSessions).mockImplementation(() => [session]);
+
+    const store = createStore();
+    let renderer!: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(React.createElement(Provider, { store }, React.createElement(SettingsTab)));
+    });
+    vi.mocked(updateSessionProfile).mockClear();
+
+    // Writing this tab's older avatar back on another tab's write would
+    // ping-pong whole account lists between the tabs.
+    await act(async () => {
+      session = {
+        ...session,
+        lastKnownAvatarUrl: 'mxc://mindroom.chat/new',
+        lastKnownAvatarDataUrl: undefined,
+      };
+      renderer.update(React.createElement(Provider, { store }, React.createElement(SettingsTab)));
+      await Promise.resolve();
+    });
+
+    vi.mocked(updateSessionProfile).mock.calls.forEach(([, update]) => {
+      expect(update).not.toHaveProperty('lastKnownAvatarUrl');
+    });
+  });
+
   it('fetches the last known avatar url when the live profile avatar is unavailable', async () => {
     class FileReaderMock {
       result: string | null = null;

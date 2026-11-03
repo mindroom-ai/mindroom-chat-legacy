@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   LEGACY_SESSION_STORAGE_KEYS,
+  SESSION_STORE_KEY,
+  SIGNED_OUT_DEVICES_KEY,
   SessionStoreWriteError,
   clearLegacySessionStorage,
   createSessionId,
@@ -203,6 +205,51 @@ describe('sessions', () => {
 
     markCryptoStoreInitialized(newer, storage);
     expect(hasInitializedCryptoStore(newer.sessionId, storage)).toBe(true);
+  });
+
+  it('keeps a signed-out device removed when another tab writes an older copy back', () => {
+    const storage = createStorage();
+    const session = putSession(
+      {
+        baseUrl: 'https://example.com',
+        userId: '@alice:example.com',
+        deviceId: 'DEVICE_A',
+        accessToken: 'token-a',
+      },
+      undefined,
+      storage
+    );
+    markCryptoStoreInitialized(session, storage);
+    const copyReadBeforeSignOut = storage.getItem(SESSION_STORE_KEY)!;
+
+    removeSession(session.sessionId, storage);
+    // Another tab saves its route from the list it read before the sign-out.
+    storage.setItem(SESSION_STORE_KEY, copyReadBeforeSignOut);
+
+    expect(listSessions(storage)).toEqual([]);
+    expect(getActiveSession(storage)).toBeUndefined();
+    expect(hasInitializedCryptoStore(session.sessionId, storage)).toBe(false);
+    expect(JSON.parse(storage.getItem(SIGNED_OUT_DEVICES_KEY)!)).toEqual([
+      { sessionId: session.sessionId, deviceId: 'DEVICE_A' },
+    ]);
+  });
+
+  it('keeps a new login of an account whose earlier device signed out', () => {
+    const storage = createStorage();
+    const login = {
+      baseUrl: 'https://example.com',
+      userId: '@alice:example.com',
+      accessToken: 'token-a',
+    };
+    const older = putSession({ ...login, deviceId: 'DEVICE_A' }, undefined, storage);
+    removeSession(older.sessionId, storage);
+
+    putSession({ ...login, deviceId: 'DEVICE_B' }, undefined, storage);
+    expect(listSessions(storage).map((session) => session.deviceId)).toEqual(['DEVICE_B']);
+
+    // Signing in again with a device that signed out earlier is deliberate.
+    putSession({ ...login, deviceId: 'DEVICE_A' }, undefined, storage);
+    expect(getActiveSession(storage)?.deviceId).toBe('DEVICE_A');
   });
 
   it('can set a different session active and keeps the session list sorted by lastUsedAt', () => {

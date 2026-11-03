@@ -7,19 +7,22 @@
 - Why: after signing out with several tabs open, the next start could stop at "Failed to start account ... The encryption storage for ... is missing while its existing Matrix device login is still present."
   Retry and Clear Cache and Reload kept the error, because both keep the account record; deleting the site's data cleared it, and Remove Account deletes the same record.
   The homeserver no longer had the device, and no new login had happened, so the account record had outlived its sign-out.
-- Cause: `ClientLayout` saved the tab's route with `updateSessionLastPath` whenever the `activeSession` record changed.
-  Every write to the account list replaces that record in all other tabs through the `storage` event, so tabs on different routes kept saving their routes back and forth.
-  Each save rewrites the whole account list from that tab's copy, and Chrome can hand a tab a copy that does not yet hold another tab's write.
-  A tab that saved its route just after another tab signed out wrote the removed account back, still marked `cryptoStoreInitialized`, while the sign-out deleted its Rust crypto store; the next start then refused the account, as designed.
+- Cause: every writer of the account list rewrites the whole list from its tab's copy, and Chrome can hand a tab a copy that does not yet hold another tab's write.
+  A tab that wrote just after another tab signed out wrote the removed account back, still marked `cryptoStoreInitialized`, while the sign-out deleted its Rust crypto store; the next start then refused the account, as designed.
+  `ClientLayout` made such writes constant: it saved the tab's route whenever the `activeSession` record changed, every write replaces that record in all other tabs through the `storage` event, so tabs on different routes saved their routes back and forth without end.
+- Change: `removeSession` records the signed-out device, its session ID and device ID only, under its own key `mindroom_signed_out_devices` before it rewrites the list, and every read of the list drops a recorded device.
+  A stale write that brings the account back is ignored, and the next write from any tab removes it from the list.
+  Only sign-out adds to that key and only signing the same device in again removes from it, so the stale copies that rewrite the account list never rewrite it; it keeps the last 20 devices.
 - Change: `ClientLayout` keys its effects on the active session ID, so a tab saves its route only when its own route or account changes, and an alias route no longer resolves again on every write from another tab.
+- Change: `SettingsTab` saves the tab's profile when its own profile changes and reads the stored avatar through a ref, so two tabs whose live profiles disagree (for example after the avatar changed on another device) no longer write their avatars back and forth.
 - Adjacent race, not this incident's cause: `initClient` marked the store by account only, so a tab still starting an older device could mark a newer login of the same account (for example through Add account) whose store did not exist yet, and that login's next start failed the same way.
   `markCryptoStoreInitialized` now takes the session and device and marks only the record of that device.
-- Not changed: every writer still rewrites the whole list from its tab's copy: a tab's own route save on navigation, token refresh, profile updates and start-up.
-  They no longer repeat on other tabs' writes, so a removed account now comes back only when one of them lands at the moment of a sign-out.
-- Tests: `ClientLayout.test.tsx` subscribes to the store as the app does and keeps a route another tab saved (fails before the change); `sessions.test.ts` marks only the device whose store was opened.
-- Check: a page in headless Chromium replaying the old save pattern wrote about 5,600 times a second per tab with two idle tabs, and with three tabs a removed account came back in 17 of 20 sign-outs.
+- An account restored before this change has no signed-out record and still needs Remove Account.
+- Tests: `sessions.test.ts` writes a copy read before a sign-out back after it and finds no account, no active account and no crypto mark, with only IDs in the signed-out list (fails before the change); it keeps a new login of the same account and a deliberate sign-in of the earlier device, and marks only the device whose store was opened.
+  `ClientLayout.test.tsx` subscribes to the store as the app does and keeps a route another tab saved; `SettingsTab.test.ts` keeps an avatar another tab saved; both fail before the change.
+- Check: a page in headless Chromium replaying the old route saves wrote about 5,600 times a second per tab with two idle tabs, and with three tabs a removed account came back in 17 of 20 sign-outs.
   The app itself was not run with several tabs.
-- Next: make a record that outlived its sign-out recoverable without Remove Account: when the store is missing but the record is marked, a rejected token (`M_UNKNOWN_TOKEN` from `whoami`) means the device is gone, so the record can be removed and the sign-in page shown.
+- Next: none.
 
 ### Insert an escaped translation value once, even when it holds its own placeholder (2026-11-02)
 

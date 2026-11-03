@@ -1,9 +1,11 @@
 import {
   MINDROOM_SESSION_STORE_EVENT,
   MINDROOM_SESSION_STORE_KEY,
+  MINDROOM_SIGNED_OUT_DEVICES_KEY,
 } from '../mindroom/cache/sessionStoreConfig';
 import {
   getSafeLocalStorage,
+  getStorageItemSafe,
   removeStorageItemSafe,
   setStorageItemSafe,
 } from '../utils/safeLocalStorage';
@@ -58,12 +60,14 @@ type LocalStorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 type SessionStoreListener = () => void;
 type SessionStoreSnapshot = {
   raw: string | null;
+  signedOutRaw?: string | null;
   store: SessionStore;
   activeSession?: StoredSession;
   sessions: StoredSession[];
 };
 
 export const SESSION_STORE_KEY = MINDROOM_SESSION_STORE_KEY;
+export const SIGNED_OUT_DEVICES_KEY = MINDROOM_SIGNED_OUT_DEVICES_KEY;
 export const SESSION_STORE_EVENT = MINDROOM_SESSION_STORE_EVENT;
 export const SESSION_STORE_VERSION = 1 as const;
 export const LEGACY_SESSION_STORAGE_KEYS = [
@@ -165,7 +169,48 @@ const toStoredSession = (value: unknown): StoredSession | undefined => {
   };
 };
 
-const sanitizeSessionStore = (value: unknown): SessionStore => {
+type SignedOutDevice = Pick<StoredSession, 'sessionId' | 'deviceId'>;
+
+// Every writer rewrites the whole account list from its tab's copy, and a tab
+// can still hold a copy from before another tab signed a device out. The
+// signed-out devices live under their own key, which only sign-out and sign-in
+// write, so readers drop a device such a stale write brings back.
+const MAX_SIGNED_OUT_DEVICES = 20;
+
+const readSignedOutDevices = (raw: string | null): SignedOutDevice[] => {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item) =>
+      isRecord(item) && typeof item.sessionId === 'string' && typeof item.deviceId === 'string'
+        ? [{ sessionId: item.sessionId, deviceId: item.deviceId }]
+        : []
+    );
+  } catch {
+    return [];
+  }
+};
+
+const isSameDevice = (a: SignedOutDevice, b: SignedOutDevice): boolean =>
+  a.sessionId === b.sessionId && a.deviceId === b.deviceId;
+
+const writeSignedOutDevices = (
+  update: (devices: SignedOutDevice[]) => SignedOutDevice[],
+  storage: LocalStorageLike | undefined
+): void => {
+  const devices = readSignedOutDevices(getStorageItemSafe(storage, SIGNED_OUT_DEVICES_KEY));
+  setStorageItemSafe(
+    storage,
+    SIGNED_OUT_DEVICES_KEY,
+    JSON.stringify(update(devices).slice(-MAX_SIGNED_OUT_DEVICES))
+  );
+};
+
+const sanitizeSessionStore = (
+  value: unknown,
+  signedOutDevices: SignedOutDevice[] = []
+): SessionStore => {
   if (
     !isRecord(value) ||
     value.version !== SESSION_STORE_VERSION ||
@@ -180,7 +225,7 @@ const sanitizeSessionStore = (value: unknown): SessionStore => {
   const sessionMap = new Map<string, StoredSession>();
   value.sessions.forEach((item) => {
     const session = toStoredSession(item);
-    if (!session) return;
+    if (!session || signedOutDevices.some((device) => isSameDevice(device, session))) return;
     sessionMap.set(session.sessionId, session);
   });
 
@@ -221,7 +266,8 @@ const writeSessionStoreOrThrow = (
 
 const createSessionStoreSnapshot = (
   raw: string | null,
-  store: SessionStore
+  store: SessionStore,
+  signedOutRaw?: string | null
 ): SessionStoreSnapshot => {
   const activeSession = store.activeSessionId
     ? store.sessions.find((session) => session.sessionId === store.activeSessionId)
@@ -237,6 +283,7 @@ const createSessionStoreSnapshot = (
 
   return {
     raw,
+    signedOutRaw,
     store,
     activeSession,
     sessions,
@@ -252,13 +299,20 @@ const getSessionStoreSnapshot = (
 
   try {
     const raw = storage.getItem(SESSION_STORE_KEY);
+    const signedOutRaw = storage.getItem(SIGNED_OUT_DEVICES_KEY);
     const cachedSnapshot = sessionStoreSnapshotCache.get(storage);
-    if (cachedSnapshot && cachedSnapshot.raw === raw) {
+    if (
+      cachedSnapshot &&
+      cachedSnapshot.raw === raw &&
+      cachedSnapshot.signedOutRaw === signedOutRaw
+    ) {
       return cachedSnapshot;
     }
 
-    const store = raw ? sanitizeSessionStore(JSON.parse(raw)) : EMPTY_SESSION_STORE;
-    const snapshot = createSessionStoreSnapshot(raw, store);
+    const store = raw
+      ? sanitizeSessionStore(JSON.parse(raw), readSignedOutDevices(signedOutRaw))
+      : EMPTY_SESSION_STORE;
+    const snapshot = createSessionStoreSnapshot(raw, store, signedOutRaw);
     sessionStoreSnapshotCache.set(storage, snapshot);
     return snapshot;
   } catch {
@@ -331,6 +385,17 @@ export const putSession = (
     lastKnownAvatarUrl: input.lastKnownAvatarUrl ?? existing?.lastKnownAvatarUrl,
     lastKnownAvatarDataUrl: input.lastKnownAvatarDataUrl ?? existing?.lastKnownAvatarDataUrl,
   };
+
+  if (
+    readSignedOutDevices(getStorageItemSafe(storage, SIGNED_OUT_DEVICES_KEY)).some((device) =>
+      isSameDevice(device, nextSession)
+    )
+  ) {
+    writeSignedOutDevices(
+      (devices) => devices.filter((device) => !isSameDevice(device, nextSession)),
+      storage
+    );
+  }
 
   writeSessionStoreOrThrow(
     {
@@ -505,6 +570,18 @@ export const removeSession = (
   storage: LocalStorageLike | undefined = getSafeLocalStorage()
 ): SessionStore => {
   const store = getSessionStore(storage);
+  const removed = store.sessions.find((session) => session.sessionId === sessionId);
+  // Recorded before the list changes, so no tab can read the new list without it.
+  if (removed) {
+    writeSignedOutDevices(
+      (devices) => [
+        ...devices.filter((device) => !isSameDevice(device, removed)),
+        // Only the identifiers: this list must never hold credentials.
+        { sessionId: removed.sessionId, deviceId: removed.deviceId },
+      ],
+      storage
+    );
+  }
   const sessions = store.sessions.filter((session) => session.sessionId !== sessionId);
   const activeSessionId =
     store.activeSessionId === sessionId
@@ -525,7 +602,9 @@ export const subscribeToSessionStore = (listener: SessionStoreListener): (() => 
 
   const handleWindowEvent = () => listener();
   const handleStorage = (event: StorageEvent) => {
-    if (event.key && event.key !== SESSION_STORE_KEY) return;
+    if (event.key && event.key !== SESSION_STORE_KEY && event.key !== SIGNED_OUT_DEVICES_KEY) {
+      return;
+    }
     listener();
   };
 
