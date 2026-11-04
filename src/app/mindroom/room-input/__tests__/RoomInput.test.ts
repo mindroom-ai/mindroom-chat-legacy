@@ -297,8 +297,11 @@ vi.mock('../../../components/emoji-board', async () => ({
     emojiBoardState.props = props;
     return null;
   },
-  EmojiBoardTab: (await vi.importActual<object>('../../../components/emoji-board/types'))
-    .EmojiBoardTab,
+  EmojiBoardTab: (
+    await vi.importActual<typeof import('../../../components/emoji-board/types')>(
+      '../../../components/emoji-board/types'
+    )
+  ).EmojiBoardTab,
 }));
 
 vi.mock('../../../components/upload-card', () => ({
