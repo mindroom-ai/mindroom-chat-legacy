@@ -18,7 +18,8 @@ import {
 } from 'folds';
 import React, { MouseEventHandler, ReactNode, useState } from 'react';
 import { ReactEditor, useSlate } from 'slate-react';
-import { Menu, IconButton } from '../glass/GlassPrimitives';
+import { Menu } from '../glass/GlassPrimitives';
+import { ComposerIconButton } from './ComposerIconButton';
 import {
   headingLevel,
   isAnyMarkActive,
@@ -71,9 +72,8 @@ export function MarkButton({ format, icon, tooltip }: MarkButtonProps) {
   return (
     <TooltipProvider tooltip={tooltip} delay={500}>
       {(triggerRef) => (
-        <IconButton
+        <ComposerIconButton
           ref={triggerRef}
-          variant="SurfaceVariant"
           onClick={handleClick}
           aria-pressed={isMarkActive(editor, format)}
           size="400"
@@ -81,7 +81,7 @@ export function MarkButton({ format, icon, tooltip }: MarkButtonProps) {
           disabled={disableInline}
         >
           <Icon size="200" src={icon} />
-        </IconButton>
+        </ComposerIconButton>
       )}
     </TooltipProvider>
   );
@@ -103,16 +103,15 @@ export function BlockButton({ format, icon, tooltip }: BlockButtonProps) {
   return (
     <TooltipProvider tooltip={tooltip} delay={500}>
       {(triggerRef) => (
-        <IconButton
+        <ComposerIconButton
           ref={triggerRef}
-          variant="SurfaceVariant"
           onClick={handleClick}
           aria-pressed={isBlockActive(editor, format)}
           size="400"
           radii="300"
         >
           <Icon size="200" src={icon} />
-        </IconButton>
+        </ComposerIconButton>
       )}
     </TooltipProvider>
   );
@@ -162,14 +161,14 @@ export function HeadingBlockButton() {
                 delay={500}
               >
                 {(triggerRef) => (
-                  <IconButton
+                  <ComposerIconButton
                     ref={triggerRef}
                     onClick={() => handleMenuSelect(1)}
                     size="400"
                     radii="300"
                   >
                     <Icon size="200" src={Icons.Heading1} />
-                  </IconButton>
+                  </ComposerIconButton>
                 )}
               </TooltipProvider>
               <TooltipProvider
@@ -177,14 +176,14 @@ export function HeadingBlockButton() {
                 delay={500}
               >
                 {(triggerRef) => (
-                  <IconButton
+                  <ComposerIconButton
                     ref={triggerRef}
                     onClick={() => handleMenuSelect(2)}
                     size="400"
                     radii="300"
                   >
                     <Icon size="200" src={Icons.Heading2} />
-                  </IconButton>
+                  </ComposerIconButton>
                 )}
               </TooltipProvider>
               <TooltipProvider
@@ -192,14 +191,14 @@ export function HeadingBlockButton() {
                 delay={500}
               >
                 {(triggerRef) => (
-                  <IconButton
+                  <ComposerIconButton
                     ref={triggerRef}
                     onClick={() => handleMenuSelect(3)}
                     size="400"
                     radii="300"
                   >
                     <Icon size="200" src={Icons.Heading3} />
-                  </IconButton>
+                  </ComposerIconButton>
                 )}
               </TooltipProvider>
             </Box>
@@ -207,9 +206,8 @@ export function HeadingBlockButton() {
         </FocusTrap>
       }
     >
-      <IconButton
+      <ComposerIconButton
         style={{ width: 'unset' }}
-        variant="SurfaceVariant"
         onClick={handleMenuOpen}
         aria-pressed={isActive}
         size="400"
@@ -217,7 +215,7 @@ export function HeadingBlockButton() {
       >
         <Icon size="200" src={level ? Icons[`Heading${level}`] : Icons.Heading1} />
         <Icon size="200" src={isActive ? Icons.Cross : Icons.ChevronBottom} />
-      </IconButton>
+      </ComposerIconButton>
     </PopOut>
   );
 }
@@ -239,15 +237,9 @@ export function ExitFormatting({ tooltip }: ExitFormattingProps) {
   return (
     <TooltipProvider tooltip={tooltip} delay={500}>
       {(triggerRef) => (
-        <IconButton
-          ref={triggerRef}
-          variant="SurfaceVariant"
-          onClick={handleClick}
-          size="400"
-          radii="300"
-        >
+        <ComposerIconButton ref={triggerRef} onClick={handleClick} size="400" radii="300">
           <Text size="B400">{t('sharedUi.toolbar.exitValue1', { value1: KeySymbol.Hyper })}</Text>
-        </IconButton>
+        </ComposerIconButton>
       )}
     </TooltipProvider>
   );
@@ -382,9 +374,8 @@ export function Toolbar() {
               delay={500}
             >
               {(triggerRef) => (
-                <IconButton
+                <ComposerIconButton
                   ref={triggerRef}
-                  variant="SurfaceVariant"
                   onClick={() => setIsMarkdown(!isMarkdown)}
                   aria-pressed={isMarkdown}
                   size="300"
@@ -392,7 +383,7 @@ export function Toolbar() {
                   disabled={disableInline || !!isAnyMarkActive(editor)}
                 >
                   <Icon size="200" src={Icons.Markdown} filled={isMarkdown} />
-                </IconButton>
+                </ComposerIconButton>
               )}
             </TooltipProvider>
             <span />

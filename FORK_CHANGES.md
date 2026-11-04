@@ -2,6 +2,41 @@
 
 ## Runbook
 
+### Quiet the composer's buttons and show the Markdown state (2026-11-04)
+
+- Why: the owner found the composer too busy.
+  Every attach, voice, format, sticker, emoji and formatting-toolbar button was its own raised glass control (#270), a divider line split the input row from the toolbar, and the Markdown toggle looked the same on and off.
+- Change: new `ComposerIconButton` (`components/editor/ComposerIconButton.tsx`) wraps the folds `IconButton` with `fill="None"`.
+  It is `SurfaceVariant` at rest and `Primary` while its boolean `aria-pressed` is true, which folds' pressed rule fills with `Primary` `ContainerActive`.
+  It takes `aria-pressed` itself rather than a separate `pressed` prop, so a caller cannot pass one that is silently overridden, and a string value does not typecheck.
+  It replaces the glass `IconButton` on the formatting toolbar (marks, blocks, heading and its level menu, Exit, Markdown) and on the composer's attach, voice, Formatting, sticker and emoji buttons.
+  It also replaces the soft folds `IconButton` on the message editor's Formatting and emoji buttons; the emoji button's `MouseEventHandler` cast is no longer needed.
+  Send keeps the raised glass `Primary` control, so it stays the one prominent action.
+  The `Line` between the input row and the toolbar is gone from the composer and the message editor; the toolbar's small vertical group separators remain.
+  The composer files import the button directly, not through the editor barrel, which `RoomInput.test.ts` mocks.
+  In Simple Mode at 500px and wider the Sticker button is hidden, yet the emoji button counted as pressed only on the board's Emoji tab, so switching the open board to its Sticker tab left no control pressed.
+  `RoomInputEditor` now derives `showStickerBtn` once, and without a Sticker button the emoji button stays pressed for either tab.
+- Design rule: recorded in `docs/ui-design.md` under shared implementation.
+- Unchanged: the voice recorder's Discard and Pause (composer `top` slot while recording) keep the glass button, and the reply preview's cancel keeps its soft one.
+- Tests: `e2e/live/composer-glass.spec.ts` now asserts that only Send has backdrop blur and that only Send has the highlight, each checked separately, before and after opening the toolbar.
+  With the pointer moved away, it asserts that the pressed Formatting toggle has a fill while Attach stays transparent.
+  It asserts that Markdown, on by default, has a fill, loses it when turned off, and is pressed again when turned back on.
+  Pressed Formatting and Markdown must also differ in text color from bare buttons; with `variant` forced to `SurfaceVariant` the test fails there, because folds alone gives a pressed button a grey fill.
+  `dev`'s glass Attach has a tinted background, so these checks reject it.
+  `RoomInput.test.ts` covers the Simple Mode fix: in Simple Mode the emoji button stays pressed after the board switches to its Sticker tab, and with the Sticker button shown only the open tab's button is pressed.
+  Its `UseStateProvider` mock without state is gone, so the board's tab can change, and its `PopOut` mock now renders the board, so a test can switch the tab.
+  Reverting the fix fails the first test; pressing the emoji button for either tab with the Sticker button shown fails the second.
+- Validation: typecheck, production build, lint and prettier on touched files pass; related unit suites pass (two message suites time out under parallel load and pass alone).
+  Fixture screenshots compared dev and this branch in light and dark on Chromium: Markdown on shows a Primary chip, off shows a bare icon, Bold pressed matches.
+  Live `composer-glass` passes in Chromium for both cases.
+  Run back to back on one account, the silver-theme case hits the local homeserver's per-account login limit (`M_LIMIT_EXCEEDED`, retry after 177 s) before reaching the composer, so it passed in a separate run.
+  WebKit browsers are not installed locally.
+  A throwaway live script captured the message editor with its toolbar open on `dev` and on this branch, and checked the Simple Mode emoji button on the Sticker tab: `aria-pressed="false"` on `dev`, `"true"` here.
+- Review: a fresh Claude reviewer and Codex (`gpt-6-astra`) found a silently overridable `aria-pressed`, an untested Markdown toggle, a combined blur-and-highlight check that let a half-raised button pass, and Runbook and design-guide wording; all fixed.
+  The second round (Codex approved) found the Simple Mode emoji state, also raised by CodeRabbit, a test that never checked for Primary, and missing message editor screenshots; all fixed.
+  The third round (Codex approved) asked for a unit test of the Simple Mode fix and clearer wording for the separate silver run; both done.
+- Next: check the result on the owner's Mac and an iPhone, where the previous rims were most visible.
+
 ### Open an agent's connect and reset links signed in from the iOS app (2026-11-04)
 
 - Why: the iOS app opened a tapped connect or reset link bare in Safari, which has no Connections portal session, so it landed on the backend's dashboard API-key login (`/login?next=...`); the link handling of #535 skips the native apps.

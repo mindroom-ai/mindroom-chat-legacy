@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { IContent, MatrixClient } from 'matrix-js-sdk';
 import type { Descendant } from 'slate';
 import { Icon, Icons } from 'folds';
-import { IconButton } from '../../components/glass/GlassPrimitives';
+import { ComposerIconButton } from '../../components/editor/ComposerIconButton';
 import { IconTooltip } from '../tooltip/IconTooltip';
 import { useMediaConfig } from '../../hooks/useMediaConfig';
 import {
@@ -510,21 +510,20 @@ export const useRoomInputVoice = ({
     // the tooltip shows it too where the browser reports hovering a disabled button.
     <IconTooltip label={microphoneLabel} position="Top">
       {(triggerRef) => (
-        <IconButton
+        <ComposerIconButton
           ref={triggerRef}
           onClick={() => {
             if (voiceRecorderOpen || voiceAutoSendPending || otherRoomOwnsPendingVoiceDraft) return;
             pauseAllMediaElements();
             setVoiceRecorderOpen(true);
           }}
-          variant="SurfaceVariant"
           size="300"
           radii="300"
           disabled={voiceRecorderOpen || voiceAutoSendPending || otherRoomOwnsPendingVoiceDraft}
           aria-label={microphoneLabel}
         >
           <Icon src={Icons.Mic} />
-        </IconButton>
+        </ComposerIconButton>
       )}
     </IconTooltip>
   );

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import {
   getHomeserver,
   getPrimaryCredentials,
@@ -188,24 +188,29 @@ for (const [themeId, width] of [
       expect(await typingBar.evaluate((el) => getComputedStyle(el).backgroundColor)).toMatch(
         /(?:rgba|color\().*(?:0\.[0-9]+\))$/
       );
-      // Protect the shared material boundary across attachment, voice, format,
-      // sticker, emoji and send controls; failures include the offending styles.
-      expect(
-        await buttons.evaluateAll((nodes) =>
-          nodes.flatMap((node) => {
+      // Only Send keeps the raised control material, both its blur and its highlight.
+      // Attachment, voice, format, sticker, emoji and formatting-toolbar controls sit
+      // flat on the composer's glass, with neither; failures include the offending styles.
+      const materialMismatches = () =>
+        buttons.evaluateAll((nodes) =>
+          nodes.flatMap((node, index) => {
             const css = getComputedStyle(node);
-            return css.backdropFilter === 'none' || css.backgroundImage === 'none'
-              ? [
+            const send = node.getAttribute('aria-label') === 'Send message';
+            const blur = css.backdropFilter !== 'none';
+            const highlight = css.backgroundImage !== 'none';
+            return blur === send && highlight === send
+              ? []
+              : [
                   {
+                    index,
                     label: node.getAttribute('aria-label'),
                     blur: css.backdropFilter,
                     highlight: css.backgroundImage,
                   },
-                ]
-              : [];
+                ];
           })
-        )
-      ).toEqual([]);
+        );
+      expect(await materialMismatches()).toEqual([]);
 
       // The notice stays while the server reports typing, so only the button can hide it.
       await page.getByRole('button', { name: 'Drop Typing Status' }).click();
@@ -218,11 +223,32 @@ for (const [themeId, width] of [
       await expect(typing).toHaveCount(0);
       await buttons.nth(2).click();
       await expect.poll(() => buttons.count()).toBeGreaterThan(buttonCount);
-      expect(
-        await buttons.evaluateAll((nodes) =>
-          nodes.every((node) => getComputedStyle(node).backdropFilter !== 'none')
-        )
-      ).toBe(true);
+      expect(await materialMismatches()).toEqual([]);
+      // A pressed toggle (here Formatting) is filled while plain actions stay bare,
+      // so its state reads at a glance. Move off it first: hover fills any button.
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole('tooltip')).toHaveCount(0);
+      await expect(buttons.nth(2)).toHaveAttribute('aria-pressed', 'true');
+      await expect(buttons.nth(0)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(buttons.nth(2)).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      // Pressed toggles turn Primary; folds alone would give any pressed button a grey fill.
+      const textColor = (button: Locator) => button.evaluate((el) => getComputedStyle(el).color);
+      const bareColor = await textColor(buttons.nth(0));
+      await expect.poll(() => textColor(buttons.nth(2))).not.toBe(bareColor);
+      // Markdown, the toolbar's last button and on by default, shows the same fill
+      // and loses it when turned off.
+      const markdown = buttons.last();
+      await expect(markdown).toHaveAttribute('aria-pressed', 'true');
+      await expect(markdown).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      const markdownOnColor = await textColor(markdown);
+      await markdown.click();
+      await page.mouse.move(0, 0);
+      await expect(markdown).toHaveAttribute('aria-pressed', 'false');
+      await expect(markdown).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect.poll(() => textColor(markdown)).not.toBe(markdownOnColor);
+      await markdown.click();
+      await page.mouse.move(0, 0);
+      await expect(markdown).toHaveAttribute('aria-pressed', 'true');
       await page.screenshot({ path: testInfo.outputPath('composer-formatting.png') });
       await buttons.nth(2).click();
       await expect(buttons).toHaveCount(buttonCount);

@@ -13,7 +13,7 @@ import { isKeyHotkey } from 'is-hotkey';
 import { EventType, Room } from 'matrix-js-sdk';
 import { Editor } from 'slate';
 import { ReactEditor } from 'slate-react';
-import { Icon, Icons, Line, PopOut } from 'folds';
+import { Icon, Icons, PopOut } from 'folds';
 import { IconButton } from '../../components/glass/GlassPrimitives';
 
 import {
@@ -32,6 +32,7 @@ import {
   Toolbar,
   UserMentionAutocomplete,
 } from '../../components/editor';
+import { ComposerIconButton } from '../../components/editor/ComposerIconButton';
 import { EmojiBoard, EmojiBoardTab } from '../../components/emoji-board';
 import { UseStateProvider } from '../../components/UseStateProvider';
 import { CommandAutocomplete } from '../../features/room/CommandAutocomplete';
@@ -97,6 +98,8 @@ export function RoomInputEditor({
   const [autocompleteQuery, setAutocompleteQuery] =
     useState<AutocompleteQuery<RoomInputAutocompletePrefix>>();
   const [hideStickerBtn, setHideStickerBtn] = useState(document.body.clientWidth < 500);
+  // Without its own button, the board's Sticker tab still belongs to the emoji button.
+  const showStickerBtn = !hideStickerBtn && !simpleMode;
   const emojiBtnRef = useRef<HTMLButtonElement | null>(null);
   const isComposing = useComposingCheck();
 
@@ -243,9 +246,8 @@ export function RoomInputEditor({
             {!simpleMode && (
               <IconTooltip label={t('composer.formatting')} position="Top">
                 {(triggerRef) => (
-                  <IconButton
+                  <ComposerIconButton
                     ref={triggerRef}
-                    variant="SurfaceVariant"
                     size="300"
                     radii="300"
                     aria-label={t('composer.formatting')}
@@ -253,7 +255,7 @@ export function RoomInputEditor({
                     onClick={() => setToolbar(!toolbar)}
                   >
                     <Icon src={toolbar ? Icons.AlphabetUnderline : Icons.Alphabet} />
-                  </IconButton>
+                  </ComposerIconButton>
                 )}
               </IconTooltip>
             )}
@@ -290,15 +292,14 @@ export function RoomInputEditor({
                     />
                   }
                 >
-                  {!hideStickerBtn && !simpleMode && (
+                  {showStickerBtn && (
                     <IconTooltip label={t('sharedUi.tabs.sticker')} position="Top">
                       {(triggerRef) => (
-                        <IconButton
+                        <ComposerIconButton
                           ref={triggerRef}
                           aria-label={t('sharedUi.tabs.sticker')}
                           aria-pressed={emojiBoardTab === EmojiBoardTab.Sticker}
                           onClick={() => setEmojiBoardTab(EmojiBoardTab.Sticker)}
-                          variant="SurfaceVariant"
                           size="300"
                           radii="300"
                         >
@@ -306,33 +307,32 @@ export function RoomInputEditor({
                             src={Icons.Sticker}
                             filled={emojiBoardTab === EmojiBoardTab.Sticker}
                           />
-                        </IconButton>
+                        </ComposerIconButton>
                       )}
                     </IconTooltip>
                   )}
                   <IconTooltip label={t('sharedUi.tabs.emoji')} position="Top">
                     {(triggerRef) => (
-                      <IconButton
+                      <ComposerIconButton
                         ref={(node: HTMLButtonElement | null) => {
                           triggerRef(node);
                           emojiBtnRef.current = node;
                         }}
                         aria-label={t('sharedUi.tabs.emoji')}
                         aria-pressed={
-                          hideStickerBtn ? !!emojiBoardTab : emojiBoardTab === EmojiBoardTab.Emoji
+                          showStickerBtn ? emojiBoardTab === EmojiBoardTab.Emoji : !!emojiBoardTab
                         }
                         onClick={() => setEmojiBoardTab(EmojiBoardTab.Emoji)}
-                        variant="SurfaceVariant"
                         size="300"
                         radii="300"
                       >
                         <Icon
                           src={Icons.Smile}
                           filled={
-                            hideStickerBtn ? !!emojiBoardTab : emojiBoardTab === EmojiBoardTab.Emoji
+                            showStickerBtn ? emojiBoardTab === EmojiBoardTab.Emoji : !!emojiBoardTab
                           }
                         />
-                      </IconButton>
+                      </ComposerIconButton>
                     )}
                   </IconTooltip>
                 </PopOut>
@@ -354,15 +354,7 @@ export function RoomInputEditor({
             </IconTooltip>
           </>
         }
-        bottom={
-          toolbar &&
-          !simpleMode && (
-            <div>
-              <Line variant="SurfaceVariant" size="300" />
-              <Toolbar />
-            </div>
-          )
-        }
+        bottom={toolbar && !simpleMode && <Toolbar />}
       />
     </>
   );
