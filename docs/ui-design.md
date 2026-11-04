@@ -69,8 +69,8 @@ Custom component families should compose `glassSurface` and shared modifiers ins
   So does a neutral `Header` with no enclosing surface: standalone page chrome is flat, with no raised rim or bottom border.
   Pass `appearance="glass"` or `flat={false}` only for a deliberately raised standalone header.
 - Section labels inside a list or card (room groups in Notifications or message search, a call's participant label) use `appearance="plain"`: they are rows, not chrome.
-- The composer's input row and formatting toolbar (attach, voice, Formatting, sticker, emoji, and every toolbar button including Markdown) use [ComposerIconButton](../src/app/components/editor/ComposerIconButton.tsx): borderless `fill="None"` at rest, filled `Primary` while a toggle is pressed.
-  The composer's glass owns the material; in those two rows only Send keeps the raised glass `IconButton`.
+- The input row and formatting toolbar of the composer and the message editor (attach, voice, Formatting, sticker, emoji, and every toolbar button including Markdown) use [ComposerIconButton](../src/app/components/editor/ComposerIconButton.tsx): borderless `fill="None"` at rest, filled `Primary` while a toggle's `aria-pressed` is true.
+  The editor's glass owns the material; in those rows only the composer's Send keeps the raised glass `IconButton`.
   No divider line separates the input row from the formatting toolbar.
 - Neutral nested headers inherit the panel treatment; semantic variants retain matching foreground and background colors for contrast.
   Menus default to transparent rows, with explicit selected states where needed.

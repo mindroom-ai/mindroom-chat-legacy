@@ -249,7 +249,7 @@ export function RoomInputEditor({
                     size="300"
                     radii="300"
                     aria-label={t('composer.formatting')}
-                    pressed={toolbar}
+                    aria-pressed={toolbar}
                     onClick={() => setToolbar(!toolbar)}
                   >
                     <Icon src={toolbar ? Icons.AlphabetUnderline : Icons.Alphabet} />
@@ -296,7 +296,7 @@ export function RoomInputEditor({
                         <ComposerIconButton
                           ref={triggerRef}
                           aria-label={t('sharedUi.tabs.sticker')}
-                          pressed={emojiBoardTab === EmojiBoardTab.Sticker}
+                          aria-pressed={emojiBoardTab === EmojiBoardTab.Sticker}
                           onClick={() => setEmojiBoardTab(EmojiBoardTab.Sticker)}
                           size="300"
                           radii="300"
@@ -317,7 +317,7 @@ export function RoomInputEditor({
                           emojiBtnRef.current = node;
                         }}
                         aria-label={t('sharedUi.tabs.emoji')}
-                        pressed={
+                        aria-pressed={
                           hideStickerBtn ? !!emojiBoardTab : emojiBoardTab === EmojiBoardTab.Emoji
                         }
                         onClick={() => setEmojiBoardTab(EmojiBoardTab.Emoji)}

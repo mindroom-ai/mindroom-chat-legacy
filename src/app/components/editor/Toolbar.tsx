@@ -75,7 +75,7 @@ export function MarkButton({ format, icon, tooltip }: MarkButtonProps) {
         <ComposerIconButton
           ref={triggerRef}
           onClick={handleClick}
-          pressed={isMarkActive(editor, format)}
+          aria-pressed={isMarkActive(editor, format)}
           size="400"
           radii="300"
           disabled={disableInline}
@@ -106,7 +106,7 @@ export function BlockButton({ format, icon, tooltip }: BlockButtonProps) {
         <ComposerIconButton
           ref={triggerRef}
           onClick={handleClick}
-          pressed={isBlockActive(editor, format)}
+          aria-pressed={isBlockActive(editor, format)}
           size="400"
           radii="300"
         >
@@ -209,7 +209,7 @@ export function HeadingBlockButton() {
       <ComposerIconButton
         style={{ width: 'unset' }}
         onClick={handleMenuOpen}
-        pressed={isActive}
+        aria-pressed={isActive}
         size="400"
         radii="300"
       >
@@ -377,7 +377,7 @@ export function Toolbar() {
                 <ComposerIconButton
                   ref={triggerRef}
                   onClick={() => setIsMarkdown(!isMarkdown)}
-                  pressed={isMarkdown}
+                  aria-pressed={isMarkdown}
                   size="300"
                   radii="300"
                   disabled={disableInline || !!isAnyMarkActive(editor)}

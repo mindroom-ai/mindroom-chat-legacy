@@ -4,18 +4,28 @@
 
 ### Quiet the composer's buttons and show the Markdown state (2026-11-04)
 
-- Why: the owner found the composer too busy. Every attach, voice, format, sticker, emoji and formatting-toolbar button was its own raised glass control (#270), a divider line split the input row from the toolbar, and the Markdown toggle looked the same on and off.
-- Change: new `ComposerIconButton` (`components/editor/ComposerIconButton.tsx`) wraps the folds `IconButton` with `fill="None"`: `SurfaceVariant` at rest, `Primary` with `aria-pressed="true"` while its `pressed` prop is true, which folds' pressed rule fills with `Primary` `ContainerActive`; without `pressed` it sets no `aria-pressed`.
-  It replaces the glass `IconButton` on the formatting toolbar (marks, blocks, heading and its level menu, Exit, Markdown) and the composer's attach, voice, Formatting, sticker and emoji buttons, and the soft folds `IconButton` on the message editor's Formatting and emoji buttons.
+- Why: the owner found the composer too busy.
+  Every attach, voice, format, sticker, emoji and formatting-toolbar button was its own raised glass control (#270), a divider line split the input row from the toolbar, and the Markdown toggle looked the same on and off.
+- Change: new `ComposerIconButton` (`components/editor/ComposerIconButton.tsx`) wraps the folds `IconButton` with `fill="None"`.
+  It is `SurfaceVariant` at rest and `Primary` while its boolean `aria-pressed` is true, which folds' pressed rule fills with `Primary` `ContainerActive`.
+  It takes `aria-pressed` itself rather than a separate `pressed` prop, so a caller cannot pass one that is silently overridden, and a string value does not typecheck.
+  It replaces the glass `IconButton` on the formatting toolbar (marks, blocks, heading and its level menu, Exit, Markdown) and on the composer's attach, voice, Formatting, sticker and emoji buttons.
+  It also replaces the soft folds `IconButton` on the message editor's Formatting and emoji buttons; the emoji button's `MouseEventHandler` cast is no longer needed.
   Send keeps the raised glass `Primary` control, so it stays the one prominent action.
   The `Line` between the input row and the toolbar is gone from the composer and the message editor; the toolbar's small vertical group separators remain.
   The composer files import the button directly, not through the editor barrel, which `RoomInput.test.ts` mocks.
 - Design rule: recorded in `docs/ui-design.md` under shared implementation.
 - Unchanged: the voice recorder's Discard and Pause (composer `top` slot while recording) keep the glass button, and the reply preview's cancel keeps its soft one.
-- Tests: `e2e/live/composer-glass.spec.ts` now asserts that only Send has backdrop blur and the highlight, before and after opening the toolbar, and, with the pointer moved away, that the pressed Formatting toggle has a fill while Attach stays transparent; `dev`'s glass Attach has a tinted background, so both new checks reject it.
+- Tests: `e2e/live/composer-glass.spec.ts` now asserts that only Send has backdrop blur and that only Send has the highlight, each checked separately, before and after opening the toolbar.
+  With the pointer moved away, it asserts that the pressed Formatting toggle has a fill while Attach stays transparent.
+  It asserts that Markdown, on by default, has a fill, loses it when turned off, and is pressed again when turned back on.
+  `dev`'s glass Attach has a tinted background, so these checks reject it.
 - Validation: typecheck, production build, lint and prettier on touched files pass; related unit suites pass (two message suites time out under parallel load and pass alone).
   Fixture screenshots compared dev and this branch in light and dark on Chromium: Markdown on shows a Primary chip, off shows a bare icon, Bold pressed matches.
-  Live `composer-glass` passes in Chromium for both cases. Run back to back on one account, the silver-theme case hits the local homeserver's per-account login limit (`M_LIMIT_EXCEEDED`, retry after 177 s) before reaching the composer, so it passed in a separate run. WebKit browsers are not installed locally.
+  Live `composer-glass` passes in Chromium for both cases.
+  Run back to back on one account, the silver-theme case hits the local homeserver's per-account login limit (`M_LIMIT_EXCEEDED`, retry after 177 s) before reaching the composer, so it runs separately.
+  WebKit browsers are not installed locally.
+- Review: a fresh Claude reviewer and Codex (`gpt-6-astra`) found a silently overridable `aria-pressed`, an untested Markdown toggle, a combined blur-and-highlight check that let a half-raised button pass, and Runbook and design-guide wording; all fixed.
 - Next: check the result on the owner's Mac and an iPhone, where the previous rims were most visible.
 
 ### Open an agent's connect and reset links signed in from the iOS app (2026-11-04)

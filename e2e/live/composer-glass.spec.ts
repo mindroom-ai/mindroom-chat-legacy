@@ -188,16 +188,17 @@ for (const [themeId, width] of [
       expect(await typingBar.evaluate((el) => getComputedStyle(el).backgroundColor)).toMatch(
         /(?:rgba|color\().*(?:0\.[0-9]+\))$/
       );
-      // Only Send keeps the raised control material. Attachment, voice, format,
-      // sticker, emoji and formatting-toolbar controls sit flat on the composer's
-      // glass; failures include the offending styles.
+      // Only Send keeps the raised control material, both its blur and its highlight.
+      // Attachment, voice, format, sticker, emoji and formatting-toolbar controls sit
+      // flat on the composer's glass, with neither; failures include the offending styles.
       const materialMismatches = () =>
         buttons.evaluateAll((nodes) =>
           nodes.flatMap((node, index) => {
             const css = getComputedStyle(node);
             const send = node.getAttribute('aria-label') === 'Send message';
-            const raised = css.backdropFilter !== 'none' && css.backgroundImage !== 'none';
-            return raised === send
+            const blur = css.backdropFilter !== 'none';
+            const highlight = css.backgroundImage !== 'none';
+            return blur === send && highlight === send
               ? []
               : [
                   {
@@ -230,6 +231,18 @@ for (const [themeId, width] of [
       await expect(buttons.nth(2)).toHaveAttribute('aria-pressed', 'true');
       await expect(buttons.nth(0)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(buttons.nth(2)).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      // Markdown, the toolbar's last button and on by default, shows the same fill
+      // and loses it when turned off.
+      const markdown = buttons.last();
+      await expect(markdown).toHaveAttribute('aria-pressed', 'true');
+      await expect(markdown).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await markdown.click();
+      await page.mouse.move(0, 0);
+      await expect(markdown).toHaveAttribute('aria-pressed', 'false');
+      await expect(markdown).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await markdown.click();
+      await page.mouse.move(0, 0);
+      await expect(markdown).toHaveAttribute('aria-pressed', 'true');
       await page.screenshot({ path: testInfo.outputPath('composer-formatting.png') });
       await buttons.nth(2).click();
       await expect(buttons).toHaveCount(buttonCount);

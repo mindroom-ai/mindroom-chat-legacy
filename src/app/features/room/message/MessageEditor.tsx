@@ -1,10 +1,4 @@
-import React, {
-  KeyboardEventHandler,
-  MouseEventHandler,
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
+import React, { KeyboardEventHandler, useCallback, useEffect, useState } from 'react';
 import { Box, Chip, Icon, Icons, PopOut, RectCords, Spinner, Text, as, config } from 'folds';
 import { Editor, Transforms } from 'slate';
 import { ReactEditor } from 'slate-react';
@@ -300,7 +294,7 @@ export const MessageEditor = as<'div', MessageEditorProps>(
                       <ComposerIconButton
                         ref={triggerRef}
                         aria-label={t('composer.formatting')}
-                        pressed={toolbar}
+                        aria-pressed={toolbar}
                         size="300"
                         radii="300"
                         onClick={() => setToolbar(!toolbar)}
@@ -339,12 +333,9 @@ export const MessageEditor = as<'div', MessageEditorProps>(
                             <ComposerIconButton
                               ref={triggerRef}
                               aria-label={t('sharedUi.tabs.emoji')}
-                              pressed={anchor !== undefined}
-                              onClick={
-                                ((evt) =>
-                                  setAnchor(
-                                    evt.currentTarget.getBoundingClientRect()
-                                  )) as MouseEventHandler<HTMLButtonElement>
+                              aria-pressed={anchor !== undefined}
+                              onClick={(evt) =>
+                                setAnchor(evt.currentTarget.getBoundingClientRect())
                               }
                               size="300"
                               radii="300"
