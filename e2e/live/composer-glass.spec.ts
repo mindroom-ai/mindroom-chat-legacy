@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import {
   getHomeserver,
   getPrimaryCredentials,
@@ -231,15 +231,21 @@ for (const [themeId, width] of [
       await expect(buttons.nth(2)).toHaveAttribute('aria-pressed', 'true');
       await expect(buttons.nth(0)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(buttons.nth(2)).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      // Pressed toggles turn Primary; folds alone would give any pressed button a grey fill.
+      const textColor = (button: Locator) => button.evaluate((el) => getComputedStyle(el).color);
+      const bareColor = await textColor(buttons.nth(0));
+      await expect.poll(() => textColor(buttons.nth(2))).not.toBe(bareColor);
       // Markdown, the toolbar's last button and on by default, shows the same fill
       // and loses it when turned off.
       const markdown = buttons.last();
       await expect(markdown).toHaveAttribute('aria-pressed', 'true');
       await expect(markdown).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      const markdownOnColor = await textColor(markdown);
       await markdown.click();
       await page.mouse.move(0, 0);
       await expect(markdown).toHaveAttribute('aria-pressed', 'false');
       await expect(markdown).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect.poll(() => textColor(markdown)).not.toBe(markdownOnColor);
       await markdown.click();
       await page.mouse.move(0, 0);
       await expect(markdown).toHaveAttribute('aria-pressed', 'true');

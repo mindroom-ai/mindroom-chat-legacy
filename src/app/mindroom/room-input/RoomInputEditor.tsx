@@ -98,6 +98,8 @@ export function RoomInputEditor({
   const [autocompleteQuery, setAutocompleteQuery] =
     useState<AutocompleteQuery<RoomInputAutocompletePrefix>>();
   const [hideStickerBtn, setHideStickerBtn] = useState(document.body.clientWidth < 500);
+  // Without its own button, the board's Sticker tab still belongs to the emoji button.
+  const showStickerBtn = !hideStickerBtn && !simpleMode;
   const emojiBtnRef = useRef<HTMLButtonElement | null>(null);
   const isComposing = useComposingCheck();
 
@@ -290,7 +292,7 @@ export function RoomInputEditor({
                     />
                   }
                 >
-                  {!hideStickerBtn && !simpleMode && (
+                  {showStickerBtn && (
                     <IconTooltip label={t('sharedUi.tabs.sticker')} position="Top">
                       {(triggerRef) => (
                         <ComposerIconButton
@@ -318,7 +320,7 @@ export function RoomInputEditor({
                         }}
                         aria-label={t('sharedUi.tabs.emoji')}
                         aria-pressed={
-                          hideStickerBtn ? !!emojiBoardTab : emojiBoardTab === EmojiBoardTab.Emoji
+                          showStickerBtn ? emojiBoardTab === EmojiBoardTab.Emoji : !!emojiBoardTab
                         }
                         onClick={() => setEmojiBoardTab(EmojiBoardTab.Emoji)}
                         size="300"
@@ -327,7 +329,7 @@ export function RoomInputEditor({
                         <Icon
                           src={Icons.Smile}
                           filled={
-                            hideStickerBtn ? !!emojiBoardTab : emojiBoardTab === EmojiBoardTab.Emoji
+                            showStickerBtn ? emojiBoardTab === EmojiBoardTab.Emoji : !!emojiBoardTab
                           }
                         />
                       </ComposerIconButton>
