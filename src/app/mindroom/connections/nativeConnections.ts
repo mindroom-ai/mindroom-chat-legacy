@@ -35,8 +35,14 @@ const endsSilently = (error: unknown): boolean => {
   return code === 'AUTH_CANCELLED' || code === 'AUTH_IN_PROGRESS';
 };
 
-/** The nonce of a `mindroom://connections/confirm?nonce=...` callback; anything else is not ours to confirm. */
-const parseConfirmNonce = (callbackUrl: string | undefined): string | undefined => {
+/**
+ * The nonce of a `mindroom://connections/confirm?nonce=...&origin=...` callback whose `origin` is `origin`,
+ * the backend this sign-in started with; anything else is not ours to confirm.
+ * The redeem page names the origin that issued its nonce. Without this check, a backend could redirect sheet one
+ * to another backend's redeem URL holding a start state of its own, receive that backend's nonce in our confirm
+ * call, confirm it there itself, and send sheet two to the result, signing this browser in as someone else.
+ */
+const parseConfirmNonce = (callbackUrl: string | undefined, origin: string): string | undefined => {
   if (!callbackUrl) return undefined;
   let url: URL;
   try {
@@ -54,6 +60,8 @@ const parseConfirmNonce = (callbackUrl: string | undefined): string | undefined 
     return undefined;
   }
   const nonces = url.searchParams.getAll('nonce');
+  const origins = url.searchParams.getAll('origin');
+  if (origins.length !== 1 || origins[0] !== origin) return undefined;
   return nonces.length === 1 && nonces[0] ? nonces[0] : undefined;
 };
 
@@ -69,8 +77,9 @@ const sameOriginUrl = (value: unknown, origin: string): string => {
 
 /**
  * Opens the backend Connections portal signed in as the current Matrix user, from the iOS app.
- * Sheet one visits a one-time redeem URL and ends at `mindroom://connections/confirm?nonce=...`;
- * the app then confirms that nonce with its own token, and sheet two continues to `next` signed in.
+ * Sheet one visits a one-time redeem URL and ends at `mindroom://connections/confirm?nonce=...&origin=...`;
+ * the app then confirms that nonce with its own token, only if `origin` is this backend's,
+ * and sheet two continues to `next` signed in.
  * The user closing sheet two after the provider's success page ends with `AUTH_CANCELLED`, which is normal.
  * Failures open `fallbackUrl` the way a bare link opens today; the user closing sheet one opens nothing.
  * Never rejects: a click handler starts this without awaiting it.
@@ -116,7 +125,7 @@ export async function openConnectionsPortalNative({
       if (endsSilently(error)) return;
       throw error;
     }
-    const nonce = parseConfirmNonce(callbackUrl);
+    const nonce = parseConfirmNonce(callbackUrl, origin);
     if (!nonce) throw new Error('Native sign-in ended at an unexpected callback');
 
     const confirmed = await post(origin, CONFIRM_PATH, { openid_token: openidToken, nonce });

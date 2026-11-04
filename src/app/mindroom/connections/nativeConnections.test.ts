@@ -27,7 +27,9 @@ const CONTINUE_URL = `${BACKEND}/api/connections/session/native/continue?confirm
 const NEXT = '/api/oauth/notion/authorize?connect_token=t';
 const FALLBACK_URL = `${BACKEND}${NEXT}`;
 const NONCE = 'nonce-secret-1';
-const CONFIRM_CALLBACK = `mindroom://connections/confirm?nonce=${NONCE}`;
+// The redeem page names the origin of the backend that issued the nonce, URL-encoded.
+const ORIGIN_PARAM = `origin=${encodeURIComponent(BACKEND)}`;
+const CONFIRM_CALLBACK = `mindroom://connections/confirm?nonce=${NONCE}&${ORIGIN_PARAM}`;
 
 const TOKEN: IOpenIDToken = {
   access_token: 'openid-token-secret',
@@ -197,6 +199,55 @@ describe('openConnectionsPortalNative', () => {
     expect(request.mock.calls[0]?.[0]).toBe(START_URL);
   });
 
+  it('confirms a nonce whose callback names the origin of the backend it started with', async () => {
+    const local = 'http://localhost:8765';
+    const request = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url === `${local}/api/connections/session/native/start`) {
+        return json({ redeem_url: `${local}/api/connections/session/native/redeem?start=S1` });
+      }
+      if (url === `${local}/api/connections/session/native/confirm`) {
+        return json({
+          continue_url: `${local}/api/connections/session/native/continue?confirmed=K1`,
+        });
+      }
+      throw new Error(`unexpected request to ${url}`);
+    });
+    sheet.mockImplementation(async (url) =>
+      url.includes('/redeem?')
+        ? `mindroom://connections/confirm?nonce=${NONCE}&origin=${encodeURIComponent(local)}`
+        : undefined
+    );
+
+    await open(request, { backendUrl: `${local}/` });
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(bodyOf(request, 1)).toEqual({ openid_token: TOKEN, nonce: NONCE });
+    expect(sheet).toHaveBeenCalledTimes(2);
+    expect(openFallback).not.toHaveBeenCalled();
+  });
+
+  it('never posts a nonce that another backend issued to the backend it started with', async () => {
+    // A malicious backend answers start with a redeem URL of its own that redirects sheet one to an honest
+    // backend's redeem URL holding the attacker's start state. The honest page names itself in the callback,
+    // so the app refuses its nonce instead of handing it to the malicious backend, which could confirm it there.
+    const request = makeRequest();
+    sheet.mockResolvedValueOnce(
+      `mindroom://connections/confirm?nonce=${NONCE}&origin=${encodeURIComponent(
+        'https://honest.example'
+      )}`
+    );
+
+    await open(request);
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls[0]?.[0]).toBe(START_URL);
+    expect(JSON.stringify(request.mock.calls)).not.toContain(NONCE);
+    expect(sheet).toHaveBeenCalledTimes(1);
+    expect(openFallback).toHaveBeenCalledTimes(1);
+    expect(openFallback).toHaveBeenCalledWith(FALLBACK_URL);
+  });
+
   describe('falls back to the original link', () => {
     it('on a 404 from an old backend, without opening a sheet', async () => {
       const request = makeRequest({ start: () => json({ detail: 'Not Found' }, 404) });
@@ -299,14 +350,39 @@ describe('openConnectionsPortalNative', () => {
     });
 
     it.each([
-      ['another mindroom URL', 'mindroom://auth/x'],
-      ['an https URL with a nonce', 'https://evil.example/?nonce=n'],
-      ['the right URL on another host', 'https://app.example/connections/confirm?nonce=n'],
-      ['the confirm URL without a nonce', 'mindroom://connections/confirm'],
-      ['the confirm URL with an empty nonce', 'mindroom://connections/confirm?nonce='],
-      ['the confirm URL with two nonces', 'mindroom://connections/confirm?nonce=a&nonce=b'],
-      ['another connections path', 'mindroom://connections/other?nonce=n'],
-      ['credentials in the URL', 'mindroom://user@connections/confirm?nonce=n'],
+      ['another mindroom URL', `mindroom://auth/x?nonce=n&${ORIGIN_PARAM}`],
+      ['an https URL with a nonce', `https://evil.example/?nonce=n&${ORIGIN_PARAM}`],
+      [
+        'the right URL on another host',
+        `https://app.example/connections/confirm?nonce=n&${ORIGIN_PARAM}`,
+      ],
+      ['the confirm URL without a nonce', `mindroom://connections/confirm?${ORIGIN_PARAM}`],
+      [
+        'the confirm URL with an empty nonce',
+        `mindroom://connections/confirm?nonce=&${ORIGIN_PARAM}`,
+      ],
+      [
+        'the confirm URL with two nonces',
+        `mindroom://connections/confirm?nonce=a&nonce=b&${ORIGIN_PARAM}`,
+      ],
+      ['the confirm URL without an origin', 'mindroom://connections/confirm?nonce=n'],
+      ['the confirm URL with an empty origin', 'mindroom://connections/confirm?nonce=n&origin='],
+      [
+        'the confirm URL with two origins',
+        `mindroom://connections/confirm?nonce=n&${ORIGIN_PARAM}&${ORIGIN_PARAM}`,
+      ],
+      [
+        'the confirm URL naming another origin',
+        `mindroom://connections/confirm?nonce=n&origin=${encodeURIComponent(
+          'https://honest.example'
+        )}`,
+      ],
+      [
+        'the confirm URL naming the backend URL rather than its origin',
+        `mindroom://connections/confirm?nonce=n&origin=${encodeURIComponent(`${BACKEND}/`)}`,
+      ],
+      ['another connections path', `mindroom://connections/other?nonce=n&${ORIGIN_PARAM}`],
+      ['credentials in the URL', `mindroom://user@connections/confirm?nonce=n&${ORIGIN_PARAM}`],
       ['something that is not a URL', 'not a url'],
       ['no URL at all', undefined],
     ])('when sheet one ends at %s', async (_label, callback) => {
