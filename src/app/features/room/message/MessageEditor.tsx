@@ -5,20 +5,7 @@ import React, {
   useEffect,
   useState,
 } from 'react';
-import {
-  Box,
-  Chip,
-  Icon,
-  IconButton,
-  Icons,
-  Line,
-  PopOut,
-  RectCords,
-  Spinner,
-  Text,
-  as,
-  config,
-} from 'folds';
+import { Box, Chip, Icon, Icons, PopOut, RectCords, Spinner, Text, as, config } from 'folds';
 import { Editor, Transforms } from 'slate';
 import { ReactEditor } from 'slate-react';
 import { IContent, IMentions, MatrixEvent, RelationType, Room } from 'matrix-js-sdk';
@@ -46,6 +33,7 @@ import {
   useEditor,
   getMentions,
 } from '../../../components/editor';
+import { ComposerIconButton } from '../../../components/editor/ComposerIconButton';
 import { useSetting } from '../../../state/hooks/settings';
 import { settingsAtom } from '../../../state/settings';
 import { UseStateProvider } from '../../../components/UseStateProvider';
@@ -309,17 +297,16 @@ export const MessageEditor = as<'div', MessageEditorProps>(
                 <Box gap="Inherit">
                   <IconTooltip label={t('composer.formatting')} position="Top">
                     {(triggerRef) => (
-                      <IconButton
+                      <ComposerIconButton
                         ref={triggerRef}
                         aria-label={t('composer.formatting')}
-                        aria-pressed={toolbar}
-                        variant="SurfaceVariant"
+                        pressed={toolbar}
                         size="300"
                         radii="300"
                         onClick={() => setToolbar(!toolbar)}
                       >
                         <Icon size="400" src={toolbar ? Icons.AlphabetUnderline : Icons.Alphabet} />
-                      </IconButton>
+                      </ComposerIconButton>
                     )}
                   </IconTooltip>
                   <UseStateProvider initial={undefined}>
@@ -349,22 +336,21 @@ export const MessageEditor = as<'div', MessageEditorProps>(
                       >
                         <IconTooltip label={t('sharedUi.tabs.emoji')} position="Top">
                           {(triggerRef) => (
-                            <IconButton
+                            <ComposerIconButton
                               ref={triggerRef}
                               aria-label={t('sharedUi.tabs.emoji')}
-                              aria-pressed={anchor !== undefined}
+                              pressed={anchor !== undefined}
                               onClick={
                                 ((evt) =>
                                   setAnchor(
                                     evt.currentTarget.getBoundingClientRect()
                                   )) as MouseEventHandler<HTMLButtonElement>
                               }
-                              variant="SurfaceVariant"
                               size="300"
                               radii="300"
                             >
                               <Icon size="400" src={Icons.Smile} filled={anchor !== undefined} />
-                            </IconButton>
+                            </ComposerIconButton>
                           )}
                         </IconTooltip>
                       </PopOut>
@@ -372,12 +358,7 @@ export const MessageEditor = as<'div', MessageEditorProps>(
                   </UseStateProvider>
                 </Box>
               </Box>
-              {toolbar && (
-                <div>
-                  <Line variant="SurfaceVariant" size="300" />
-                  <Toolbar />
-                </div>
-              )}
+              {toolbar && <Toolbar />}
             </>
           }
         />

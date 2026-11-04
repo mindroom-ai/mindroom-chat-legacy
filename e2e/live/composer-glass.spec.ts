@@ -188,24 +188,28 @@ for (const [themeId, width] of [
       expect(await typingBar.evaluate((el) => getComputedStyle(el).backgroundColor)).toMatch(
         /(?:rgba|color\().*(?:0\.[0-9]+\))$/
       );
-      // Protect the shared material boundary across attachment, voice, format,
-      // sticker, emoji and send controls; failures include the offending styles.
-      expect(
-        await buttons.evaluateAll((nodes) =>
-          nodes.flatMap((node) => {
+      // Only Send keeps the raised control material. Attachment, voice, format,
+      // sticker, emoji and formatting-toolbar controls sit flat on the composer's
+      // glass; failures include the offending styles.
+      const materialMismatches = () =>
+        buttons.evaluateAll((nodes) =>
+          nodes.flatMap((node, index) => {
             const css = getComputedStyle(node);
-            return css.backdropFilter === 'none' || css.backgroundImage === 'none'
-              ? [
+            const send = node.getAttribute('aria-label') === 'Send message';
+            const raised = css.backdropFilter !== 'none' && css.backgroundImage !== 'none';
+            return raised === send
+              ? []
+              : [
                   {
+                    index,
                     label: node.getAttribute('aria-label'),
                     blur: css.backdropFilter,
                     highlight: css.backgroundImage,
                   },
-                ]
-              : [];
+                ];
           })
-        )
-      ).toEqual([]);
+        );
+      expect(await materialMismatches()).toEqual([]);
 
       // The notice stays while the server reports typing, so only the button can hide it.
       await page.getByRole('button', { name: 'Drop Typing Status' }).click();
@@ -218,11 +222,14 @@ for (const [themeId, width] of [
       await expect(typing).toHaveCount(0);
       await buttons.nth(2).click();
       await expect.poll(() => buttons.count()).toBeGreaterThan(buttonCount);
-      expect(
-        await buttons.evaluateAll((nodes) =>
-          nodes.every((node) => getComputedStyle(node).backdropFilter !== 'none')
-        )
-      ).toBe(true);
+      expect(await materialMismatches()).toEqual([]);
+      // A pressed toggle (here Formatting) is filled while plain actions stay bare,
+      // so its state reads at a glance. Move off it first: hover fills any button.
+      await page.mouse.move(0, 0);
+      await expect(page.getByRole('tooltip')).toHaveCount(0);
+      await expect(buttons.nth(2)).toHaveAttribute('aria-pressed', 'true');
+      await expect(buttons.nth(0)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(buttons.nth(2)).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await page.screenshot({ path: testInfo.outputPath('composer-formatting.png') });
       await buttons.nth(2).click();
       await expect(buttons).toHaveCount(buttonCount);

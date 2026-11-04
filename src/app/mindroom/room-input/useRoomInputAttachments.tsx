@@ -14,7 +14,8 @@ import {
   Text,
   toRem,
 } from 'folds';
-import { Dialog, IconButton } from '../../components/glass/GlassPrimitives';
+import { Dialog } from '../../components/glass/GlassPrimitives';
+import { ComposerIconButton } from '../../components/editor/ComposerIconButton';
 import { IconTooltip } from '../tooltip/IconTooltip';
 import { useFilePicker } from '../../hooks/useFilePicker';
 import { useFileDropZone } from '../../hooks/useFileDrop';
@@ -368,16 +369,15 @@ export const useRoomInputAttachments = ({
   const attachButton = (
     <IconTooltip label={t('composer.attach')} position="Top">
       {(triggerRef) => (
-        <IconButton
+        <ComposerIconButton
           ref={triggerRef}
           onClick={() => pickFile('*')}
-          variant="SurfaceVariant"
           size="300"
           radii="300"
           aria-label={t('composer.attach')}
         >
           <Icon src={Icons.PlusCircle} />
-        </IconButton>
+        </ComposerIconButton>
       )}
     </IconTooltip>
   );
