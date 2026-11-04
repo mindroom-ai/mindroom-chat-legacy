@@ -347,6 +347,53 @@ describe('nativeSso', () => {
     }
   });
 
+  it('ignores a Connections confirm URL opened from outside, so only its own sheet confirms', async () => {
+    const replaceState = vi.fn();
+    const dispatchEvent = vi.fn();
+    const replace = vi.fn();
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { dispatchEvent, history: { replaceState }, location: { replace } },
+    });
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const confirmUrl = 'mindroom://connections/confirm?nonce=n';
+    let appUrlOpenListener: ((event: { url?: string }) => void) | undefined;
+    const nativeAppPlugin = {
+      getLaunchUrl: vi.fn().mockResolvedValue({ url: confirmUrl }),
+      addListener: vi.fn((eventName: string, listener: (event: { url?: string }) => void) => {
+        appUrlOpenListener = listener;
+        return Promise.resolve();
+      }),
+    };
+
+    try {
+      expect(getAppPathFromNativeSsoUrl(confirmUrl)).toBeUndefined();
+      expect(routeNativeSsoCallback(confirmUrl)).toBe(false);
+
+      registerNativeAppUrlCallbacks(nativeAppPlugin);
+      await nativeAppPlugin.getLaunchUrl.mock.results[0]?.value;
+      await Promise.resolve();
+      appUrlOpenListener?.({ url: confirmUrl });
+      appUrlOpenListener?.({ url: 'mindroom:/connections/confirm?nonce=n' });
+
+      // Neither the launch URL nor appUrlOpen navigates, closes a sheet or reaches the backend.
+      expect(replaceState).not.toHaveBeenCalled();
+      expect(dispatchEvent).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
+      expect(Browser.close).not.toHaveBeenCalled();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      // The rejection is logged without the URL, which carries the nonce.
+      expect(warn).toHaveBeenCalledTimes(3);
+      expect(warn.mock.calls.every((call) => call.length === 1)).toBe(true);
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('nonce');
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('exchanges native Apple credentials for a Matrix login token and routes it', async () => {
     vi.mocked(Capacitor.isNativePlatform).mockReturnValue(true);
     vi.mocked(Capacitor.getPlatform).mockReturnValue('ios');

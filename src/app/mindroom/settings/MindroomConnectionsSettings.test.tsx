@@ -11,7 +11,9 @@ const mocks = vi.hoisted(() => {
   const authedRequest = vi.fn();
   return {
     isNativePlatform: vi.fn(),
+    nativeConnectionsSupported: vi.fn(),
     openConnectionsPortal: vi.fn(),
+    openConnectionsPortalNative: vi.fn(),
     discoveredUrls: [] as string[],
     authedRequest,
     client: {
@@ -75,6 +77,10 @@ vi.mock('@capacitor/core', () => ({
 vi.mock('../../hooks/useMatrixClient', () => ({
   useMatrixClient: () => mocks.client,
 }));
+vi.mock('../connections/nativeConnections', () => ({
+  nativeConnectionsSupported: mocks.nativeConnectionsSupported,
+  openConnectionsPortalNative: mocks.openConnectionsPortalNative,
+}));
 vi.mock('../connections/openConnections', () => ({
   openConnectionsPortal: mocks.openConnectionsPortal,
 }));
@@ -102,7 +108,9 @@ beforeEach(() => {
   localStorage.clear();
   store = createStore();
   mocks.isNativePlatform.mockReset().mockReturnValue(false);
+  mocks.nativeConnectionsSupported.mockReset().mockReturnValue(false);
   mocks.openConnectionsPortal.mockReset().mockReturnValue('opened');
+  mocks.openConnectionsPortalNative.mockReset().mockResolvedValue(undefined);
   mocks.authedRequest.mockReset();
   mocks.client.clientRunning = true;
   mocks.discoveredUrls = [];
@@ -122,10 +130,30 @@ const render = (deploymentUrl = 'https://backend.example') =>
   });
 
 describe('connections settings', () => {
-  it('renders nothing on native builds', () => {
+  it('renders nothing on native builds without a native sign-in, such as Android', () => {
     mocks.isNativePlatform.mockReturnValue(true);
     render();
     expect(renderer.toJSON()).toBeNull();
+  });
+
+  it('shows the card in the iOS app and opens the portal natively, with no link to continue to', () => {
+    mocks.isNativePlatform.mockReturnValue(true);
+    mocks.nativeConnectionsSupported.mockReturnValue(true);
+    render('https://backend.example');
+    expect(renderer.toJSON()).not.toBeNull();
+    expect(texts()).toContain('Connections');
+    expect(openButton().props.disabled).toBeFalsy();
+
+    click();
+
+    expect(mocks.openConnectionsPortalNative).toHaveBeenCalledTimes(1);
+    const options = mocks.openConnectionsPortalNative.mock.calls[0][0];
+    expect(options.backendUrl).toBe('https://backend.example');
+    expect(options.next).toBeUndefined();
+    expect(options.fallbackUrl).toBeUndefined();
+    expect(options.getOpenIdToken).toEqual(expect.any(Function));
+    expect(mocks.openConnectionsPortal).not.toHaveBeenCalled();
+    expect(alerts()).toHaveLength(0);
   });
 
   it('shows the card copy with an enabled button when a server is configured', () => {

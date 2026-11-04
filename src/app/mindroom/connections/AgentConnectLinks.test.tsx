@@ -6,6 +6,7 @@ import { AgentConnectLinkFeature, agentLinkBackend } from './AgentConnectLinks';
 
 const mocks = vi.hoisted(() => ({
   isNativePlatform: vi.fn(() => false),
+  nativeConnectionsSupported: vi.fn(() => false),
   openPortal: vi.fn(() => 'opened' as 'opened' | 'blocked'),
   urls: ['https://app.example.org'],
 }));
@@ -15,6 +16,9 @@ vi.mock('@capacitor/core', () => ({
 }));
 vi.mock('../computer/useComputerApiUrl', () => ({
   useComputerApiUrls: () => ({ urls: mocks.urls, discovered: false }),
+}));
+vi.mock('./nativeConnections', () => ({
+  nativeConnectionsSupported: mocks.nativeConnectionsSupported,
 }));
 vi.mock('./useOpenConnectionsPortal', () => ({
   useOpenConnectionsPortal: () => mocks.openPortal,
@@ -65,6 +69,7 @@ describe('AgentConnectLinkFeature', () => {
 
   beforeEach(() => {
     mocks.isNativePlatform.mockReset().mockReturnValue(false);
+    mocks.nativeConnectionsSupported.mockReset().mockReturnValue(false);
     mocks.openPortal.mockReset().mockReturnValue('opened');
     mocks.urls = ['https://app.example.org'];
     anchor = document.createElement('a');
@@ -127,7 +132,7 @@ describe('AgentConnectLinkFeature', () => {
     expect(click().defaultPrevented).toBe(true);
   });
 
-  it('stays out of the native apps and stops listening when unmounted', () => {
+  it('stays out of the native apps without a native sign-in and stops listening when unmounted', () => {
     mocks.isNativePlatform.mockReturnValue(true);
     render();
     expect(click().defaultPrevented).toBe(false);
@@ -140,4 +145,32 @@ describe('AgentConnectLinkFeature', () => {
     expect(click().defaultPrevented).toBe(false);
     expect(mocks.openPortal).not.toHaveBeenCalled();
   });
+
+  it('leaves clicks to the system browser on Android, which has no native sign-in', () => {
+    mocks.isNativePlatform.mockReturnValue(true);
+    mocks.nativeConnectionsSupported.mockReturnValue(false);
+    render();
+    expect(click().defaultPrevented).toBe(false);
+    expect(mocks.openPortal).not.toHaveBeenCalled();
+  });
+
+  it('opens a clicked connect link through the portal in the iOS app', () => {
+    mocks.isNativePlatform.mockReturnValue(true);
+    mocks.nativeConnectionsSupported.mockReturnValue(true);
+    render();
+    const event = click({}, anchor.querySelector('span')!);
+    expect(mocks.openPortal).toHaveBeenCalledWith('https://app.example.org', CONNECT_PATH);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it.each([{ button: 1 }, { ctrlKey: true }, { metaKey: true }])(
+    'leaves %o clicks to the browser in the iOS app too',
+    (init) => {
+      mocks.isNativePlatform.mockReturnValue(true);
+      mocks.nativeConnectionsSupported.mockReturnValue(true);
+      render();
+      expect(click(init).defaultPrevented).toBe(false);
+      expect(mocks.openPortal).not.toHaveBeenCalled();
+    }
+  );
 });

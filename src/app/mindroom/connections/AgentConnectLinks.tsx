@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useComputerApiUrls } from '../computer/useComputerApiUrl';
+import { nativeConnectionsSupported } from './nativeConnections';
 import { useOpenConnectionsPortal } from './useOpenConnectionsPortal';
 
 const AGENT_LINK_PATH = /^\/api\/oauth\/[^/]+\/(authorize|reset)$/;
@@ -37,8 +38,8 @@ export function AgentConnectLinkFeature() {
   latest.current = { urls, openPortal };
 
   useEffect(() => {
-    // The native shells have no pop-up window to hand a token to.
-    if (Capacitor.isNativePlatform()) return undefined;
+    // Android has no pop-up window to hand a token to; the iOS app signs in through its authentication sheets.
+    if (Capacitor.isNativePlatform() && !nativeConnectionsSupported()) return undefined;
     const onClick = (event: MouseEvent) => {
       if (event.defaultPrevented || event.button !== 0) return;
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

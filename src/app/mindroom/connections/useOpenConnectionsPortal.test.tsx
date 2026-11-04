@@ -2,8 +2,8 @@
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import type { IOpenIDToken } from 'matrix-js-sdk';
-import { describe, expect, it, vi } from 'vitest';
-import { useConnectionsHandoff } from './useOpenConnectionsPortal';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useConnectionsHandoff, useOpenConnectionsPortal } from './useOpenConnectionsPortal';
 
 const TOKEN: IOpenIDToken = {
   access_token: 'openid-token',
@@ -14,6 +14,9 @@ const TOKEN: IOpenIDToken = {
 
 const mocks = vi.hoisted(() => ({
   submit: vi.fn(),
+  openPortal: vi.fn(),
+  nativeSupported: vi.fn(() => false),
+  openNative: vi.fn(),
   resolveToken: undefined as ((token: IOpenIDToken) => void) | undefined,
 }));
 
@@ -27,8 +30,12 @@ vi.mock('../matrix/openidAudience', () => ({
     }),
 }));
 vi.mock('./openConnections', () => ({
-  openConnectionsPortal: vi.fn(),
+  openConnectionsPortal: mocks.openPortal,
   submitConnectionsHandoff: mocks.submit,
+}));
+vi.mock('./nativeConnections', () => ({
+  nativeConnectionsSupported: mocks.nativeSupported,
+  openConnectionsPortalNative: mocks.openNative,
 }));
 
 const handOffOnce = async (abortFirst: boolean) => {
@@ -58,5 +65,78 @@ describe('useConnectionsHandoff', () => {
     mocks.submit.mockClear();
     await handOffOnce(true);
     expect(mocks.submit).not.toHaveBeenCalled();
+  });
+});
+
+describe('useOpenConnectionsPortal', () => {
+  const renderHook = async () => {
+    let open: ReturnType<typeof useOpenConnectionsPortal> | undefined;
+    function Harness() {
+      open = useOpenConnectionsPortal(false);
+      return null;
+    }
+    await act(async () => {
+      create(<Harness />);
+    });
+    return open!;
+  };
+
+  beforeEach(() => {
+    mocks.openPortal.mockReset().mockReturnValue('opened');
+    mocks.nativeSupported.mockReset().mockReturnValue(false);
+    mocks.openNative.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('opens the pop-up portal outside the iOS app and returns its answer', async () => {
+    mocks.openPortal.mockReturnValue('blocked');
+    const open = await renderHook();
+
+    expect(open('https://backend.example.org', '/api/oauth/x/authorize?connect_token=t')).toBe(
+      'blocked'
+    );
+
+    expect(mocks.openPortal).toHaveBeenCalledWith({
+      backendUrl: 'https://backend.example.org',
+      next: '/api/oauth/x/authorize?connect_token=t',
+      getOpenIdToken: expect.any(Function),
+    });
+    expect(mocks.openNative).not.toHaveBeenCalled();
+  });
+
+  it('starts the native sign-in in the iOS app, with the link as its fallback, and says opened', async () => {
+    mocks.nativeSupported.mockReturnValue(true);
+    const open = await renderHook();
+
+    expect(open('https://backend.example.org', '/api/oauth/x/authorize?connect_token=t')).toBe(
+      'opened'
+    );
+
+    expect(mocks.openNative).toHaveBeenCalledTimes(1);
+    expect(mocks.openNative).toHaveBeenCalledWith({
+      backendUrl: 'https://backend.example.org',
+      next: '/api/oauth/x/authorize?connect_token=t',
+      getOpenIdToken: expect.any(Function),
+      fallbackUrl: 'https://backend.example.org/api/oauth/x/authorize?connect_token=t',
+    });
+    expect(mocks.openPortal).not.toHaveBeenCalled();
+  });
+
+  it('has no fallback link when the iOS app opens the portal itself', async () => {
+    mocks.nativeSupported.mockReturnValue(true);
+    const open = await renderHook();
+
+    open('https://backend.example.org');
+
+    const options = mocks.openNative.mock.calls[0][0];
+    expect(options.next).toBeUndefined();
+    expect(options.fallbackUrl).toBeUndefined();
+  });
+
+  it('answers at once without waiting for the native sign-in', async () => {
+    mocks.nativeSupported.mockReturnValue(true);
+    mocks.openNative.mockReturnValue(new Promise<void>(() => {}));
+    const open = await renderHook();
+
+    expect(open('https://backend.example.org')).toBe('opened');
   });
 });
