@@ -2,6 +2,34 @@
 
 ## Runbook
 
+### Open an agent's connect and reset links signed in from the iOS app (2026-11-04)
+
+- Why: the iOS app opened a tapped connect or reset link bare in Safari, which has no Connections portal session, so it landed on the backend's dashboard API-key login (`/login?next=...`); the link handling of #535 skips the native apps.
+  Every personal connection (Notion, Google, GitHub, Slack) was unreachable from the app.
+- Change: on the iOS shell with its `MindRoomAuth` plugin (`nativeConnectionsSupported()` in `connections/nativeConnections.ts`), `useOpenConnectionsPortal` starts `openConnectionsPortalNative` instead of the pop-up handshake, without awaiting it, and returns `'opened'` at once.
+  The opener asks the backend's `POST /api/connections/session/native/start` for a one-time redeem URL, using a token bound to the backend origin, and opens it in the first ASWebAuthenticationSession sheet.
+  That sheet ends at `mindroom://connections/confirm?nonce=...&origin=...`, and only the return value of the app's own `authenticate` call is accepted: `nativeSso.ts` ignores the same URL arriving through `appUrlOpen` or as the launch URL.
+  The app accepts that callback only with exactly one non-empty `nonce` and exactly one `origin` equal to `new URL(backendUrl).origin`, the backend it started with; otherwise it posts no confirm and falls back like any other unexpected callback.
+  Why: review of the first round found a relay through another backend; a malicious backend the app talks to (for example one an agent published in a shared room) could redirect sheet one to an honest backend's redeem URL holding the attacker's own start state, receive the honest backend's nonce in the app's confirm call, confirm it there with the attacker's token, and redirect sheet two to the resulting continue URL, signing the victim's browser in as the attacker.
+  The honest backend's own page names its origin in the callback, so the app never relays its nonce.
+  The app then posts the nonce and its own token to `.../native/confirm`, so a link forwarded to someone else cannot sign them in as the sender, and opens the returned continue URL in a second sheet, which signs that browser in and goes to the link.
+  The user closing sheet two after the provider's success page ends with `AUTH_CANCELLED`, which is normal.
+  If the sign-in fails (an old backend answers 404, a refusal, a network error, a 15 second timeout), it opens the original link as before, with `Browser.open` (in-app Safari sheet), because the fallback runs after awaits and WKWebView ignores `window.open` without a user gesture.
+  A fixed warning is logged without tokens, nonces or URLs, and the opener never rejects.
+  The user closing sheet one stops silently.
+  `AgentConnectLinks.tsx` now returns early only on native platforms without that plugin (Android), so iOS agent links use the hook; middle and modified clicks still go to the browser.
+- Unchanged by design: the Settings Connections card stays hidden on every native platform.
+  Its Connect buttons open `window.open` pop-ups that are untested inside a sign-in sheet, and a failed sign-in from the card would show nothing; agent links skip the portal page.
+  Android and web behavior are unchanged.
+- Depends on: the MindRoom backend branch `native-connections-sign-in`, which adds `/api/connections/session/native/{start,redeem,confirm,continue}`, answers CORS for `capacitor://localhost` on `start` and `confirm`, names its origin in the confirm callback, and needs a homeserver that binds OpenID tokens.
+  It also refuses the app while `MINDROOM_CONNECTIONS_ALLOWED_ORIGINS` is `[]` or invalid.
+  Against a backend without it the links open bare, as before.
+- Tests: `nativeConnections.test.ts` (support check, the start, sheet one, confirm, sheet two order, the nonce, origin and URL checks including a callback from another backend, every fallback case, the timeout, logging), `useOpenConnectionsPortal.test.tsx` (the iOS branch starts the opener with the link as fallback and answers at once), `AgentConnectLinks.test.tsx` and `AgentConnectLinks.native.test.tsx` (iOS opens a clicked link through the portal; Android and modified clicks leave it to the browser), `nativeSso.test.ts` (a Connections confirm URL from outside is ignored), `MindroomConnectionsSettings.test.tsx` (the card renders nothing in the iOS app even when the native sign-in is supported).
+- Validation: `npx vitest run src/app/mindroom/connections src/app/mindroom/settings src/app/mindroom/native` passes 410 tests (403 before the origin binding) and fails only `xcodeCloudPostClone.test.ts` (3 tests, which also fails on `dev`); `npm run typecheck`, `npm run lint` (0 errors, 18 existing warnings) and prettier on touched files pass.
+  Still owed: a device check on an iOS build against a backend with the branch (agent connect link end to end, sheet one cancelled opens nothing, an old backend falls back to the in-app browser), and the Notion connect from the app on staging once the backend is deployed.
+  Two system "wants to use ... to Sign In" prompts per connect are accepted for now.
+- Next: App Store submission waits for the owner, because approval publishes the build; the Settings card follows once the portal page's popups are proven inside a sheet.
+
 ### Hide the room-wide typing bar in thread views (2026-11-03)
 
 - Why: with a thread open, the typing bar above the composer listed everyone typing anywhere in the room, so a reader of one thread saw someone typing in another (#547).
@@ -211,12 +239,12 @@
   A plain left click on a personal link, `/api/oauth/<provider>/authorize?connect_token=…` or `/api/oauth/<provider>/reset?reset_token=…` with `execution_scope=user` or `user_agent`, on one of the Computers backends (`useComputerApiUrls()`, the same list the Connections card offers) opens `<backend>/connections/?next=<link path>` through `openConnectionsPortal` instead.
   Shared links need no sign-in and other OAuth links use the dashboard login, so they keep the browser's normal navigation; routing them through the portal broke them where portal sign-in is off (review finding).
   The portal signs in with Chat's OpenID handshake as before, then opens the link, which now accepts that session for its own requester (mindroom-ai/mindroom PR "Let Chat sign-ins open an agent's connect and reset links").
-  Other links, other backends, middle and modified clicks, and the native apps are left to the browser; a blocked window leaves the click to the browser too.
+  Other links, other backends, middle and modified clicks, and the native apps are left to the browser (the iOS app has opened connect and reset links signed in since 2026-11-04); a blocked window leaves the click to the browser too.
   If the portal's sign-in fails, it still opens the link, so the click ends where a plain click would have.
 - Refactor: the Connections card's token getter moved into `useOpenConnectionsPortal(discovered)` (`connections/useOpenConnectionsPortal.ts`), which the card and the link feature share, so both keep the account-switch guard and the binding check for discovered backends.
 - Tests: `AgentConnectLinks.test.tsx` (link matching, including shared, tokenless and mismatched-token links left alone; a clicked connect link opens the portal with its path and stops the browser; blocked windows, middle and modified clicks, other backends and paths, native apps and unmount leave it alone; the backend list is read at click time), `openConnections.test.ts` (`next` in the portal URL). `MindroomConnectionsSettings.test.tsx` passes unchanged.
 - Validation: `npm run typecheck`, `npm run build`, eslint and prettier on touched files pass. Full `npx vitest run` fails only the 4 tests that also fail on `dev` (`xcodeCloudPostClone` ×3, one caption send test).
-- Next: links opened outside Chat, or in the native apps, still ask for the dashboard login.
+- Next: links opened outside Chat still ask for the dashboard login; in the native apps, the iOS app signs them in since 2026-11-04 and Android still asks.
 
 ### Show a reply's reasoning as a small text toggle (2026-10-31)
 
@@ -1232,7 +1260,7 @@
   Standalone metadata and screenshot uploads still never submit for review; the Ruby suite covers these cases.
 - Reviewer access: preserve Apple's existing reviewer instructions and append each update's guidance instead of overwriting them with the repository template.
   The saved demo credentials signed in to the review homeserver, and the demo-account-required flag was restored after the metadata upload.
-- Release notes omit Connections, which native builds hide.
+- Release notes omit Connections, which this build hid on native; the iOS app has since gained a native sign-in for agent connect and reset links (2026-11-04), and the Settings card stays hidden there.
   `mindroom.chat` does not advertise `io.mindroom.openid_audience`; keep audience enforcement disabled until compatible backends and this iOS update are live, as #442 requires.
 - Screenshots: all ten Rivera household captures were regenerated, reviewed, and uploaded; their processed checksums match the reviewed files.
   The capture spec checks the expanded tool row's argument and result, replacing the `Tool #1: call_service` label removed by #450.

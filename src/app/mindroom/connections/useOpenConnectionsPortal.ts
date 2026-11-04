@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import type { IOpenIDToken } from 'matrix-js-sdk';
 import { useMatrixClient } from '../../hooks/useMatrixClient';
 import { requestAudienceOpenIdToken } from '../matrix/openidAudience';
+import { nativeConnectionsSupported, openConnectionsPortalNative } from './nativeConnections';
 import { openConnectionsPortal, submitConnectionsHandoff } from './openConnections';
 
 /**
@@ -25,12 +26,24 @@ const useConnectionsOpenIdToken = (discovered: boolean) => {
 /**
  * Open a backend's Connections portal signed in as the current Matrix user, optionally to open an agent link there.
  * Call the returned function synchronously from a click handler so popup blockers allow the window.
+ * The iOS app signs in through its authentication sheets instead and never blocks: it starts that without waiting,
+ * and a failure there opens the link as before.
  */
 export const useOpenConnectionsPortal = (discovered: boolean) => {
   const getOpenIdToken = useConnectionsOpenIdToken(discovered);
   return useCallback(
-    (backendUrl: string, next?: string) =>
-      openConnectionsPortal({ backendUrl, next, getOpenIdToken }),
+    (backendUrl: string, next?: string): 'opened' | 'blocked' => {
+      if (nativeConnectionsSupported()) {
+        void openConnectionsPortalNative({
+          backendUrl,
+          next,
+          getOpenIdToken,
+          fallbackUrl: next ? new URL(next, backendUrl).toString() : undefined,
+        });
+        return 'opened';
+      }
+      return openConnectionsPortal({ backendUrl, next, getOpenIdToken });
+    },
     [getOpenIdToken]
   );
 };

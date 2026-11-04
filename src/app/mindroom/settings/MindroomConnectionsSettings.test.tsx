@@ -11,7 +11,9 @@ const mocks = vi.hoisted(() => {
   const authedRequest = vi.fn();
   return {
     isNativePlatform: vi.fn(),
+    nativeConnectionsSupported: vi.fn(),
     openConnectionsPortal: vi.fn(),
+    openConnectionsPortalNative: vi.fn(),
     discoveredUrls: [] as string[],
     authedRequest,
     client: {
@@ -75,6 +77,10 @@ vi.mock('@capacitor/core', () => ({
 vi.mock('../../hooks/useMatrixClient', () => ({
   useMatrixClient: () => mocks.client,
 }));
+vi.mock('../connections/nativeConnections', () => ({
+  nativeConnectionsSupported: mocks.nativeConnectionsSupported,
+  openConnectionsPortalNative: mocks.openConnectionsPortalNative,
+}));
 vi.mock('../connections/openConnections', () => ({
   openConnectionsPortal: mocks.openConnectionsPortal,
 }));
@@ -102,7 +108,9 @@ beforeEach(() => {
   localStorage.clear();
   store = createStore();
   mocks.isNativePlatform.mockReset().mockReturnValue(false);
+  mocks.nativeConnectionsSupported.mockReset().mockReturnValue(false);
   mocks.openConnectionsPortal.mockReset().mockReturnValue('opened');
+  mocks.openConnectionsPortalNative.mockReset().mockResolvedValue(undefined);
   mocks.authedRequest.mockReset();
   mocks.client.clientRunning = true;
   mocks.discoveredUrls = [];
@@ -126,6 +134,16 @@ describe('connections settings', () => {
     mocks.isNativePlatform.mockReturnValue(true);
     render();
     expect(renderer.toJSON()).toBeNull();
+  });
+
+  // The portal page's Connect buttons open pop-ups that are untested inside an authentication sheet, and a failed
+  // sign-in from the card would show nothing. Agent links, which skip the page, are the iOS entry point.
+  it('renders nothing in the iOS app even though it can sign in natively', () => {
+    mocks.isNativePlatform.mockReturnValue(true);
+    mocks.nativeConnectionsSupported.mockReturnValue(true);
+    render();
+    expect(renderer.toJSON()).toBeNull();
+    expect(mocks.openConnectionsPortalNative).not.toHaveBeenCalled();
   });
 
   it('shows the card copy with an enabled button when a server is configured', () => {
