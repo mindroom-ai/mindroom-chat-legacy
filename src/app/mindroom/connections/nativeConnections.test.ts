@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import type { IOpenIDToken } from 'matrix-js-sdk';
 import { authenticateInNativeBrowser, isNativeIOS } from '../native/nativeSso';
@@ -7,6 +8,10 @@ import { nativeConnectionsSupported, openConnectionsPortalNative } from './nativ
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: { isPluginAvailable: vi.fn() },
+}));
+
+vi.mock('@capacitor/browser', () => ({
+  Browser: { open: vi.fn() },
 }));
 
 vi.mock('../native/nativeSso', () => ({
@@ -89,7 +94,10 @@ describe('openConnectionsPortalNative', () => {
   const getOpenIdToken = vi.fn<(audience: string) => Promise<IOpenIDToken>>();
   const openFallback = vi.fn<(url: string) => void>();
 
-  const open = (request: typeof fetch, overrides: { fallbackUrl?: string; next?: string } = {}) =>
+  const open = (
+    request: typeof fetch,
+    overrides: { backendUrl?: string; fallbackUrl?: string; next?: string } = {}
+  ) =>
     openConnectionsPortalNative({
       backendUrl: BACKEND,
       next: NEXT,
@@ -100,7 +108,11 @@ describe('openConnectionsPortalNative', () => {
       ...overrides,
     });
 
+  // The fallback logs one line; keep it out of the test output and let the logging tests read it.
+  let warn: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     getOpenIdToken.mockResolvedValue(TOKEN);
     sheet.mockImplementation(async (url) => (url === REDEEM_URL ? CONFIRM_CALLBACK : undefined));
   });
@@ -109,6 +121,7 @@ describe('openConnectionsPortalNative', () => {
     getOpenIdToken.mockReset();
     openFallback.mockReset();
     sheet.mockReset();
+    vi.mocked(Browser.open).mockReset();
     vi.restoreAllMocks();
   });
 
@@ -343,8 +356,9 @@ describe('openConnectionsPortalNative', () => {
       expect(openFallback).not.toHaveBeenCalled();
     });
 
-    it('opens the link in a new window by default', async () => {
+    it('opens the link in the in-app browser by default, which needs no user gesture', async () => {
       const windowOpen = vi.spyOn(window, 'open').mockReturnValue(null);
+      vi.mocked(Browser.open).mockResolvedValue(undefined);
       const request = makeRequest({ start: () => json({ detail: 'Not Found' }, 404) });
 
       await openConnectionsPortalNative({
@@ -355,8 +369,159 @@ describe('openConnectionsPortalNative', () => {
         request,
       });
 
-      expect(windowOpen).toHaveBeenCalledTimes(1);
-      expect(windowOpen).toHaveBeenCalledWith(FALLBACK_URL, '_blank');
+      expect(Browser.open).toHaveBeenCalledTimes(1);
+      expect(Browser.open).toHaveBeenCalledWith({ url: FALLBACK_URL });
+      // WKWebView ignores `window.open` after an await, so the old-backend case would do nothing.
+      expect(windowOpen).not.toHaveBeenCalled();
+    });
+
+    it('resolves when the default in-app browser refuses to open', async () => {
+      vi.mocked(Browser.open).mockRejectedValue(new Error('no browser'));
+      const request = makeRequest({ start: () => json({ detail: 'Not Found' }, 404) });
+
+      await expect(
+        openConnectionsPortalNative({
+          backendUrl: BACKEND,
+          next: NEXT,
+          fallbackUrl: FALLBACK_URL,
+          getOpenIdToken,
+          request,
+        })
+      ).resolves.toBeUndefined();
+
+      expect(Browser.open).toHaveBeenCalledTimes(1);
+    });
+
+    it('resolves when the opener throws', async () => {
+      openFallback.mockImplementation(() => {
+        throw new Error('window.open blocked');
+      });
+      const request = makeRequest({ start: () => json({ detail: 'Not Found' }, 404) });
+
+      await expect(open(request)).resolves.toBeUndefined();
+
+      expect(openFallback).toHaveBeenCalledTimes(1);
+    });
+
+    it('resolves when the opener rejects', async () => {
+      openFallback.mockRejectedValue(new Error('window.open blocked'));
+      const request = makeRequest({ start: () => json({ detail: 'Not Found' }, 404) });
+
+      await expect(open(request)).resolves.toBeUndefined();
+
+      expect(openFallback).toHaveBeenCalledTimes(1);
+    });
+
+    it('opens the link when the backend URL cannot be parsed, with no request or sheet', async () => {
+      const request = makeRequest();
+
+      await expect(open(request, { backendUrl: 'not a url' })).resolves.toBeUndefined();
+
+      expect(openFallback).toHaveBeenCalledTimes(1);
+      expect(openFallback).toHaveBeenCalledWith(FALLBACK_URL);
+      expect(getOpenIdToken).not.toHaveBeenCalled();
+      expect(request).not.toHaveBeenCalled();
+      expect(sheet).not.toHaveBeenCalled();
+    });
+
+    it('opens nothing when the backend URL cannot be parsed and there is no fallback URL', async () => {
+      const request = makeRequest();
+
+      await expect(
+        open(request, { backendUrl: 'not a url', fallbackUrl: undefined })
+      ).resolves.toBeUndefined();
+
+      expect(openFallback).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['TimeoutError', 'start'],
+      ['AbortError', 'start'],
+      ['TimeoutError', 'confirm'],
+      ['AbortError', 'confirm'],
+    ] as const)('when a %s ends the %s request', async (errorName, stage) => {
+      const aborted = Promise.reject(new DOMException('The operation timed out', errorName));
+      aborted.catch(() => undefined);
+      const request = makeRequest(
+        stage === 'start'
+          ? { start: () => aborted }
+          : { confirm: () => aborted as unknown as Response }
+      );
+
+      await expect(open(request)).resolves.toBeUndefined();
+
+      expect(openFallback).toHaveBeenCalledTimes(1);
+      expect(openFallback).toHaveBeenCalledWith(FALLBACK_URL);
+      // Confirm runs after sheet one; a start timeout never opens a sheet.
+      expect(sheet).toHaveBeenCalledTimes(stage === 'start' ? 0 : 1);
+    });
+  });
+
+  describe('request timeout', () => {
+    it('gives start and confirm a 15 second abort signal', async () => {
+      const timeout = vi.spyOn(AbortSignal, 'timeout');
+      const request = makeRequest();
+
+      await open(request);
+
+      expect(timeout).toHaveBeenCalledTimes(2);
+      expect(timeout).toHaveBeenNthCalledWith(1, 15000);
+      expect(timeout).toHaveBeenNthCalledWith(2, 15000);
+      expect(request.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+      expect(request.mock.calls[1]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+      expect(openFallback).not.toHaveBeenCalled();
+    });
+
+    it('opens the link when a request that never answers is aborted by its signal', async () => {
+      const controller = new AbortController();
+      vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
+      const request = vi.fn<typeof fetch>(
+        (_input, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('The operation timed out', 'TimeoutError'))
+            );
+          })
+      );
+
+      const pending = open(request);
+      await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+      expect(openFallback).not.toHaveBeenCalled();
+      controller.abort();
+      await pending;
+
+      expect(openFallback).toHaveBeenCalledTimes(1);
+      expect(openFallback).toHaveBeenCalledWith(FALLBACK_URL);
+      expect(sheet).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('logging', () => {
+    it('logs one fixed line, with no error, token, nonce or URL, when it falls back', async () => {
+      const request = makeRequest({ confirm: () => json({ detail: 'no' }, 403) });
+
+      await open(request);
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]).toEqual([
+        '[MindRoom Chat] Native Connections sign-in failed; opening the link directly',
+      ]);
+    });
+
+    it('logs one fixed line when there is no link to open instead', async () => {
+      const request = makeRequest({ start: () => json({ detail: 'Not Found' }, 404) });
+
+      await open(request, { fallbackUrl: undefined });
+
+      expect(warn.mock.calls).toEqual([['[MindRoom Chat] Native Connections sign-in failed']]);
+    });
+
+    it('logs nothing on success or when the user leaves sheet one', async () => {
+      await open(makeRequest());
+      sheet.mockRejectedValueOnce(sheetError('AUTH_CANCELLED'));
+      await open(makeRequest());
+
+      expect(warn).not.toHaveBeenCalled();
     });
   });
 

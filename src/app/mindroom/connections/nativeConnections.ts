@@ -1,3 +1,4 @@
+import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import type { IOpenIDToken } from 'matrix-js-sdk';
 import { authenticateInNativeBrowser, isNativeIOS } from '../native/nativeSso';
@@ -7,6 +8,7 @@ const CONFIRM_PATH = '/api/connections/session/native/confirm';
 const CALLBACK_SCHEME = 'mindroom';
 const CONFIRM_CALLBACK_HOST = 'connections';
 const CONFIRM_CALLBACK_PATH = '/confirm';
+const REQUEST_TIMEOUT_MS = 15_000;
 
 export type OpenConnectionsPortalNativeOptions = {
   backendUrl: string;
@@ -17,16 +19,15 @@ export type OpenConnectionsPortalNativeOptions = {
   /** The original link, opened as before when the native sign-in cannot run (an old backend, a refusal, a network error). */
   fallbackUrl?: string;
   request?: typeof fetch;
-  openFallback?: (url: string) => void;
+  openFallback?: (url: string) => void | Promise<unknown>;
 };
 
 /** Whether this app can run the native sign-in: the iOS shell with its authentication-session plugin. */
 export const nativeConnectionsSupported = (): boolean =>
   isNativeIOS() && Capacitor.isPluginAvailable('MindRoomAuth');
 
-const openInNewWindow = (url: string): void => {
-  window.open(url, '_blank');
-};
+// The fallback runs after awaits, outside any user gesture, and WKWebView ignores `window.open` then.
+const openInBrowser = (url: string): Promise<void> => Browser.open({ url });
 
 // The user leaving a sheet, or a sheet already open, is a decision, not a failure.
 const endsSilently = (error: unknown): boolean => {
@@ -72,6 +73,7 @@ const sameOriginUrl = (value: unknown, origin: string): string => {
  * the app then confirms that nonce with its own token, and sheet two continues to `next` signed in.
  * The user closing sheet two after the provider's success page ends with `AUTH_CANCELLED`, which is normal.
  * Failures open `fallbackUrl` the way a bare link opens today; the user closing sheet one opens nothing.
+ * Never rejects: a click handler starts this without awaiting it.
  */
 export async function openConnectionsPortalNative({
   backendUrl,
@@ -79,25 +81,32 @@ export async function openConnectionsPortalNative({
   getOpenIdToken,
   fallbackUrl,
   request = fetch,
-  openFallback = openInNewWindow,
+  openFallback = openInBrowser,
 }: OpenConnectionsPortalNativeOptions): Promise<void> {
-  const origin = new URL(backendUrl).origin;
-
-  const post = async (path: string, body: unknown): Promise<Record<string, unknown>> => {
+  const post = async (
+    origin: string,
+    path: string,
+    body: unknown
+  ): Promise<Record<string, unknown>> => {
     const response = await request(new URL(path, origin).toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       credentials: 'omit',
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) throw new Error(`Native sign-in refused with HTTP ${response.status}`);
     return (await response.json()) as Record<string, unknown>;
   };
 
   const signIn = async (): Promise<void> => {
+    const { origin } = new URL(backendUrl);
     const openidToken = await getOpenIdToken(origin);
 
-    const started = await post(START_PATH, { openid_token: openidToken, next: next ?? null });
+    const started = await post(origin, START_PATH, {
+      openid_token: openidToken,
+      next: next ?? null,
+    });
     const redeemUrl = sameOriginUrl(started.redeem_url, origin);
 
     let callbackUrl: string | undefined;
@@ -110,7 +119,7 @@ export async function openConnectionsPortalNative({
     const nonce = parseConfirmNonce(callbackUrl);
     if (!nonce) throw new Error('Native sign-in ended at an unexpected callback');
 
-    const confirmed = await post(CONFIRM_PATH, { openid_token: openidToken, nonce });
+    const confirmed = await post(origin, CONFIRM_PATH, { openid_token: openidToken, nonce });
     const continueUrl = sameOriginUrl(confirmed.continue_url, origin);
 
     try {
@@ -123,7 +132,18 @@ export async function openConnectionsPortalNative({
   try {
     await signIn();
   } catch {
-    // Nothing here may be logged: errors can sit next to the token and the nonce.
-    if (fallbackUrl) openFallback(fallbackUrl);
+    // A fixed line only: errors can sit next to the token and the nonce, and URLs carry link tokens.
+    // eslint-disable-next-line no-console
+    console.warn(
+      fallbackUrl
+        ? '[MindRoom Chat] Native Connections sign-in failed; opening the link directly'
+        : '[MindRoom Chat] Native Connections sign-in failed'
+    );
+    if (!fallbackUrl) return;
+    try {
+      await openFallback(fallbackUrl);
+    } catch {
+      // The link could not be opened either; there is nothing left to try, and the caller does not await this.
+    }
   }
 }
