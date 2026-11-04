@@ -130,30 +130,20 @@ const render = (deploymentUrl = 'https://backend.example') =>
   });
 
 describe('connections settings', () => {
-  it('renders nothing on native builds without a native sign-in, such as Android', () => {
+  it('renders nothing on native builds', () => {
     mocks.isNativePlatform.mockReturnValue(true);
     render();
     expect(renderer.toJSON()).toBeNull();
   });
 
-  it('shows the card in the iOS app and opens the portal natively, with no link to continue to', () => {
+  // The portal page's Connect buttons open pop-ups that are untested inside an authentication sheet, and a failed
+  // sign-in from the card would show nothing. Agent links, which skip the page, are the iOS entry point.
+  it('renders nothing in the iOS app even though it can sign in natively', () => {
     mocks.isNativePlatform.mockReturnValue(true);
     mocks.nativeConnectionsSupported.mockReturnValue(true);
-    render('https://backend.example');
-    expect(renderer.toJSON()).not.toBeNull();
-    expect(texts()).toContain('Connections');
-    expect(openButton().props.disabled).toBeFalsy();
-
-    click();
-
-    expect(mocks.openConnectionsPortalNative).toHaveBeenCalledTimes(1);
-    const options = mocks.openConnectionsPortalNative.mock.calls[0][0];
-    expect(options.backendUrl).toBe('https://backend.example');
-    expect(options.next).toBeUndefined();
-    expect(options.fallbackUrl).toBeUndefined();
-    expect(options.getOpenIdToken).toEqual(expect.any(Function));
-    expect(mocks.openConnectionsPortal).not.toHaveBeenCalled();
-    expect(alerts()).toHaveLength(0);
+    render();
+    expect(renderer.toJSON()).toBeNull();
+    expect(mocks.openConnectionsPortalNative).not.toHaveBeenCalled();
   });
 
   it('shows the card copy with an enabled button when a server is configured', () => {

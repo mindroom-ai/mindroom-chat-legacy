@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { SequenceCard } from '../../components/sequence-card';
 import { SettingTile } from '../../components/setting-tile';
 import { useComputerApiUrls } from '../computer/useComputerApiUrl';
-import { nativeConnectionsSupported } from '../connections/nativeConnections';
 import { useOpenConnectionsPortal } from '../connections/useOpenConnectionsPortal';
 
 export function MindroomConnectionsSettings({ className }: { className?: string }) {
@@ -14,8 +13,8 @@ export function MindroomConnectionsSettings({ className }: { className?: string 
   const openPortal = useOpenConnectionsPortal(discovered);
   const [blocked, setBlocked] = useState(false);
 
-  // Android has no pop-up window to hand a token to; the iOS app signs in through its authentication sheets.
-  if (Capacitor.isNativePlatform() && !nativeConnectionsSupported()) return null;
+  // The native shells have no pop-up window to hand a token to.
+  if (Capacitor.isNativePlatform()) return null;
 
   // The window must open inside the click itself, so nothing here awaits before the call.
   const open = (backendUrl: string) => {
