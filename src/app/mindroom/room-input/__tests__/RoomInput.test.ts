@@ -21,6 +21,8 @@ import {
   getMatrixUploadErrorStage,
   toMatrixUploadError,
 } from '../../../utils/matrix';
+import { mindroomAccountSettingsAtom } from '../../settings/useMindroomAccountSettings';
+import { DEFAULT_MINDROOM_ACCOUNT_SETTINGS } from '../../settings/mindroomAccountSettings';
 
 const ROOM_ID = '!room:example.org';
 const OTHER_ROOM_ID = '!other:example.org';
@@ -29,6 +31,7 @@ const THIRD_ROOM_ID = '!third:example.org';
 const {
   customEditorState,
   editorMocks,
+  emojiBoardState,
   editorOutputState,
   encryptionState,
   mediaConfigState,
@@ -37,6 +40,9 @@ const {
   typingState,
   voiceRecorderState,
 } = vi.hoisted(() => ({
+  emojiBoardState: {
+    props: undefined as { onTabChange: (tab: string) => void } | undefined,
+  },
   editorMocks: {
     insertNode: vi.fn(),
     insertText: vi.fn(),
@@ -203,7 +209,9 @@ vi.mock('folds', () => {
     Overlay: Wrapper,
     OverlayBackdrop: Wrapper,
     OverlayCenter: Wrapper,
-    PopOut: Wrapper,
+    // Render the closed board too, so tests can switch its tab.
+    PopOut: ({ children, content }: { children?: React.ReactNode; content?: React.ReactNode }) =>
+      React.createElement('div', null, content, children),
     Scroll: Wrapper,
     Text: Wrapper,
     // Icon buttons name themselves in tooltips; render only the trigger.
@@ -284,19 +292,13 @@ vi.mock('../../../components/editor/utils', async (importOriginal) => ({
   restoreEditorContent: editorMocks.restoreEditorContent,
 }));
 
-vi.mock('../../../components/emoji-board', () => ({
-  EmojiBoard: () => null,
-  EmojiBoardTab: {},
-}));
-
-vi.mock('../../../components/UseStateProvider', () => ({
-  UseStateProvider: ({
-    children,
-    initial,
-  }: {
-    children: (state: undefined, setState: (value: undefined) => void) => React.ReactNode;
-    initial: undefined;
-  }) => children(initial, vi.fn()),
+vi.mock('../../../components/emoji-board', async () => ({
+  EmojiBoard: (props: { onTabChange: (tab: string) => void }) => {
+    emojiBoardState.props = props;
+    return null;
+  },
+  EmojiBoardTab: (await vi.importActual<object>('../../../components/emoji-board/types'))
+    .EmojiBoardTab,
 }));
 
 vi.mock('../../../components/upload-card', () => ({
@@ -882,6 +884,7 @@ const openVoiceRecorder = async (renderer: ReactTestRenderer) => {
 };
 
 afterEach(() => {
+  emojiBoardState.props = undefined;
   voiceRecorderState.props = undefined;
   voiceRecorderState.send.mockReset();
   voiceRecorderState.send.mockResolvedValue(false);
@@ -954,6 +957,52 @@ describe('RoomInput', () => {
     // Simple Mode, so no formatting or sticker buttons.
     expect(labels).toEqual(expect.arrayContaining(['Attach files', 'Emoji', 'Send message']));
     expect(labels.some((label) => String(label).startsWith('Record voice message'))).toBe(true);
+
+    renderer.unmount();
+  });
+
+  const findButton = (renderer: ReactTestRenderer, label: string) =>
+    renderer.root.findAll((node) => node.type === 'button' && node.props['aria-label'] === label);
+
+  it('keeps the emoji button pressed on the Sticker tab when Simple Mode hides the sticker button', async () => {
+    const { renderer } = await renderRoomInput();
+    expect(findButton(renderer, 'Sticker')).toHaveLength(0);
+    const [emoji] = findButton(renderer, 'Emoji');
+    expect(emoji.props['aria-pressed']).toBe(false);
+
+    await act(async () => {
+      emoji.props.onClick();
+    });
+    expect(findButton(renderer, 'Emoji')[0].props['aria-pressed']).toBe(true);
+
+    // The board's own Sticker tab still belongs to the only button that opened it.
+    await act(async () => {
+      emojiBoardState.props!.onTabChange('Sticker');
+    });
+    expect(findButton(renderer, 'Emoji')[0].props['aria-pressed']).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('presses only the button for the open tab when the sticker button shows', async () => {
+    const store = createStore();
+    store.set(mindroomAccountSettingsAtom, {
+      ...DEFAULT_MINDROOM_ACCOUNT_SETTINGS,
+      simpleMode: false,
+    });
+    const { renderer } = await renderRoomInput(store);
+    const pressed = () =>
+      ['Sticker', 'Emoji'].map((label) => findButton(renderer, label)[0].props['aria-pressed']);
+
+    await act(async () => {
+      findButton(renderer, 'Sticker')[0].props.onClick();
+    });
+    expect(pressed()).toEqual([true, false]);
+
+    await act(async () => {
+      emojiBoardState.props!.onTabChange('Emoji');
+    });
+    expect(pressed()).toEqual([false, true]);
 
     renderer.unmount();
   });

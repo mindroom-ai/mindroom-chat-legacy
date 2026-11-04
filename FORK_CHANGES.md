@@ -23,15 +23,18 @@
   It asserts that Markdown, on by default, has a fill, loses it when turned off, and is pressed again when turned back on.
   Pressed Formatting and Markdown must also differ in text color from bare buttons; with `variant` forced to `SurfaceVariant` the test fails there, because folds alone gives a pressed button a grey fill.
   `dev`'s glass Attach has a tinted background, so these checks reject it.
+  `RoomInput.test.ts` covers the Simple Mode fix: in Simple Mode the emoji button stays pressed after the board switches to its Sticker tab, and with the Sticker button shown only the open tab's button is pressed.
+  Its `UseStateProvider` mock without state is gone, so the board's tab can change, and its `PopOut` mock now renders the board, so a test can switch the tab.
+  Reverting the fix fails the first test; pressing the emoji button for either tab with the Sticker button shown fails the second.
 - Validation: typecheck, production build, lint and prettier on touched files pass; related unit suites pass (two message suites time out under parallel load and pass alone).
   Fixture screenshots compared dev and this branch in light and dark on Chromium: Markdown on shows a Primary chip, off shows a bare icon, Bold pressed matches.
   Live `composer-glass` passes in Chromium for both cases.
-  Run back to back on one account, the silver-theme case hits the local homeserver's per-account login limit (`M_LIMIT_EXCEEDED`, retry after 177 s) before reaching the composer, so it runs separately.
+  Run back to back on one account, the silver-theme case hits the local homeserver's per-account login limit (`M_LIMIT_EXCEEDED`, retry after 177 s) before reaching the composer, so it passed in a separate run.
   WebKit browsers are not installed locally.
   A throwaway live script captured the message editor with its toolbar open on `dev` and on this branch, and checked the Simple Mode emoji button on the Sticker tab: `aria-pressed="false"` on `dev`, `"true"` here.
-  No unit test covers that fix: `RoomInput.test.ts` mocks `UseStateProvider` without state, so it cannot change the board's tab.
 - Review: a fresh Claude reviewer and Codex (`gpt-6-astra`) found a silently overridable `aria-pressed`, an untested Markdown toggle, a combined blur-and-highlight check that let a half-raised button pass, and Runbook and design-guide wording; all fixed.
   The second round (Codex approved) found the Simple Mode emoji state, also raised by CodeRabbit, a test that never checked for Primary, and missing message editor screenshots; all fixed.
+  The third round (Codex approved) asked for a unit test of the Simple Mode fix and clearer wording for the separate silver run; both done.
 - Next: check the result on the owner's Mac and an iPhone, where the previous rims were most visible.
 
 ### Open an agent's connect and reset links signed in from the iOS app (2026-11-04)
