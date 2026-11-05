@@ -183,6 +183,48 @@ describe('thread receipt unread state with SDK models', () => {
     }
   );
 
+  it('covers the terminal edit of a streamed reply with one thread receipt', async () => {
+    const { mx, thread, requests } = await setupRoom();
+    thread.initialEventsFetched = true;
+    thread.addEvent(message('$reply', 3000, '$root'), false, false);
+    const streamEdit = (id: string, ts: number, status: string) =>
+      new MatrixEvent({
+        event_id: id,
+        room_id: ROOM_ID,
+        sender: '@bob:example.org',
+        type: 'm.room.message',
+        origin_server_ts: ts,
+        content: {
+          msgtype: 'm.text',
+          body: '* answer',
+          'm.new_content': { msgtype: 'm.text', body: 'answer', 'io.mindroom.stream_status': status },
+          'm.relates_to': { rel_type: RelationType.Replace, event_id: '$reply' },
+        },
+      });
+    thread.addEvent(streamEdit('$streaming', 3500, 'streaming'), false, false);
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(requests).toHaveBeenLastCalledWith(
+      'POST',
+      `/rooms/${encodeURIComponent(ROOM_ID)}/receipt/${ReceiptType.Read}/%24reply`,
+      undefined,
+      { thread_id: '$root' }
+    );
+
+    thread.addEvent(streamEdit('$completed', 4000, 'completed'), false, false);
+    requests.mockClear();
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(requests).toHaveBeenCalledWith(
+      'POST',
+      `/rooms/${encodeURIComponent(ROOM_ID)}/receipt/${ReceiptType.Read}/%24completed`,
+      undefined,
+      { thread_id: '$root' }
+    );
+
+    requests.mockClear();
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(requests).not.toHaveBeenCalled();
+  });
+
   it('rejects a receipt for a bundled reply that belongs to another thread', async () => {
     const { room, thread } = await setupRoom();
     thread.addEvent(message('$reply', 3000, '$root'), false, false);

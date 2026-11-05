@@ -8,6 +8,7 @@ import {
   type Thread,
 } from 'matrix-js-sdk';
 import { MAIN_ROOM_TIMELINE } from 'matrix-js-sdk/lib/@types/read_receipts';
+import { getStreamStatusFromContent, TERMINAL_STREAM_STATUSES } from '../messages/aiRun';
 import { isThreadOnlyRoomActivity } from '../threads/threadRenderUtils';
 import { isLocalEchoEventId } from '../threads/threadRouteUtils';
 import { eventBelongsToThread } from '../threads/threadUtils';
@@ -32,10 +33,21 @@ const getLatestReceiptTarget = (
   return undefined;
 };
 
-const isThreadReplyReceiptTarget = (event: MatrixEvent, threadId: string): boolean =>
-  event.getId() !== threadId &&
-  eventBelongsToThread(event, threadId) &&
-  event.getRelation()?.rel_type === RelationType.Thread;
+/**
+ * The edit that ends a streamed reply: the server counts it as a new message,
+ * so a receipt must reach it for the finished reply to count as read.
+ * Undecrypted edits have no readable status yet and do not match.
+ */
+export const isTerminalStreamEdit = (event: MatrixEvent): boolean => {
+  if (event.getRelation()?.rel_type !== RelationType.Replace) return false;
+  const status = getStreamStatusFromContent(event.getContent());
+  return !!status && TERMINAL_STREAM_STATUSES.has(status);
+};
+
+const isThreadReplyReceiptTarget = (event: MatrixEvent, threadId: string): boolean => {
+  if (event.getId() === threadId || !eventBelongsToThread(event, threadId)) return false;
+  return event.getRelation()?.rel_type === RelationType.Thread || isTerminalStreamEdit(event);
+};
 
 const getThreadReplyTarget = (thread: Thread): MatrixEvent | undefined => {
   const isEligible = (event: MatrixEvent) => isThreadReplyReceiptTarget(event, thread.id);

@@ -5,8 +5,8 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from 'react';
-import { Direction } from 'matrix-js-sdk';
-import type { MatrixClient, Room } from 'matrix-js-sdk';
+import { Direction, MatrixEventEvent } from 'matrix-js-sdk';
+import type { MatrixClient, MatrixEvent, Room } from 'matrix-js-sdk';
 import {
   getIntersectionObserverEntry,
   useIntersectionObserver,
@@ -14,15 +14,18 @@ import {
 import { useDebounce } from '../../hooks/useDebounce';
 import { useDocumentFocusChange } from '../../hooks/useDocumentFocusChange';
 import {
+  isTerminalStreamEdit,
   markMainTimelineAsRead,
   markRoomAndThreadsAsRead,
   markThreadAsRead,
 } from '../notifications/readReceipts';
+import { useLiveEventArrive } from './roomLiveEventArrive';
 import {
   getEventTimeline,
   getFirstLinkedTimeline,
 } from './timelinePagination';
 import type { ThreadInitialRenderMode } from './threadRenderUtils';
+import { eventBelongsToThread } from './threadUtils';
 
 type RoomUnreadInfoLike = {
   inLiveTimeline: boolean;
@@ -34,6 +37,35 @@ type OpenEventHandler = (
   highlight?: boolean,
   onScroll?: (scrolled: boolean) => void
 ) => void | Promise<void>;
+
+/**
+ * A streamed reply that finishes while the user watches the open thread's live
+ * end, with the window focused, is read, like a reply arriving there.
+ * The main timeline needs no extra rule: it already marks every live event
+ * there, edits included, while the user follows it.
+ */
+export const shouldMarkStreamFinishAsRead = ({
+  atBottom,
+  atLiveEnd,
+  event,
+  hasFocus,
+  roomId,
+  threadId,
+}: {
+  atBottom: boolean;
+  atLiveEnd: boolean;
+  event: MatrixEvent;
+  hasFocus: boolean;
+  roomId: string;
+  threadId?: string;
+}): boolean =>
+  !!threadId &&
+  atBottom &&
+  atLiveEnd &&
+  hasFocus &&
+  event.getRoomId() === roomId &&
+  eventBelongsToThread(event, threadId) &&
+  isTerminalStreamEdit(event);
 
 export const useTimelineReadReceiptController = ({
   atBottom,
@@ -105,6 +137,46 @@ export const useTimelineReadReceiptController = ({
     threadInitialRenderMode,
     threadTailLoaded,
   ]);
+
+  const markStreamFinishAsRead = useCallback(
+    (event: MatrixEvent) => {
+      if (
+        shouldMarkStreamFinishAsRead({
+          atBottom: atBottomRef.current,
+          atLiveEnd: atLiveEndRef.current,
+          event,
+          hasFocus: document.hasFocus(),
+          roomId: room.roomId,
+          threadId,
+        })
+      ) {
+        tryAutoMarkThreadAsRead();
+      }
+    },
+    [atBottomRef, atLiveEndRef, room.roomId, threadId, tryAutoMarkThreadAsRead]
+  );
+
+  // Without relation recursion the SDK inserts thread edits as non-live events,
+  // so every forward arrival counts.
+  useLiveEventArrive(
+    room,
+    useCallback(
+      (event, { toStartOfTimeline }) => {
+        if (!toStartOfTimeline) markStreamFinishAsRead(event);
+      },
+      [markStreamFinishAsRead]
+    )
+  );
+
+  // An encrypted terminal edit shows its status only once decrypted.
+  useEffect(() => {
+    if (!threadId) return undefined;
+    const handleDecrypted = (event: MatrixEvent) => markStreamFinishAsRead(event);
+    mx.on(MatrixEventEvent.Decrypted, handleDecrypted);
+    return () => {
+      mx.removeListener(MatrixEventEvent.Decrypted, handleDecrypted);
+    };
+  }, [markStreamFinishAsRead, mx, threadId]);
 
   const debounceSetAtBottom = useDebounce(
     useCallback((entry: IntersectionObserverEntry) => {
