@@ -20,10 +20,7 @@ import {
   markThreadAsRead,
 } from '../notifications/readReceipts';
 import { useLiveEventArrive } from './roomLiveEventArrive';
-import {
-  getEventTimeline,
-  getFirstLinkedTimeline,
-} from './timelinePagination';
+import { getEventTimeline, getFirstLinkedTimeline } from './timelinePagination';
 import type { ThreadInitialRenderMode } from './threadRenderUtils';
 import { eventBelongsToThread } from './threadUtils';
 
@@ -179,9 +176,12 @@ export const useTimelineReadReceiptController = ({
   }, [markStreamFinishAsRead, mx, threadId]);
 
   const debounceSetAtBottom = useDebounce(
-    useCallback((entry: IntersectionObserverEntry) => {
-      if (!entry.isIntersecting) setAtBottom(false);
-    }, [setAtBottom]),
+    useCallback(
+      (entry: IntersectionObserverEntry) => {
+        if (!entry.isIntersecting) setAtBottom(false);
+      },
+      [setAtBottom]
+    ),
     { wait: 1000 }
   );
 

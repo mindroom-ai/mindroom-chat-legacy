@@ -2,6 +2,24 @@
 
 ## Runbook
 
+### Read a streamed reply that finishes while the user watches it (2026-11-05)
+
+- Why: MindRoom's Tuwunel fork now counts a streamed reply as a new unread message when its stream ends (the terminal `m.replace` edit), and sends one push then, because a reply read half-way has not been read.
+  The client must therefore acknowledge the terminal edit when the user watched the reply finish; otherwise a watched reply leaves an unread count.
+- Rule: a terminal edit (`io.mindroom.stream_status` in `m.new_content` is one of `TERMINAL_STREAM_STATUSES`) of a reply in the open thread is read when the thread view is at the bottom and at its live end and the window has focus, the same conditions under which a new reply arriving there is read.
+  Unfocused, scrolled away, or another thread or room open: no receipt.
+- Change: `readReceipts.ts` adds `isTerminalStreamEdit`, and thread receipt targets now include terminal stream edits, so `markThreadAsRead` (and whole-room marking) cover the finished reply.
+  Other edits stay excluded, as before.
+  `timelineReadReceiptController.ts` adds `shouldMarkStreamFinishAsRead` and runs the existing thread auto-mark when such an edit arrives (any forward timeline arrival, since without relation recursion the SDK inserts thread edits as non-live) or when an encrypted one is decrypted.
+  Returning focus to the thread later marks the finished reply read through the existing focus path, because the terminal edit is now the thread's receipt target.
+  The SDK puts edits of thread replies in the thread (`threadIdForReceipt`), so the receipt carries the thread's `thread_id`; the private read receipt setting applies as before.
+  The main timeline needs no change: it already marks every live event there, edits included, while the user follows it.
+- Tests: `timelineReadReceiptController.test.tsx` covers the decision (each terminal status; streaming edit; unfocused, scrolled away, not at live end, no thread, another thread, another room, non-edit) and the hook (plaintext arrival as a non-live insert, decryption, unfocused and scrolled away send nothing).
+  `readReceipts.test.ts` checks a private receipt targets the terminal edit; `readReceipts.integration.test.ts` checks with real SDK models that a streaming edit is not a target, the terminal edit gets one thread receipt, and a repeat sends nothing.
+  These tests fail against `dev`'s `readReceipts.ts`.
+  New live spec `e2e/live/stream-finish-receipt.spec.ts` against a disposable Tuwunel: the open thread's streamed reply finishes and the receipt for the terminal edit is accepted with the thread's `thread_id`, no receipt goes to the streaming edit, and with the window unfocused nothing is sent until focus returns.
+- Pairs with the Tuwunel change that counts a finished stream as a new message.
+
 ### Quiet the composer's buttons and show the Markdown state (2026-11-04)
 
 - Why: the owner found the composer too busy.

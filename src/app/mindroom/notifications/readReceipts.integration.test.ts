@@ -197,7 +197,11 @@ describe('thread receipt unread state with SDK models', () => {
         content: {
           msgtype: 'm.text',
           body: '* answer',
-          'm.new_content': { msgtype: 'm.text', body: 'answer', 'io.mindroom.stream_status': status },
+          'm.new_content': {
+            msgtype: 'm.text',
+            body: 'answer',
+            'io.mindroom.stream_status': status,
+          },
           'm.relates_to': { rel_type: RelationType.Replace, event_id: '$reply' },
         },
       });

@@ -135,26 +135,28 @@ describe('useTimelineReadReceiptController stream finish', () => {
     const room = { roomId: ROOM_ID, ...roomEmitter } as unknown as Room;
     const mx = mxEmitter as unknown as MatrixClient;
 
+    // Stable props, as the timeline passes them; new refs each render would loop the observer.
+    const props = {
+      atBottom,
+      atBottomAnchorRef: { current: null },
+      atBottomRef: { current: atBottom },
+      atLiveEndRef: { current: true },
+      getScrollElement: () => null,
+      handleOpenEvent: vi.fn(),
+      hideActivity: true,
+      mx,
+      readUptoEventIdRef: { current: undefined },
+      room,
+      setAtBottom: vi.fn(),
+      threadEventsLength: 2,
+      threadId: THREAD_ID,
+      threadInitialRenderMode: 'live' as const,
+      threadTailLoaded: true,
+      timelineAtLiveEnd: true,
+      unreadInfo: undefined,
+    };
     const Harness = () => {
-      useTimelineReadReceiptController({
-        atBottom,
-        atBottomAnchorRef: { current: null },
-        atBottomRef: { current: atBottom },
-        atLiveEndRef: { current: true },
-        getScrollElement: () => null,
-        handleOpenEvent: vi.fn(),
-        hideActivity: true,
-        mx,
-        readUptoEventIdRef: { current: undefined },
-        room,
-        setAtBottom: vi.fn(),
-        threadEventsLength: 2,
-        threadId: THREAD_ID,
-        threadInitialRenderMode: 'ready',
-        threadTailLoaded: true,
-        timelineAtLiveEnd: true,
-        unreadInfo: undefined,
-      });
+      useTimelineReadReceiptController(props);
       return null;
     };
 
