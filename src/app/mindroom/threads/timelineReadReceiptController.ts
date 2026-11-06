@@ -19,8 +19,8 @@ import {
   markRoomAndThreadsAsRead,
   markThreadAsRead,
 } from '../notifications/readReceipts';
-import { useLiveEventArrive } from './roomLiveEventArrive';
 import { getEventTimeline, getFirstLinkedTimeline } from './timelinePagination';
+import { isScrollNearBottom } from './timelineScrollUtils';
 import type { ThreadInitialRenderMode } from './threadRenderUtils';
 import { eventBelongsToThread } from './threadUtils';
 
@@ -35,34 +35,8 @@ type OpenEventHandler = (
   onScroll?: (scrolled: boolean) => void
 ) => void | Promise<void>;
 
-/**
- * A streamed reply that finishes while the user watches the open thread's live
- * end, with the window focused, is read, like a reply arriving there.
- * The main timeline needs no extra rule: it already marks every live event
- * there, edits included, while the user follows it.
- */
-export const shouldMarkStreamFinishAsRead = ({
-  atBottom,
-  atLiveEnd,
-  event,
-  hasFocus,
-  roomId,
-  threadId,
-}: {
-  atBottom: boolean;
-  atLiveEnd: boolean;
-  event: MatrixEvent;
-  hasFocus: boolean;
-  roomId: string;
-  threadId?: string;
-}): boolean =>
-  !!threadId &&
-  atBottom &&
-  atLiveEnd &&
-  hasFocus &&
-  event.getRoomId() === roomId &&
-  eventBelongsToThread(event, threadId) &&
-  isTerminalStreamEdit(event);
+// The bottom anchor counts as in view within this distance of the viewport.
+const AT_BOTTOM_MARGIN_PX = 100;
 
 export const useTimelineReadReceiptController = ({
   atBottom,
@@ -124,7 +98,11 @@ export const useTimelineReadReceiptController = ({
       return;
     }
 
-    requestAnimationFrame(() => markThreadAsRead(mx, room.roomId, threadId, hideActivity));
+    // The receipt names the newest reply when the frame runs; one that arrives
+    // after the window lost focus has not been seen.
+    requestAnimationFrame(() => {
+      if (document.hasFocus()) markThreadAsRead(mx, room.roomId, threadId, hideActivity);
+    });
   }, [
     hideActivity,
     mx,
@@ -135,45 +113,42 @@ export const useTimelineReadReceiptController = ({
     threadTailLoaded,
   ]);
 
-  const markStreamFinishAsRead = useCallback(
-    (event: MatrixEvent) => {
+  // A streamed reply that finishes while the user watches the open thread's live
+  // end, with the window focused, is read, like a reply arriving there.
+  // The edit that ends it replaces the reply's content whether it arrives live,
+  // is decrypted later, or comes bundled with a refetched reply.
+  // The main timeline needs no extra rule: it already marks every live event
+  // there, edits included, while the user follows it.
+  useEffect(() => {
+    if (!threadId) return undefined;
+    const handleReplaced = (event: MatrixEvent) => {
       if (
-        shouldMarkStreamFinishAsRead({
-          atBottom: atBottomRef.current,
-          atLiveEnd: atLiveEndRef.current,
-          event,
-          hasFocus: document.hasFocus(),
-          roomId: room.roomId,
-          threadId,
+        event.getRoomId() !== room.roomId ||
+        !eventBelongsToThread(event, threadId) ||
+        !isTerminalStreamEdit(event.replacingEvent()) ||
+        !atLiveEndRef.current
+      ) {
+        return;
+      }
+      // The bottom state turns false a second late, so measure the viewport now.
+      const scrollElement = getScrollElement();
+      if (
+        scrollElement &&
+        isScrollNearBottom({
+          scrollHeight: scrollElement.scrollHeight,
+          scrollTop: scrollElement.scrollTop,
+          clientHeight: scrollElement.clientHeight,
+          thresholdPx: AT_BOTTOM_MARGIN_PX,
         })
       ) {
         tryAutoMarkThreadAsRead();
       }
-    },
-    [atBottomRef, atLiveEndRef, room.roomId, threadId, tryAutoMarkThreadAsRead]
-  );
-
-  // Without relation recursion the SDK inserts thread edits as non-live events,
-  // so every forward arrival counts.
-  useLiveEventArrive(
-    room,
-    useCallback(
-      (event, { toStartOfTimeline }) => {
-        if (!toStartOfTimeline) markStreamFinishAsRead(event);
-      },
-      [markStreamFinishAsRead]
-    )
-  );
-
-  // An encrypted terminal edit shows its status only once decrypted.
-  useEffect(() => {
-    if (!threadId) return undefined;
-    const handleDecrypted = (event: MatrixEvent) => markStreamFinishAsRead(event);
-    mx.on(MatrixEventEvent.Decrypted, handleDecrypted);
-    return () => {
-      mx.removeListener(MatrixEventEvent.Decrypted, handleDecrypted);
     };
-  }, [markStreamFinishAsRead, mx, threadId]);
+    mx.on(MatrixEventEvent.Replaced, handleReplaced);
+    return () => {
+      mx.removeListener(MatrixEventEvent.Replaced, handleReplaced);
+    };
+  }, [atLiveEndRef, getScrollElement, mx, room.roomId, threadId, tryAutoMarkThreadAsRead]);
 
   const debounceSetAtBottom = useDebounce(
     useCallback(
@@ -216,7 +191,7 @@ export const useTimelineReadReceiptController = ({
     useCallback(
       () => ({
         root: getScrollElement(),
-        rootMargin: '100px',
+        rootMargin: `${AT_BOTTOM_MARGIN_PX}px`,
       }),
       [getScrollElement]
     ),

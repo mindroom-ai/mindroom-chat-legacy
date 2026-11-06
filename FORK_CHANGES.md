@@ -9,15 +9,25 @@
 - Rule: a terminal edit (`io.mindroom.stream_status` in `m.new_content` is one of `TERMINAL_STREAM_STATUSES`) of a reply in the open thread is read when the thread view is at the bottom and at its live end and the window has focus, the same conditions under which a new reply arriving there is read.
   Unfocused, scrolled away, or another thread or room open: no receipt.
 - Change: `readReceipts.ts` adds `isTerminalStreamEdit`, and thread receipt targets now include terminal stream edits, so `markThreadAsRead` (and whole-room marking) cover the finished reply.
-  Other edits stay excluded, as before.
-  `timelineReadReceiptController.ts` adds `shouldMarkStreamFinishAsRead` and runs the existing thread auto-mark when such an edit arrives (any forward timeline arrival, since without relation recursion the SDK inserts thread edits as non-live) or when an encrypted one is decrypted.
+  Other edits stay excluded, as before, and so does a terminal edit of the root, which belongs to the main timeline.
+  Targets also include terminal edits the thread's timeline lacks: a reply's latest edit (`replacingEvent()`), which the server bundles with the reply and backfills apply the same way, and the edits an unopened thread buffers (`getBufferedThreadRelations`, the SDK owner's accessor for `replayEvents`).
+  The SDK takes a receipt's `thread_id` from its event, so `markThreadAsRead` gives a bundled edit, which has no thread of its own, its reply's thread before sending.
+  `getThreadReadState` resolves a receipt on such an edit through the reply it replaces, so a thread read up to its finished reply stays read after a reload and on other devices.
+  `timelineReadReceiptController.ts` runs the existing thread auto-mark when a reply in the open thread gets a terminal edit (`MatrixEventEvent.Replaced`, which covers live, decrypted, and bundled edits) while the timeline is at its live end and the viewport, measured then, is at the bottom (the debounced bottom state turns false a second late).
+  The auto-mark's frame checks focus again, because the receipt names the newest reply when the frame runs.
   Returning focus to the thread later marks the finished reply read through the existing focus path, because the terminal edit is now the thread's receipt target.
-  The SDK puts edits of thread replies in the thread (`threadIdForReceipt`), so the receipt carries the thread's `thread_id`; the private read receipt setting applies as before.
+  The private read receipt setting applies as before.
   The main timeline needs no change: it already marks every live event there, edits included, while the user follows it.
-- Tests: `timelineReadReceiptController.test.tsx` covers the decision (each terminal status; streaming edit; unfocused, scrolled away, not at live end, no thread, another thread, another room, non-edit) and the hook (plaintext arrival as a non-live insert, decryption, unfocused and scrolled away send nothing).
-  `readReceipts.test.ts` checks a private receipt targets the terminal edit; `readReceipts.integration.test.ts` checks with real SDK models that a streaming edit is not a target, the terminal edit gets one thread receipt, and a repeat sends nothing.
-  These tests fail against `dev`'s `readReceipts.ts`.
-  New live spec `e2e/live/stream-finish-receipt.spec.ts` against a disposable Tuwunel: the open thread's streamed reply finishes and the receipt for the terminal edit is accepted with the thread's `thread_id`, no receipt goes to the streaming edit, and with the window unfocused nothing is sent until focus returns.
+- Tests: `timelineReadReceiptController.test.tsx` drives the hook through `Replaced`: each terminal status marks the open thread read; a streaming edit, a viewport scrolled away while the bottom state still says bottom, a timeline off its live end, another thread or room, an unfocused window, and focus lost before the frame send nothing; without an open thread nothing reads focus.
+  With real SDK models it checks that a terminal edit added to the open thread and a refetched reply bundling its terminal edit both mark the thread read.
+  `readReceipts.integration.test.ts` checks with real SDK models that a streaming edit is not a target and the terminal edit gets one thread receipt; that synchronized receipts on a summary reply's bundled edit and on a buffered edit leave the thread read and send nothing; that a loaded reply's bundled edit is targeted with the thread's `thread_id`; that thread and whole-room marking target a buffered edit; and that a root's terminal edit is never a thread target.
+  `readReceipts.test.ts` checks a private receipt targets the terminal edit.
+  Each new test fails against the PR's first revision, and each of 12 mutations of the new checks fails a test.
+  Live spec `e2e/live/stream-finish-receipt.spec.ts` against a disposable Tuwunel: the open thread's streamed reply finishes and the receipt for the terminal edit is accepted with the thread's `thread_id`, no receipt goes to the streaming edit, and with the window unfocused nothing is sent until focus returns.
+- Review round 1 (Opus 5.5, GPT-6.1 Sol, GPT-6 Astra) found receipts on unloaded terminal edits reading as unread after a reload (followed by a backwards receipt on the reply), bundled and buffered terminal edits never acknowledged, stale bottom state acknowledging a completion scrolled out of view, a hook test that asserted nothing, and per-event work with no thread open; all are fixed above.
+  The live spec then exposed a frame race: a mark scheduled while focused ran after focus left and acknowledged the terminal edit that arrived in between (the first revision failed 4 of 4 runs on a loaded machine); the frame focus check fixes it.
+- Gaps: a terminal edit that is neither bundled nor buffered, such as one the server purged as superseded, resolves only once its thread loads.
+  A reply read mid-stream that finishes while the user is away counts as unread on the server, but `getThreadUnread` compares replies only, so its thread card shows it read.
 - Pairs with the Tuwunel change that counts a finished stream as a new message.
 
 ### Quiet the composer's buttons and show the Markdown state (2026-11-04)
