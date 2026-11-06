@@ -13,6 +13,7 @@ import { isLocalEchoEventId } from '../threads/threadRouteUtils';
 import {
   getLatestTerminalEdit,
   getThreadReadState,
+  isTerminalStreamEdit,
   isThreadReceiptTarget,
 } from '../threads/roomThreadList';
 
@@ -35,6 +36,18 @@ const getLatestReceiptTarget = (
   return undefined;
 };
 
+/**
+ * The order of two events of a thread: by timestamp, and within one millisecond
+ * by the thread timeline when it holds both; otherwise unknown (0).
+ */
+const compareThreadEvents = (thread: Thread, a: MatrixEvent, b: MatrixEvent): number => {
+  const byTs = a.getTs() - b.getTs();
+  if (byTs !== 0 || a.getId() === b.getId()) return byTs;
+  const indexA = thread.events.findIndex((event) => event.getId() === a.getId());
+  const indexB = thread.events.findIndex((event) => event.getId() === b.getId());
+  return indexA >= 0 && indexB >= 0 ? indexA - indexB : 0;
+};
+
 const getThreadReplyTarget = (thread: Thread): MatrixEvent | undefined => {
   const isEligible = (event: MatrixEvent) => isThreadReceiptTarget(event, thread.id);
   // Before history is loaded, the SDK keeps the bundled latest reply outside events,
@@ -45,9 +58,10 @@ const getThreadReplyTarget = (thread: Thread): MatrixEvent | undefined => {
     replyToEvent ? getLatestReceiptTarget([replyToEvent], null, isEligible) : undefined,
     getLatestTerminalEdit(thread),
   ];
-  // A tie goes to the later candidate: the summary reply, or an edit over its reply.
+  // A tie of unknown order goes to the later candidate: the summary reply, or an edit.
   return candidates.reduce<MatrixEvent | undefined>(
-    (latest, event) => (event && (!latest || event.getTs() >= latest.getTs()) ? event : latest),
+    (latest, event) =>
+      event && (!latest || compareThreadEvents(thread, event, latest) >= 0) ? event : latest,
     undefined
   );
 };
@@ -96,7 +110,17 @@ const getLatestThreadReplyTarget = async (
         );
   }
 
-  return mappedReply;
+  // The server bundles the reply's latest edit, which may have finished it.
+  const edit = mappedReply.replacingEvent();
+  return edit && isTerminalStreamEdit(edit) ? edit : mappedReply;
+};
+
+/**
+ * The SDK builds the receipt's path from the event's room, which an edit the
+ * server bundled with its reply does not carry.
+ */
+const ensureEventRoom = (event: MatrixEvent, roomId: string) => {
+  if (!event.getRoomId()) event.event.room_id = roomId;
 };
 
 export async function markMainTimelineAsRead(
@@ -140,6 +164,7 @@ export async function markThreadAsRead(
   // The SDK takes the receipt's thread_id from the event, and an edit bundled
   // with its reply has no thread of its own.
   if (latestReply.threadRootId !== threadId) latestReply.setThreadId(threadId);
+  ensureEventRoom(latestReply, room.roomId);
   await mx.sendReceipt(latestReply, getReceiptType(privateReceipt), {
     thread_id: threadId,
   });
@@ -162,5 +187,6 @@ export async function markRoomAndThreadsAsRead(
   }
   if (!latestEvent) return;
 
+  ensureEventRoom(latestEvent, room.roomId);
   await mx.sendReadReceipt(latestEvent, getReceiptType(privateReceipt), true);
 }

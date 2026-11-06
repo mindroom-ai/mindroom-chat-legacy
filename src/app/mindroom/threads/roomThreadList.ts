@@ -52,18 +52,24 @@ export const isThreadReceiptTarget = (event: MatrixEvent, threadId: string): boo
  */
 export const getLatestTerminalEdit = (thread: Thread): MatrixEvent | undefined => {
   let latest: MatrixEvent | undefined;
-  const consider = (event: MatrixEvent | null | undefined) => {
-    if (!event || !isTerminalStreamEdit(event)) return;
-    if (!latest || event.getTs() >= latest.getTs()) latest = event;
+  // Newest first, so most events cost a timestamp check; a tie goes to the later
+  // place: buffered, then the summary reply, then the timeline, an edit over its reply.
+  const consider = (edit: MatrixEvent | null | undefined, event: MatrixEvent) => {
+    if (!edit || (latest && edit.getTs() <= latest.getTs())) return;
+    if (isTerminalStreamEdit(edit) && isThreadReceiptTarget(event, thread.id)) latest = edit;
   };
-  for (const event of [...(thread.events ?? []), thread.replyToEvent]) {
-    if (!event || !isThreadReceiptTarget(event, thread.id)) continue;
-    consider(event);
-    consider(event.replacingEvent?.());
+  const buffered = getBufferedThreadRelations(thread);
+  for (let index = buffered.length - 1; index >= 0; index -= 1) {
+    consider(buffered[index], buffered[index]);
   }
-  getBufferedThreadRelations(thread).forEach((event) => {
-    if (isThreadReceiptTarget(event, thread.id)) consider(event);
-  });
+  const events = [...(thread.events ?? []), thread.replyToEvent];
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event) {
+      consider(event.replacingEvent?.(), event);
+      consider(event, event);
+    }
+  }
   return latest;
 };
 
@@ -84,8 +90,10 @@ const findThreadReceiptEvent = (
       ? { event: edit, threadRootId: event.threadRootId }
       : undefined;
   };
-  for (const event of thread.events ?? []) {
-    const found = match(event);
+  // Receipts mostly name recent events.
+  const events = thread.events ?? [];
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const found = match(events[index]);
     if (found) return found;
   }
   return (
@@ -143,8 +151,16 @@ export const getThreadUnread = (thread: Thread, userId: string): boolean => {
   const latest =
     finish && (!latestReply || finish.getTs() >= latestReply.getTs()) ? finish : latestReply;
   if (!latest || latest.getSender() === userId) return false;
-  const readUpToTs = getThreadReadState(thread, userId)?.readUpToTs;
-  return readUpToTs === undefined || latest.getTs() > readUpToTs;
+  const readState = getThreadReadState(thread, userId);
+  if (readState?.readUpToTs === undefined) return true;
+  const { readEventIds, readUpToTs } = readState;
+  if (latest.getTs() !== readUpToTs) return latest.getTs() > readUpToTs;
+  // A finish in the same millisecond as the reply a receipt names still follows it.
+  return (
+    latest === finish &&
+    !readEventIds.has(latest.getId()!) &&
+    readEventIds.has(latest.getAssociatedId()!)
+  );
 };
 
 /**

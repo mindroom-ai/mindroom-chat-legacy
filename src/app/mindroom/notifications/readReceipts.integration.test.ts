@@ -23,9 +23,9 @@ const message = (id: string, ts: number, threadId?: string) =>
     },
   });
 
+// Servers bundle a reply's latest edit without its room, as they do the summary's latest reply.
 const rawStreamEdit = (id: string, ts: number, status: string, targetId = '$reply') => ({
   event_id: id,
-  room_id: ROOM_ID,
   sender: '@bob:example.org',
   type: 'm.room.message',
   origin_server_ts: ts,
@@ -38,7 +38,9 @@ const rawStreamEdit = (id: string, ts: number, status: string, targetId = '$repl
 });
 
 const streamEdit = (id: string, ts: number, status: string, targetId?: string) =>
-  new MatrixEvent(rawStreamEdit(id, ts, status, targetId));
+  new MatrixEvent({ ...rawStreamEdit(id, ts, status, targetId), room_id: ROOM_ID });
+
+const withoutRoom = ({ room_id: _roomId, ...event }: { room_id?: string }) => event;
 
 const receiptPath = (eventId: string, receiptType = ReceiptType.Read) =>
   `/rooms/${encodeURIComponent(ROOM_ID)}/receipt/${receiptType}/${encodeURIComponent(eventId)}`;
@@ -58,7 +60,7 @@ const setupRoom = async ({ replyEdit }: { replyEdit?: object } = {}) => {
       [RelationType.Thread]: {
         count: 2,
         current_user_participated: true,
-        latest_event: reply.event,
+        latest_event: withoutRoom(reply.event),
       },
     },
   });
@@ -336,6 +338,77 @@ describe('thread receipt unread state with SDK models', () => {
       replyEdit: rawStreamEdit('$completed', 4000, 'completed'),
     });
     syncThreadReceipt(room, '$reply', 3500);
+
+    expect(getThreadUnread(thread, USER_ID)).toBe(true);
+  });
+
+  it('acknowledges the bundled finish of a reply read mid-stream', async () => {
+    const { mx, room, thread, requests } = await setupRoom({
+      replyEdit: rawStreamEdit('$completed', 4000, 'completed'),
+    });
+    syncThreadReceipt(room, '$reply', 3500);
+
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(requests).toHaveBeenLastCalledWith('POST', receiptPath('$completed'), undefined, {
+      thread_id: '$root',
+    });
+    expect(getThreadUnread(thread, USER_ID)).toBe(false);
+  });
+
+  it('acknowledges the bundled finish of a reply read mid-stream when the room is marked read', async () => {
+    const { mx, room, requests } = await setupRoom({
+      replyEdit: rawStreamEdit('$completed', 4000, 'completed'),
+    });
+    syncThreadReceipt(room, '$reply', 3500);
+
+    await markRoomAndThreadsAsRead(mx, ROOM_ID, false);
+    expect(requests).toHaveBeenLastCalledWith('POST', receiptPath('$completed'), undefined, {});
+  });
+
+  it('acknowledges the bundled finish of the latest reply without a thread model', async () => {
+    const mx = createClient({ baseUrl: 'https://example.org', userId: USER_ID });
+    const room = new Room(ROOM_ID, mx, USER_ID);
+    mx.store.storeRoom(room);
+    const requests = vi.spyOn(mx.http, 'authedRequest').mockResolvedValue({});
+    vi.spyOn(mx, 'fetchRelations').mockResolvedValue({
+      chunk: [
+        {
+          ...message('$reply', 3000, '$root').event,
+          unsigned: {
+            'm.relations': {
+              [RelationType.Replace]: rawStreamEdit('$completed', 4000, 'completed'),
+            },
+          },
+        },
+      ],
+    } as Awaited<ReturnType<typeof mx.fetchRelations>>);
+    expect(room.getThread('$root')).toBeNull();
+
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+
+    expect(requests).toHaveBeenCalledWith('POST', receiptPath('$completed'), undefined, {
+      thread_id: '$root',
+    });
+  });
+
+  it('keeps a reply that follows a finish in the same millisecond as the receipt target', async () => {
+    const { mx, room, thread, requests } = await setupRoom();
+    thread.initialEventsFetched = true;
+    thread.addEvent(message('$reply', 3000, '$root'), false, false);
+    thread.addEvent(streamEdit('$completed', 4000, 'completed'), false, false);
+    thread.addEvent(message('$later', 4000, '$root'), false, false);
+    syncThreadReceipt(room, '$later', 4500);
+
+    expect(getThreadUnread(thread, USER_ID)).toBe(false);
+    requests.mockClear();
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(requests).not.toHaveBeenCalled();
+  });
+
+  it('shows a finish in the same millisecond as its read reply as unread', async () => {
+    const { room, thread } = await setupRoom();
+    syncThreadReceipt(room, '$reply', 3500);
+    await room.addLiveEvents([streamEdit('$completed', 3000, 'completed')], { addToState: false });
 
     expect(getThreadUnread(thread, USER_ID)).toBe(true);
   });
