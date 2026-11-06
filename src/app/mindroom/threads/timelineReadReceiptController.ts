@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -88,6 +89,16 @@ export const useTimelineReadReceiptController = ({
     }
   }, [hideActivity, mx, readUptoEventIdRef, room]);
 
+  // Replaced when the thread view goes away or the user stops watching a reply
+  // finish, so marks scheduled before then do not read what the user missed.
+  const threadViewRef = useRef({});
+  useEffect(
+    () => () => {
+      threadViewRef.current = {};
+    },
+    [room.roomId, threadId]
+  );
+
   const tryAutoMarkThreadAsRead = useCallback(() => {
     if (
       !threadId ||
@@ -99,11 +110,16 @@ export const useTimelineReadReceiptController = ({
     }
 
     // The receipt names the newest reply when the frame runs; one that arrives
-    // after the window lost focus has not been seen.
+    // after the window lost focus, the user left the thread, or the user stopped
+    // watching a finish has not been seen.
+    const view = threadViewRef.current;
     requestAnimationFrame(() => {
-      if (document.hasFocus()) markThreadAsRead(mx, room.roomId, threadId, hideActivity);
+      if (view === threadViewRef.current && atLiveEndRef.current && document.hasFocus()) {
+        markThreadAsRead(mx, room.roomId, threadId, hideActivity);
+      }
     });
   }, [
+    atLiveEndRef,
     hideActivity,
     mx,
     room.roomId,
@@ -130,7 +146,8 @@ export const useTimelineReadReceiptController = ({
       ) {
         return;
       }
-      // The bottom state turns false a second late, so measure the viewport now.
+      // The bottom state turns false a second late, so measure the viewport now,
+      // before the finished content renders.
       const scrollElement = getScrollElement();
       if (
         scrollElement &&
@@ -142,6 +159,8 @@ export const useTimelineReadReceiptController = ({
         })
       ) {
         tryAutoMarkThreadAsRead();
+      } else {
+        threadViewRef.current = {};
       }
     };
     mx.on(MatrixEventEvent.Replaced, handleReplaced);

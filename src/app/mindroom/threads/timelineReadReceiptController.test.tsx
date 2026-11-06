@@ -136,23 +136,40 @@ const renderController = (
     return null;
   };
 
+  let renderer: ReturnType<typeof create> | undefined;
   act(() => {
-    create(<Harness />);
+    renderer = create(<Harness />);
   });
   // Opening the thread at its live end marks it read once; only later receipts matter here.
   vi.mocked(markThreadAsRead).mockClear();
   vi.mocked(document.hasFocus).mockClear();
+  return {
+    atLiveEndRef: props.atLiveEndRef,
+    scrollElement,
+    unmount: () => act(() => renderer?.unmount()),
+  };
+};
+
+// Frames that run only when the test says so, as when the browser is busy.
+const holdFrames = () => {
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback));
+  return {
+    frames,
+    run: () => act(() => frames.splice(0).forEach((callback) => callback(0))),
+  };
 };
 
 describe('useTimelineReadReceiptController stream finish', () => {
   const setup = (view?: ViewOptions) => {
     const mxEmitter = makeEmitter();
-    renderController(
+    const rendered = renderController(
       mxEmitter as unknown as MatrixClient,
       { roomId: ROOM_ID } as unknown as RoomModel,
       view
     );
     return {
+      ...rendered,
       finish: (reply = new MatrixEvent(rawReply()), status = 'completed') => {
         reply.makeReplaced(new MatrixEvent(rawEdit(status, reply.getRoomId())));
         act(() => mxEmitter.emit(MatrixEventEvent.Replaced, reply));
@@ -191,19 +208,65 @@ describe('useTimelineReadReceiptController stream finish', () => {
   });
 
   it('sends nothing when the window loses focus before the frame', () => {
-    const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
-      frames.push(callback)
-    );
+    const { frames, run } = holdFrames();
     const { finish } = setup();
     frames.length = 0;
 
     finish();
     expect(frames).toHaveLength(1);
     hasFocus = false;
-    frames.forEach((callback) => callback(0));
+    run();
 
     expect(markThreadAsRead).not.toHaveBeenCalled();
+  });
+
+  // A mark scheduled earlier, by opening the thread or a new reply, must not
+  // read a finish the user no longer watches when the frame runs.
+  it('drops a scheduled mark when the user scrolls away and the reply then finishes', () => {
+    const { frames, run } = holdFrames();
+    const { finish, scrollElement } = setup();
+    expect(frames).toHaveLength(1);
+
+    scrollElement.scrollTop = 0;
+    finish();
+    run();
+
+    expect(markThreadAsRead).not.toHaveBeenCalled();
+  });
+
+  it('drops a scheduled mark when the user leaves the thread before the frame', () => {
+    const { frames, run } = holdFrames();
+    const { finish, unmount } = setup();
+    expect(frames).toHaveLength(1);
+
+    unmount();
+    finish();
+    run();
+
+    expect(markThreadAsRead).not.toHaveBeenCalled();
+  });
+
+  it('drops a scheduled mark when the user leaves the live end before the frame', () => {
+    const { frames, run } = holdFrames();
+    const { atLiveEndRef, finish } = setup();
+    expect(frames).toHaveLength(1);
+
+    atLiveEndRef.current = false;
+    finish();
+    run();
+
+    expect(markThreadAsRead).not.toHaveBeenCalled();
+  });
+
+  it('keeps a scheduled mark while the user still watches the finish', () => {
+    const { frames, run } = holdFrames();
+    const { finish } = setup();
+    expect(frames).toHaveLength(1);
+
+    finish();
+    run();
+
+    expect(markThreadAsRead).toHaveBeenCalledTimes(2);
   });
 
   it('reads neither focus nor the reply while no thread is open', () => {
@@ -264,7 +327,9 @@ describe('useTimelineReadReceiptController stream finish with SDK models', () =>
     const { mapEvent, thread } = setupThread();
 
     // A reply fetched again (gap recovery, backfill) carries its latest edit bundled.
-    mapEvent({ ...rawReply(), unsigned: { 'm.relations': { 'm.replace': rawEdit('completed') } } });
+    // Servers bundle the edit without its room.
+    const { room_id: _roomId, ...bundledEdit } = rawEdit('completed');
+    mapEvent({ ...rawReply(), unsigned: { 'm.relations': { 'm.replace': bundledEdit } } });
 
     expect(thread.findEventById('$reply')?.replacingEvent()?.getId()).toBe('$edit-completed');
     expect(markThreadAsRead).toHaveBeenCalledTimes(1);
