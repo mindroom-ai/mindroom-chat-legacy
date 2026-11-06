@@ -14,11 +14,11 @@ import {
 import { useDebounce } from '../../hooks/useDebounce';
 import { useDocumentFocusChange } from '../../hooks/useDocumentFocusChange';
 import {
-  isTerminalStreamEdit,
   markMainTimelineAsRead,
   markRoomAndThreadsAsRead,
   markThreadAsRead,
 } from '../notifications/readReceipts';
+import { isTerminalStreamEdit } from './roomThreadList';
 import { getEventTimeline, getFirstLinkedTimeline } from './timelinePagination';
 import { isScrollNearBottom } from './timelineScrollUtils';
 import type { ThreadInitialRenderMode } from './threadRenderUtils';

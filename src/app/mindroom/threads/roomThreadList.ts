@@ -1,12 +1,14 @@
 /* eslint-disable no-console */
 
 import { Direction } from 'matrix-js-sdk/lib/models/event-timeline';
+import { RelationType } from 'matrix-js-sdk/lib/@types/event';
 import { ReceiptType } from 'matrix-js-sdk/lib/@types/read_receipts';
 import type { MatrixEvent } from 'matrix-js-sdk';
 import type { Room } from 'matrix-js-sdk/lib/models/room';
 import { Thread } from 'matrix-js-sdk/lib/models/thread';
+import { getStreamStatusFromContent, TERMINAL_STREAM_STATUSES } from '../messages/aiRun';
 import { getBufferedThreadRelations } from './sdk/threadBootstrapSdk';
-import { isVisibleThreadReplyEvent } from './threadUtils';
+import { eventBelongsToThread, isVisibleThreadReplyEvent } from './threadUtils';
 
 /** A thread that has not loaded its latest page knows its newest reply from the root's summary. */
 export const getLatestVisibleReply = (thread: Thread): MatrixEvent | undefined => {
@@ -22,6 +24,47 @@ export const getLatestVisibleReply = (thread: Thread): MatrixEvent | undefined =
   const summary = thread.replyToEvent;
   if (!summary || !isVisibleThreadReplyEvent(summary)) return loaded;
   return loaded && loaded.getTs() >= summary.getTs() ? loaded : summary;
+};
+
+/**
+ * The edit that ends a streamed reply. The server counts it as a new message,
+ * so a reply read half-way is unread again until a receipt reaches this edit.
+ * Undecrypted edits have no readable status yet and do not match.
+ */
+export const isTerminalStreamEdit = (event: MatrixEvent | null | undefined): boolean => {
+  if (event?.getRelation()?.rel_type !== RelationType.Replace) return false;
+  const status = getStreamStatusFromContent(event.getContent());
+  return !!status && TERMINAL_STREAM_STATUSES.has(status);
+};
+
+/** A reply in the thread, or the terminal edit of one: the events a thread receipt reads. */
+export const isThreadReceiptTarget = (event: MatrixEvent, threadId: string): boolean => {
+  if (event.getId() === threadId || !eventBelongsToThread(event, threadId)) return false;
+  if (event.getRelation()?.rel_type === RelationType.Thread) return true;
+  // An edit of the root belongs to the main timeline.
+  return isTerminalStreamEdit(event) && event.getAssociatedId() !== threadId;
+};
+
+/**
+ * The newest terminal edit of a reply, wherever the thread keeps it: in its
+ * timeline, as a reply's latest edit (which the server bundles with the reply
+ * and backfills apply the same way), or buffered while the thread is unopened.
+ */
+export const getLatestTerminalEdit = (thread: Thread): MatrixEvent | undefined => {
+  let latest: MatrixEvent | undefined;
+  const consider = (event: MatrixEvent | null | undefined) => {
+    if (!event || !isTerminalStreamEdit(event)) return;
+    if (!latest || event.getTs() >= latest.getTs()) latest = event;
+  };
+  for (const event of [...(thread.events ?? []), thread.replyToEvent]) {
+    if (!event || !isThreadReceiptTarget(event, thread.id)) continue;
+    consider(event);
+    consider(event.replacingEvent?.());
+  }
+  getBufferedThreadRelations(thread).forEach((event) => {
+    if (isThreadReceiptTarget(event, thread.id)) consider(event);
+  });
+  return latest;
 };
 
 /**
@@ -89,14 +132,19 @@ export const getThreadLastActivityTs = (thread: Thread): number =>
   getLatestVisibleReply(thread)?.getTs() ?? thread.rootEvent?.getTs() ?? 0;
 
 /**
- * A thread is unread when its latest reply is from another user and newer than
- * the user's thread or unthreaded receipt; a main-timeline receipt reads no replies.
+ * A thread is unread when its latest reply, or a later terminal edit of a reply,
+ * is from another user and newer than the user's thread or unthreaded receipt;
+ * a main-timeline receipt reads no replies. A reply read half-way is unread
+ * again once it finishes, as the server counts it.
  */
 export const getThreadUnread = (thread: Thread, userId: string): boolean => {
   const latestReply = getLatestVisibleReply(thread);
-  if (!latestReply || latestReply.getSender() === userId) return false;
+  const finish = getLatestTerminalEdit(thread);
+  const latest =
+    finish && (!latestReply || finish.getTs() >= latestReply.getTs()) ? finish : latestReply;
+  if (!latest || latest.getSender() === userId) return false;
   const readUpToTs = getThreadReadState(thread, userId)?.readUpToTs;
-  return readUpToTs === undefined || latestReply.getTs() > readUpToTs;
+  return readUpToTs === undefined || latest.getTs() > readUpToTs;
 };
 
 /**

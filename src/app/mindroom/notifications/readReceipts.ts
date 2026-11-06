@@ -8,12 +8,13 @@ import {
   type Thread,
 } from 'matrix-js-sdk';
 import { MAIN_ROOM_TIMELINE } from 'matrix-js-sdk/lib/@types/read_receipts';
-import { getStreamStatusFromContent, TERMINAL_STREAM_STATUSES } from '../messages/aiRun';
 import { isThreadOnlyRoomActivity } from '../threads/threadRenderUtils';
 import { isLocalEchoEventId } from '../threads/threadRouteUtils';
-import { eventBelongsToThread } from '../threads/threadUtils';
-import { getThreadReadState } from '../threads/roomThreadList';
-import { getBufferedThreadRelations } from '../threads/sdk/threadBootstrapSdk';
+import {
+  getLatestTerminalEdit,
+  getThreadReadState,
+  isThreadReceiptTarget,
+} from '../threads/roomThreadList';
 
 const getReceiptType = (privateReceipt: boolean): ReceiptType =>
   privateReceipt ? ReceiptType.ReadPrivate : ReceiptType.Read;
@@ -34,47 +35,15 @@ const getLatestReceiptTarget = (
   return undefined;
 };
 
-/**
- * The edit that ends a streamed reply: the server counts it as a new message,
- * so a receipt must reach it for the finished reply to count as read.
- * Undecrypted edits have no readable status yet and do not match.
- */
-export const isTerminalStreamEdit = (event: MatrixEvent | null | undefined): boolean => {
-  if (event?.getRelation()?.rel_type !== RelationType.Replace) return false;
-  const status = getStreamStatusFromContent(event.getContent());
-  return !!status && TERMINAL_STREAM_STATUSES.has(status);
-};
-
-const isThreadReplyReceiptTarget = (event: MatrixEvent, threadId: string): boolean => {
-  if (event.getId() === threadId || !eventBelongsToThread(event, threadId)) return false;
-  if (event.getRelation()?.rel_type === RelationType.Thread) return true;
-  // An edit of the root belongs to the main timeline.
-  return isTerminalStreamEdit(event) && event.getAssociatedId() !== threadId;
-};
-
-/**
- * Terminal edits the thread's timeline may lack: a reply's latest edit, which
- * the server bundles with the reply and backfills apply the same way, and the
- * edits an unopened thread buffers until it is shown.
- */
-const getTerminalEditsOutsideTimeline = (thread: Thread): MatrixEvent[] => [
-  ...[...thread.events, thread.replyToEvent].flatMap((reply) => {
-    const edit = reply && isThreadReplyReceiptTarget(reply, thread.id) && reply.replacingEvent();
-    return edit && isTerminalStreamEdit(edit) ? [edit] : [];
-  }),
-  ...getBufferedThreadRelations(thread).filter((event) =>
-    isThreadReplyReceiptTarget(event, thread.id)
-  ),
-];
-
 const getThreadReplyTarget = (thread: Thread): MatrixEvent | undefined => {
-  const isEligible = (event: MatrixEvent) => isThreadReplyReceiptTarget(event, thread.id);
-  // Before history is loaded, the SDK keeps the bundled latest reply outside events.
+  const isEligible = (event: MatrixEvent) => isThreadReceiptTarget(event, thread.id);
+  // Before history is loaded, the SDK keeps the bundled latest reply outside events,
+  // and the terminal edit of a reply can be outside them too.
   const replyToEvent = thread.replyToEvent;
   const candidates = [
     getLatestReceiptTarget(thread.events, null, isEligible),
     replyToEvent ? getLatestReceiptTarget([replyToEvent], null, isEligible) : undefined,
-    ...getTerminalEditsOutsideTimeline(thread),
+    getLatestTerminalEdit(thread),
   ];
   // A tie goes to the later candidate: the summary reply, or an edit over its reply.
   return candidates.reduce<MatrixEvent | undefined>(
@@ -118,12 +87,12 @@ const getLatestThreadReplyTarget = async (
   }
 
   const mappedReply = mx.getEventMapper()(latestReply);
-  if (mappedReply.isSending() || !isThreadReplyReceiptTarget(mappedReply, threadId)) {
+  if (mappedReply.isSending() || !isThreadReceiptTarget(mappedReply, threadId)) {
     const loadedThread = room.getThread(threadId);
     return loadedThread
       ? getThreadReplyTarget(loadedThread)
       : getLatestReceiptTarget(room.getLiveTimeline().getEvents(), null, (event) =>
-          isThreadReplyReceiptTarget(event, threadId)
+          isThreadReceiptTarget(event, threadId)
         );
   }
 

@@ -1,7 +1,7 @@
 import { createClient, MatrixEvent, ReceiptType, RelationType, Room } from 'matrix-js-sdk';
-import { FeatureSupport, Thread } from 'matrix-js-sdk/lib/models/thread';
+import { FeatureSupport, Thread, ThreadEvent } from 'matrix-js-sdk/lib/models/thread';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getThreadUnread } from '../threads/roomThreadList';
+import { getRoomThreadsUnread, getThreadUnread } from '../threads/roomThreadList';
 import { markMainTimelineAsRead, markRoomAndThreadsAsRead, markThreadAsRead } from './readReceipts';
 
 const ROOM_ID = '!receipts:example.org';
@@ -314,6 +314,43 @@ describe('thread receipt unread state with SDK models', () => {
     expect(requests).toHaveBeenLastCalledWith('POST', receiptPath('$reply'), undefined, {
       thread_id: '$root',
     });
+  });
+
+  it('shows a reply read mid-stream as unread once it finishes while the user is away', async () => {
+    const { room, thread } = await setupRoom();
+    syncThreadReceipt(room, '$reply', 3500);
+    expect(getThreadUnread(thread, USER_ID)).toBe(false);
+    const threadUpdated = vi.fn();
+    room.on(ThreadEvent.Update, threadUpdated);
+
+    await room.addLiveEvents([streamEdit('$completed', 4000, 'completed')], { addToState: false });
+
+    // The room overview recomputes its cards, sorting and filters on thread updates.
+    await vi.waitFor(() => expect(threadUpdated).toHaveBeenCalled());
+    expect(getRoomThreadsUnread(room.getThreads(), USER_ID).get('$root')).toBe(true);
+  });
+
+  it('shows a reply read mid-stream as unread when a reload brings its bundled finish', async () => {
+    const { room, thread } = await setupRoom({
+      replyEdit: rawStreamEdit('$completed', 4000, 'completed'),
+    });
+    syncThreadReceipt(room, '$reply', 3500);
+
+    expect(getThreadUnread(thread, USER_ID)).toBe(true);
+  });
+
+  it('reads a finished reply once a receipt reaches its terminal edit', async () => {
+    const { mx, thread } = await setupRoom();
+    thread.initialEventsFetched = true;
+    thread.addEvent(message('$reply', 3000, '$root'), false, false);
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(getThreadUnread(thread, USER_ID)).toBe(false);
+
+    thread.addEvent(streamEdit('$completed', 4000, 'completed'), false, false);
+    expect(getThreadUnread(thread, USER_ID)).toBe(true);
+
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(getThreadUnread(thread, USER_ID)).toBe(false);
   });
 
   it('rejects a receipt for a bundled reply that belongs to another thread', async () => {

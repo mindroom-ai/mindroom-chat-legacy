@@ -8,9 +8,12 @@
   The client must therefore acknowledge the terminal edit when the user watched the reply finish; otherwise a watched reply leaves an unread count.
 - Rule: a terminal edit (`io.mindroom.stream_status` in `m.new_content` is one of `TERMINAL_STREAM_STATUSES`) of a reply in the open thread is read when the thread view is at the bottom and at its live end and the window has focus, the same conditions under which a new reply arriving there is read.
   Unfocused, scrolled away, or another thread or room open: no receipt.
-- Change: `readReceipts.ts` adds `isTerminalStreamEdit`, and thread receipt targets now include terminal stream edits, so `markThreadAsRead` (and whole-room marking) cover the finished reply.
+  A reply read half-way that finishes while the user is away is unread again, in the client as on the server, until a receipt reaches its terminal edit.
+- Change: thread receipt targets in `readReceipts.ts` now include terminal stream edits (`isTerminalStreamEdit` in `roomThreadList.ts`), so `markThreadAsRead` (and whole-room marking) cover the finished reply.
   Other edits stay excluded, as before, and so does a terminal edit of the root, which belongs to the main timeline.
-  Targets also include terminal edits the thread's timeline lacks: a reply's latest edit (`replacingEvent()`), which the server bundles with the reply and backfills apply the same way, and the edits an unopened thread buffers (`getBufferedThreadRelations`, the SDK owner's accessor for `replayEvents`).
+  `getLatestTerminalEdit` also finds terminal edits the thread's timeline lacks: a reply's latest edit (`replacingEvent()`), which the server bundles with the reply and backfills apply the same way, and the edits an unopened thread buffers (`getBufferedThreadRelations`, the SDK owner's accessor for `replayEvents`).
+  `getThreadUnread` counts the newest terminal edit as activity from the same events, so compact thread cards, unread-first sorting, and the Threads page Unread and Needs attention filters show a reply that finished after the user's receipt as unread; a later reply from the user still reads it.
+  They recompute on the thread update the SDK emits when the edit arrives.
   The SDK takes a receipt's `thread_id` from its event, so `markThreadAsRead` gives a bundled edit, which has no thread of its own, its reply's thread before sending.
   `getThreadReadState` resolves a receipt on such an edit through the reply it replaces, so a thread read up to its finished reply stays read after a reload and on other devices.
   `timelineReadReceiptController.ts` runs the existing thread auto-mark when a reply in the open thread gets a terminal edit (`MatrixEventEvent.Replaced`, which covers live, decrypted, and bundled edits) while the timeline is at its live end and the viewport, measured then, is at the bottom (the debounced bottom state turns false a second late).
@@ -21,13 +24,15 @@
 - Tests: `timelineReadReceiptController.test.tsx` drives the hook through `Replaced`: each terminal status marks the open thread read; a streaming edit, a viewport scrolled away while the bottom state still says bottom, a timeline off its live end, another thread or room, an unfocused window, and focus lost before the frame send nothing; without an open thread nothing reads focus.
   With real SDK models it checks that a terminal edit added to the open thread and a refetched reply bundling its terminal edit both mark the thread read.
   `readReceipts.integration.test.ts` checks with real SDK models that a streaming edit is not a target and the terminal edit gets one thread receipt; that synchronized receipts on a summary reply's bundled edit and on a buffered edit leave the thread read and send nothing; that a loaded reply's bundled edit is targeted with the thread's `thread_id`; that thread and whole-room marking target a buffered edit; and that a root's terminal edit is never a thread target.
+  It also checks that a reply read mid-stream turns unread when its finish arrives while the user is away (with the thread update that refreshes the cards) or comes bundled after a reload, and that a receipt on the terminal edit reads it again; `roomThreadList.test.ts` checks that a later reply from the user reads an earlier finish.
   `readReceipts.test.ts` checks a private receipt targets the terminal edit.
-  Each new test fails against the PR's first revision, and each of 12 mutations of the new checks fails a test.
+  Each new test fails against the PR's first revision, and each of 16 mutations of the new checks fails a test.
   Live spec `e2e/live/stream-finish-receipt.spec.ts` against a disposable Tuwunel: the open thread's streamed reply finishes and the receipt for the terminal edit is accepted with the thread's `thread_id`, no receipt goes to the streaming edit, and with the window unfocused nothing is sent until focus returns.
+  A third reply read mid-stream that finishes while the user is in the room overview turns its card unread, and opening it sends a receipt for the terminal edit and clears the card; that part fails against the second revision.
 - Review round 1 (Opus 5.5, GPT-6.1 Sol, GPT-6 Astra) found receipts on unloaded terminal edits reading as unread after a reload (followed by a backwards receipt on the reply), bundled and buffered terminal edits never acknowledged, stale bottom state acknowledging a completion scrolled out of view, a hook test that asserted nothing, and per-event work with no thread open; all are fixed above.
   The live spec then exposed a frame race: a mark scheduled while focused ran after focus left and acknowledged the terminal edit that arrived in between (the first revision failed 4 of 4 runs on a loaded machine); the frame focus check fixes it.
 - Gaps: a terminal edit that is neither bundled nor buffered, such as one the server purged as superseded, resolves only once its thread loads.
-  A reply read mid-stream that finishes while the user is away counts as unread on the server, but `getThreadUnread` compares replies only, so its thread card shows it read.
+  The expanded timeline's `ThreadIndicator` computes its unread dot once per mount (its memo omits thread updates), so it shows any later reply or finish only after a remount; this predates the change.
 - Pairs with the Tuwunel change that counts a finished stream as a new message.
 
 ### Quiet the composer's buttons and show the Markdown state (2026-11-04)

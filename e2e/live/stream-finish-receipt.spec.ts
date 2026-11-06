@@ -31,7 +31,9 @@ const setWindowFocus = (page: Page, focused: boolean) =>
     document.dispatchEvent(new FocusEvent(value ? 'focusin' : 'focusout'));
   }, focused);
 
-test('reads a streamed reply that finishes in the open thread', async ({ page }) => {
+test('reads a streamed reply watched to the end, and one finished while away stays unread', async ({
+  page,
+}) => {
   test.skip(!hasPrimaryCredentials() || !getSecondaryCredentials(), 'Two Matrix accounts required');
   const homeserver = getHomeserver();
   const credentials = getPrimaryCredentials();
@@ -133,4 +135,21 @@ test('reads a streamed reply that finishes in the open thread', async ({ page })
   expect(receiptSent(unfocusedFinish)).toBeUndefined();
   await setWindowFocus(page, true);
   await expect.poll(() => !!receiptSent(unfocusedFinish)).toBe(true);
+
+  // A reply read half-way is unread again when it finishes while the user is
+  // away from the thread, and reading it to the end clears the card.
+  const thirdReply = await streamReply('Third thinking');
+  await expect(page.getByText('Third thinking')).toBeVisible();
+  await expect.poll(() => !!receiptSent(thirdReply)).toBe(true);
+  await page.goBack();
+  await expect(card).toBeVisible();
+  await expect(card).not.toHaveAttribute('data-thread-unread');
+  const awayFinish = await editReply(thirdReply, 'Third answer', 'completed');
+  await expect(card).toHaveAttribute('data-thread-unread', 'true');
+  await card.click();
+  await expect(page.getByText('Third answer')).toBeVisible();
+  await expect.poll(() => !!receiptSent(awayFinish)).toBe(true);
+  await page.goBack();
+  await expect(card).toBeVisible();
+  await expect(card).not.toHaveAttribute('data-thread-unread');
 });
