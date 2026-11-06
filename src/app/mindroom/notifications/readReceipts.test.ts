@@ -134,6 +134,41 @@ describe('markThreadAsRead', () => {
     expect(mx.sendReceipt).toHaveBeenCalledWith(reply, ReceiptType.Read, { thread_id: THREAD_ID });
   });
 
+  it('targets the terminal edit that ends a streamed reply', async () => {
+    const reply = makeThreadReplyEvent('$reply', 2);
+    const finish = new MatrixEvent({
+      ...makeMessageEvent('$finish', 3).event,
+      content: {
+        'm.relates_to': { rel_type: RelationType.Replace, event_id: '$reply' },
+        'm.new_content': {
+          msgtype: 'm.text',
+          body: 'Final reply',
+          'io.mindroom.stream_status': 'completed',
+        },
+      },
+    });
+    finish.setThreadId(THREAD_ID);
+    reply.makeReplaced(finish);
+    const room = {
+      ...makeRoom([]),
+      getThread: vi.fn(() => ({
+        id: THREAD_ID,
+        events: [reply, finish],
+        replyToEvent: reply,
+        getEventReadUpTo: vi.fn(() => reply.getId()),
+        getReadReceiptForUserId: vi.fn(() => null),
+        getLastUnthreadedReceiptFor: vi.fn(() => undefined),
+      })),
+    };
+    const mx = makeClient(room);
+
+    await markThreadAsRead(mx as never, ROOM_ID, THREAD_ID, true);
+
+    expect(mx.sendReceipt).toHaveBeenCalledWith(finish, ReceiptType.ReadPrivate, {
+      thread_id: THREAD_ID,
+    });
+  });
+
   it('does not fetch relations or send a receipt for a local thread id', async () => {
     const room = makeRoom([]);
     const mx = makeClient(room);

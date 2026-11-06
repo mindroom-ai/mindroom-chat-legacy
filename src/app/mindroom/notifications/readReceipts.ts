@@ -10,8 +10,12 @@ import {
 import { MAIN_ROOM_TIMELINE } from 'matrix-js-sdk/lib/@types/read_receipts';
 import { isThreadOnlyRoomActivity } from '../threads/threadRenderUtils';
 import { isLocalEchoEventId } from '../threads/threadRouteUtils';
-import { eventBelongsToThread } from '../threads/threadUtils';
-import { getThreadReadState } from '../threads/roomThreadList';
+import {
+  getLatestTerminalEdit,
+  getThreadReadState,
+  isTerminalStreamEdit,
+  isThreadReceiptTarget,
+} from '../threads/roomThreadList';
 
 const getReceiptType = (privateReceipt: boolean): ReceiptType =>
   privateReceipt ? ReceiptType.ReadPrivate : ReceiptType.Read;
@@ -32,22 +36,34 @@ const getLatestReceiptTarget = (
   return undefined;
 };
 
-const isThreadReplyReceiptTarget = (event: MatrixEvent, threadId: string): boolean =>
-  event.getId() !== threadId &&
-  eventBelongsToThread(event, threadId) &&
-  event.getRelation()?.rel_type === RelationType.Thread;
+/**
+ * The order of two events of a thread: by timestamp, and within one millisecond
+ * by the thread timeline when it holds both; otherwise unknown (0).
+ */
+const compareThreadEvents = (thread: Thread, a: MatrixEvent, b: MatrixEvent): number => {
+  const byTs = a.getTs() - b.getTs();
+  if (byTs !== 0 || a.getId() === b.getId()) return byTs;
+  const indexA = thread.events.findIndex((event) => event.getId() === a.getId());
+  const indexB = thread.events.findIndex((event) => event.getId() === b.getId());
+  return indexA >= 0 && indexB >= 0 ? indexA - indexB : 0;
+};
 
 const getThreadReplyTarget = (thread: Thread): MatrixEvent | undefined => {
-  const isEligible = (event: MatrixEvent) => isThreadReplyReceiptTarget(event, thread.id);
-  const loadedReply = getLatestReceiptTarget(thread.events, null, isEligible);
-  // Before history is loaded, the SDK keeps the bundled latest reply outside events.
+  const isEligible = (event: MatrixEvent) => isThreadReceiptTarget(event, thread.id);
+  // Before history is loaded, the SDK keeps the bundled latest reply outside events,
+  // and the terminal edit of a reply can be outside them too.
   const replyToEvent = thread.replyToEvent;
-  const summaryReply = replyToEvent
-    ? getLatestReceiptTarget([replyToEvent], null, isEligible)
-    : undefined;
-  return summaryReply && (!loadedReply || summaryReply.getTs() >= loadedReply.getTs())
-    ? summaryReply
-    : loadedReply;
+  const candidates = [
+    getLatestReceiptTarget(thread.events, null, isEligible),
+    replyToEvent ? getLatestReceiptTarget([replyToEvent], null, isEligible) : undefined,
+    getLatestTerminalEdit(thread),
+  ];
+  // A tie of unknown order goes to the later candidate: the summary reply, or an edit.
+  return candidates.reduce<MatrixEvent | undefined>(
+    (latest, event) =>
+      event && (!latest || compareThreadEvents(thread, event, latest) >= 0) ? event : latest,
+    undefined
+  );
 };
 
 const getLatestThreadReplyTarget = async (
@@ -85,16 +101,26 @@ const getLatestThreadReplyTarget = async (
   }
 
   const mappedReply = mx.getEventMapper()(latestReply);
-  if (mappedReply.isSending() || !isThreadReplyReceiptTarget(mappedReply, threadId)) {
+  if (mappedReply.isSending() || !isThreadReceiptTarget(mappedReply, threadId)) {
     const loadedThread = room.getThread(threadId);
     return loadedThread
       ? getThreadReplyTarget(loadedThread)
       : getLatestReceiptTarget(room.getLiveTimeline().getEvents(), null, (event) =>
-          isThreadReplyReceiptTarget(event, threadId)
+          isThreadReceiptTarget(event, threadId)
         );
   }
 
-  return mappedReply;
+  // The server bundles the reply's latest edit, which may have finished it.
+  const edit = mappedReply.replacingEvent();
+  return edit && isTerminalStreamEdit(edit) ? edit : mappedReply;
+};
+
+/**
+ * The SDK builds the receipt's path from the event's room, which an edit the
+ * server bundled with its reply does not carry.
+ */
+const ensureEventRoom = (event: MatrixEvent, roomId: string) => {
+  if (!event.getRoomId()) event.event.room_id = roomId;
 };
 
 export async function markMainTimelineAsRead(
@@ -135,6 +161,10 @@ export async function markThreadAsRead(
   const latestReply = await getLatestThreadReplyTarget(mx, room, threadId);
   if (!latestReply) return;
 
+  // The SDK takes the receipt's thread_id from the event, and an edit bundled
+  // with its reply has no thread of its own.
+  if (latestReply.threadRootId !== threadId) latestReply.setThreadId(threadId);
+  ensureEventRoom(latestReply, room.roomId);
   await mx.sendReceipt(latestReply, getReceiptType(privateReceipt), {
     thread_id: threadId,
   });
@@ -157,5 +187,6 @@ export async function markRoomAndThreadsAsRead(
   }
   if (!latestEvent) return;
 
+  ensureEventRoom(latestEvent, room.roomId);
   await mx.sendReadReceipt(latestEvent, getReceiptType(privateReceipt), true);
 }

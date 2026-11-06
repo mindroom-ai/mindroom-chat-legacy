@@ -1,11 +1,14 @@
 /* eslint-disable no-console */
 
 import { Direction } from 'matrix-js-sdk/lib/models/event-timeline';
+import { RelationType } from 'matrix-js-sdk/lib/@types/event';
 import { ReceiptType } from 'matrix-js-sdk/lib/@types/read_receipts';
 import type { MatrixEvent } from 'matrix-js-sdk';
 import type { Room } from 'matrix-js-sdk/lib/models/room';
 import { Thread } from 'matrix-js-sdk/lib/models/thread';
-import { isVisibleThreadReplyEvent } from './threadUtils';
+import { getStreamStatusFromContent, TERMINAL_STREAM_STATUSES } from '../messages/aiRun';
+import { getBufferedThreadRelations } from './sdk/threadBootstrapSdk';
+import { eventBelongsToThread, isVisibleThreadReplyEvent } from './threadUtils';
 
 /** A thread that has not loaded its latest page knows its newest reply from the root's summary. */
 export const getLatestVisibleReply = (thread: Thread): MatrixEvent | undefined => {
@@ -23,12 +26,81 @@ export const getLatestVisibleReply = (thread: Thread): MatrixEvent | undefined =
   return loaded && loaded.getTs() >= summary.getTs() ? loaded : summary;
 };
 
-const findThreadReceiptEvent = (thread: Thread, eventId: string): MatrixEvent | undefined => {
-  const timelineEvent = thread.events?.find((event) => event.getId() === eventId);
-  if (timelineEvent) return timelineEvent;
-  if (thread.replyToEvent?.getId?.() === eventId) return thread.replyToEvent;
-  if (thread.rootEvent?.getId?.() === eventId) return thread.rootEvent;
-  return undefined;
+/**
+ * The edit that ends a streamed reply. The server counts it as a new message,
+ * so a reply read half-way is unread again until a receipt reaches this edit.
+ * Undecrypted edits have no readable status yet and do not match.
+ */
+export const isTerminalStreamEdit = (event: MatrixEvent | null | undefined): boolean => {
+  if (event?.getRelation()?.rel_type !== RelationType.Replace) return false;
+  const status = getStreamStatusFromContent(event.getContent());
+  return !!status && TERMINAL_STREAM_STATUSES.has(status);
+};
+
+/** A reply in the thread, or the terminal edit of one: the events a thread receipt reads. */
+export const isThreadReceiptTarget = (event: MatrixEvent, threadId: string): boolean => {
+  if (event.getId() === threadId || !eventBelongsToThread(event, threadId)) return false;
+  if (event.getRelation()?.rel_type === RelationType.Thread) return true;
+  // An edit of the root belongs to the main timeline.
+  return isTerminalStreamEdit(event) && event.getAssociatedId() !== threadId;
+};
+
+/**
+ * The newest terminal edit of a reply, wherever the thread keeps it: in its
+ * timeline, as a reply's latest edit (which the server bundles with the reply
+ * and backfills apply the same way), or buffered while the thread is unopened.
+ */
+export const getLatestTerminalEdit = (thread: Thread): MatrixEvent | undefined => {
+  let latest: MatrixEvent | undefined;
+  // Newest first, so most events cost a timestamp check; a tie goes to the later
+  // place: buffered, then the summary reply, then the timeline, an edit over its reply.
+  const consider = (edit: MatrixEvent | null | undefined, event: MatrixEvent) => {
+    if (!edit || (latest && edit.getTs() <= latest.getTs())) return;
+    if (isTerminalStreamEdit(edit) && isThreadReceiptTarget(event, thread.id)) latest = edit;
+  };
+  const buffered = getBufferedThreadRelations(thread);
+  for (let index = buffered.length - 1; index >= 0; index -= 1) {
+    consider(buffered[index], buffered[index]);
+  }
+  const events = [...(thread.events ?? []), thread.replyToEvent];
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event) {
+      consider(event.replacingEvent?.(), event);
+      consider(event, event);
+    }
+  }
+  return latest;
+};
+
+/**
+ * The event a thread receipt names, with the thread it belongs to.
+ * A receipt on the edit that ended a streamed reply counts through that reply,
+ * whose latest edit the server bundles; an unopened thread buffers live edits.
+ */
+const findThreadReceiptEvent = (
+  thread: Thread,
+  eventId: string
+): { event: MatrixEvent; threadRootId: string | undefined } | undefined => {
+  const match = (event: MatrixEvent | null | undefined) => {
+    if (!event) return undefined;
+    if (event.getId?.() === eventId) return { event, threadRootId: event.threadRootId };
+    const edit = event.replacingEvent?.();
+    return edit?.getId() === eventId
+      ? { event: edit, threadRootId: event.threadRootId }
+      : undefined;
+  };
+  // Receipts mostly name recent events.
+  const events = thread.events ?? [];
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const found = match(events[index]);
+    if (found) return found;
+  }
+  return (
+    match(thread.replyToEvent) ??
+    match(thread.rootEvent) ??
+    match(getBufferedThreadRelations(thread).find((event) => event.getId() === eventId))
+  );
 };
 
 export const getThreadReadState = (
@@ -52,11 +124,11 @@ export const getThreadReadState = (
   const validReadEventIds = new Set<string>();
   for (const eventId of readEventIds) {
     if (!eventId) continue;
-    const event = findThreadReceiptEvent(thread, eventId);
+    const found = findThreadReceiptEvent(thread, eventId);
     // Preserve the SDK's consistency check for raw receipt targets.
-    if (!event || (eventId !== readUpToId && event.threadRootId !== thread.id)) continue;
+    if (!found || (eventId !== readUpToId && found.threadRootId !== thread.id)) continue;
     validReadEventIds.add(eventId);
-    const eventTs = event.getTs();
+    const eventTs = found.event.getTs();
     if (readUpToTs === undefined || eventTs > readUpToTs) {
       readUpToTs = eventTs;
     }
@@ -68,14 +140,19 @@ export const getThreadLastActivityTs = (thread: Thread): number =>
   getLatestVisibleReply(thread)?.getTs() ?? thread.rootEvent?.getTs() ?? 0;
 
 /**
- * A thread is unread when its latest reply is from another user and newer than
- * the user's thread or unthreaded receipt; a main-timeline receipt reads no replies.
+ * A thread is unread when its latest reply, or a later terminal edit of a reply,
+ * is from another user and newer than the user's thread or unthreaded receipt;
+ * a main-timeline receipt reads no replies. A reply read half-way is unread
+ * again once it finishes, as the server counts it.
  */
 export const getThreadUnread = (thread: Thread, userId: string): boolean => {
   const latestReply = getLatestVisibleReply(thread);
-  if (!latestReply || latestReply.getSender() === userId) return false;
+  const finish = getLatestTerminalEdit(thread);
+  const latest =
+    finish && (!latestReply || finish.getTs() >= latestReply.getTs()) ? finish : latestReply;
+  if (!latest || latest.getSender() === userId) return false;
   const readUpToTs = getThreadReadState(thread, userId)?.readUpToTs;
-  return readUpToTs === undefined || latestReply.getTs() > readUpToTs;
+  return readUpToTs === undefined || latest.getTs() > readUpToTs;
 };
 
 /**

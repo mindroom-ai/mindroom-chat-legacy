@@ -11,6 +11,11 @@ export const hasLoadedFirstThreadPage = (
   thread: Partial<Pick<Thread, 'initialEventsFetched'>>
 ): boolean => thread.initialEventsFetched === true;
 
+/** The edits and reactions an unopened thread holds back until it is shown. */
+export const getBufferedThreadRelations = (
+  thread: Partial<Pick<Thread, 'replayEvents'>>
+): readonly MatrixEvent[] => thread.replayEvents ?? [];
+
 /** Caller supplies an identified root and retains the subsequent server bootstrap. */
 export function createInitializedThreadForRoot(room: Room, root: MatrixEvent): Thread {
   const thread = room.createThread(root.getId()!, root, [], false);

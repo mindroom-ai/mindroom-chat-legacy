@@ -1,12 +1,13 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
 } from 'react';
-import { Direction } from 'matrix-js-sdk';
-import type { MatrixClient, Room } from 'matrix-js-sdk';
+import { Direction, MatrixEventEvent } from 'matrix-js-sdk';
+import type { MatrixClient, MatrixEvent, Room } from 'matrix-js-sdk';
 import {
   getIntersectionObserverEntry,
   useIntersectionObserver,
@@ -18,11 +19,10 @@ import {
   markRoomAndThreadsAsRead,
   markThreadAsRead,
 } from '../notifications/readReceipts';
-import {
-  getEventTimeline,
-  getFirstLinkedTimeline,
-} from './timelinePagination';
+import { isTerminalStreamEdit } from './roomThreadList';
+import { getEventTimeline, getFirstLinkedTimeline } from './timelinePagination';
 import type { ThreadInitialRenderMode } from './threadRenderUtils';
+import { eventBelongsToThread } from './threadUtils';
 
 type RoomUnreadInfoLike = {
   inLiveTimeline: boolean;
@@ -85,6 +85,17 @@ export const useTimelineReadReceiptController = ({
     }
   }, [hideActivity, mx, readUptoEventIdRef, room]);
 
+  // Replaced when the thread view goes away, so marks scheduled before then send nothing.
+  const threadViewRef = useRef({});
+  // Whether the bottom anchor is in view now; the bottom state turns false a second late.
+  const anchorInViewRef = useRef(true);
+  useEffect(
+    () => () => {
+      threadViewRef.current = {};
+    },
+    [room.roomId, threadId]
+  );
+
   const tryAutoMarkThreadAsRead = useCallback(() => {
     if (
       !threadId ||
@@ -95,8 +106,22 @@ export const useTimelineReadReceiptController = ({
       return;
     }
 
-    requestAnimationFrame(() => markThreadAsRead(mx, room.roomId, threadId, hideActivity));
+    // The receipt names the newest reply when the frame runs; one that arrives
+    // after the window lost focus, the user left the thread or its live end, or
+    // the bottom left the viewport has not been seen.
+    const view = threadViewRef.current;
+    requestAnimationFrame(() => {
+      if (
+        view === threadViewRef.current &&
+        anchorInViewRef.current &&
+        atLiveEndRef.current &&
+        document.hasFocus()
+      ) {
+        markThreadAsRead(mx, room.roomId, threadId, hideActivity);
+      }
+    });
   }, [
+    atLiveEndRef,
     hideActivity,
     mx,
     room.roomId,
@@ -106,10 +131,36 @@ export const useTimelineReadReceiptController = ({
     threadTailLoaded,
   ]);
 
+  // A streamed reply that finishes while the user watches the open thread's live
+  // end, with the window focused, is read, like a reply arriving there.
+  // The edit that ends it replaces the reply's content whether it arrives live,
+  // is decrypted later, or comes bundled with a refetched reply.
+  // The main timeline needs no extra rule: it already marks every live event
+  // there, edits included, while the user follows it.
+  useEffect(() => {
+    if (!threadId) return undefined;
+    const handleReplaced = (event: MatrixEvent) => {
+      if (
+        event.getRoomId() === room.roomId &&
+        eventBelongsToThread(event, threadId) &&
+        isTerminalStreamEdit(event.replacingEvent())
+      ) {
+        tryAutoMarkThreadAsRead();
+      }
+    };
+    mx.on(MatrixEventEvent.Replaced, handleReplaced);
+    return () => {
+      mx.removeListener(MatrixEventEvent.Replaced, handleReplaced);
+    };
+  }, [mx, room.roomId, threadId, tryAutoMarkThreadAsRead]);
+
   const debounceSetAtBottom = useDebounce(
-    useCallback((entry: IntersectionObserverEntry) => {
-      if (!entry.isIntersecting) setAtBottom(false);
-    }, [setAtBottom]),
+    useCallback(
+      (entry: IntersectionObserverEntry) => {
+        if (!entry.isIntersecting) setAtBottom(false);
+      },
+      [setAtBottom]
+    ),
     { wait: 1000 }
   );
 
@@ -119,7 +170,10 @@ export const useTimelineReadReceiptController = ({
         const target = atBottomAnchorRef.current;
         if (!target) return;
         const targetEntry = getIntersectionObserverEntry(target, entries);
-        if (targetEntry) debounceSetAtBottom(targetEntry);
+        if (targetEntry) {
+          debounceSetAtBottom(targetEntry);
+          anchorInViewRef.current = targetEntry.isIntersecting;
+        }
         if (targetEntry?.isIntersecting && atLiveEndRef.current) {
           setAtBottom(true);
           if (document.hasFocus()) {

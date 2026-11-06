@@ -585,6 +585,31 @@ describe('thread visibility helpers', () => {
     expect(getThreadUnread(thread, '@self:example.org')).toBe(false);
   });
 
+  it('lets a later reply from the user read an earlier finished reply', () => {
+    const finish = {
+      getAssociatedId: () => '$agent-reply',
+      getContent: () => ({ 'm.new_content': { 'io.mindroom.stream_status': 'completed' } }),
+      getId: () => '$finish',
+      getRelation: () => ({ event_id: '$agent-reply', rel_type: 'm.replace' }),
+      getSender: () => '@agent:example.org',
+      getTs: () => 400,
+      threadRootId: '$root',
+    };
+    const agentReply = {
+      ...makeThreadReplyEvent('$agent-reply', 300, '@agent:example.org'),
+      replacingEvent: () => finish,
+    };
+    const ownReply = makeThreadReplyEvent('$own-reply', 500, '@self:example.org');
+    const thread = {
+      id: '$root',
+      events: [agentReply, ownReply],
+      replyToEvent: ownReply,
+      rootEvent: { getTs: () => 100 },
+    } as never;
+
+    expect(getThreadUnread(thread, '@self:example.org')).toBe(false);
+  });
+
   it('uses the thread-scoped read receipt', () => {
     const visibleReply = makeThreadReplyEvent('$reply-visible', 300, '@other:example.org');
     const thread = {
