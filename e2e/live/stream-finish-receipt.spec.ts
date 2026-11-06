@@ -18,6 +18,87 @@ import {
 
 const STREAM_STATUS = 'io.mindroom.stream_status';
 
+/** A room where an agent streams thread replies to a question from the reader. */
+const setupStreamRoom = async (name: string) => {
+  const homeserver = getHomeserver();
+  const credentials = getPrimaryCredentials();
+  const secondCredentials = getSecondaryCredentials()!;
+  const reader = await loginToMatrix(homeserver, credentials.username, credentials.password);
+  const agent = await loginToMatrix(
+    homeserver,
+    secondCredentials.username,
+    secondCredentials.password
+  );
+  const stamp = Date.now();
+  const roomName = `${name} ${stamp}`;
+  const roomId = await createPrivateRoom(homeserver, reader.accessToken, {
+    name: roomName,
+    topic: 'Streamed reply read receipt regression fixture.',
+    invite: [agent.userId],
+  });
+  await joinRoom(homeserver, agent.accessToken, roomId);
+  const send = (accessToken: string, content: Record<string, unknown>) =>
+    sendRoomMessage(homeserver, accessToken, roomId, content);
+  const threadReply = (
+    rootId: string,
+    body: string,
+    accessToken: string,
+    extra: Record<string, unknown> = {}
+  ) =>
+    send(accessToken, {
+      msgtype: 'm.text',
+      body,
+      ...extra,
+      'm.relates_to': {
+        rel_type: 'm.thread',
+        event_id: rootId,
+        is_falling_back: true,
+        'm.in_reply_to': { event_id: rootId },
+      },
+    });
+  const readReply = (rootId: string, eventId: string) =>
+    matrixFetch(
+      homeserver,
+      `/rooms/${encodeURIComponent(roomId)}/receipt/m.read/${encodeURIComponent(eventId)}`,
+      {
+        method: 'POST',
+        accessToken: reader.accessToken,
+        body: JSON.stringify({ thread_id: rootId }),
+      }
+    );
+  /** A thread whose reader has already sent a threaded receipt. */
+  const startThread = async (question: string) => {
+    const rootId = await send(reader.accessToken, { msgtype: 'm.text', body: question });
+    // A prior threaded receipt keeps the SDK from treating later replies as read by a legacy client.
+    await readReply(rootId, await threadReply(rootId, 'Please answer', reader.accessToken));
+    return rootId;
+  };
+  const streamReply = (rootId: string, body: string) =>
+    threadReply(rootId, body, agent.accessToken, { [STREAM_STATUS]: 'streaming' });
+  // MindRoom sends the stream status both inside and outside the replacement content.
+  const editReply = (replyId: string, body: string, status: string) =>
+    send(agent.accessToken, {
+      msgtype: 'm.text',
+      body: `* ${body}`,
+      [STREAM_STATUS]: status,
+      'm.new_content': { msgtype: 'm.text', body, [STREAM_STATUS]: status },
+      'm.relates_to': { rel_type: 'm.replace', event_id: replyId },
+    });
+  return {
+    agent,
+    credentials,
+    editReply,
+    homeserver,
+    reader,
+    readReply,
+    roomId,
+    roomName,
+    send,
+    startThread,
+    streamReply,
+  };
+};
+
 const receiptFor = (eventId: string, threadId: string) => (request: Request) =>
   request.method() === 'POST' &&
   /\/receipt\/m\.read(\.private)?\//.test(request.url()) &&
@@ -35,59 +116,10 @@ test('reads a streamed reply watched to the end, and one finished while away sta
   page,
 }) => {
   test.skip(!hasPrimaryCredentials() || !getSecondaryCredentials(), 'Two Matrix accounts required');
-  const homeserver = getHomeserver();
-  const credentials = getPrimaryCredentials();
-  const secondCredentials = getSecondaryCredentials()!;
-  const reader = await loginToMatrix(homeserver, credentials.username, credentials.password);
-  const agent = await loginToMatrix(
-    homeserver,
-    secondCredentials.username,
-    secondCredentials.password
-  );
-  const stamp = Date.now();
-  const roomName = `Stream finish receipts ${stamp}`;
-  const roomId = await createPrivateRoom(homeserver, reader.accessToken, {
-    name: roomName,
-    topic: 'Streamed reply read receipt regression fixture.',
-    invite: [agent.userId],
-  });
-  await joinRoom(homeserver, agent.accessToken, roomId);
-  const rootId = await sendRoomMessage(homeserver, reader.accessToken, roomId, {
-    msgtype: 'm.text',
-    body: `Question ${stamp}`,
-  });
-  const threadReply = (body: string, accessToken: string, extra: Record<string, unknown> = {}) =>
-    sendRoomMessage(homeserver, accessToken, roomId, {
-      msgtype: 'm.text',
-      body,
-      ...extra,
-      'm.relates_to': {
-        rel_type: 'm.thread',
-        event_id: rootId,
-        is_falling_back: true,
-        'm.in_reply_to': { event_id: rootId },
-      },
-    });
-  // A prior threaded receipt keeps the SDK from treating later replies as read by a legacy client.
-  const readerReply = await threadReply('Please answer', reader.accessToken);
-  await matrixFetch(
-    homeserver,
-    `/rooms/${encodeURIComponent(roomId)}/receipt/m.read/${encodeURIComponent(readerReply)}`,
-    {
-      method: 'POST',
-      accessToken: reader.accessToken,
-      body: JSON.stringify({ thread_id: rootId }),
-    }
-  );
-  const streamReply = (body: string) =>
-    threadReply(body, agent.accessToken, { [STREAM_STATUS]: 'streaming' });
-  const editReply = (replyId: string, body: string, status: string) =>
-    sendRoomMessage(homeserver, agent.accessToken, roomId, {
-      msgtype: 'm.text',
-      body: `* ${body}`,
-      'm.new_content': { msgtype: 'm.text', body, [STREAM_STATUS]: status },
-      'm.relates_to': { rel_type: 'm.replace', event_id: replyId },
-    });
+  const { credentials, editReply, homeserver, reader, roomId, roomName, startThread, ...fixture } =
+    await setupStreamRoom('Stream finish receipts');
+  const rootId = await startThread(`Question ${Date.now()}`);
+  const streamReply = (body: string) => fixture.streamReply(rootId, body);
 
   await loginWithPassword(page, { homeserver, ...credentials });
   await expectLoggedInShellStable(page);
@@ -154,4 +186,81 @@ test('reads a streamed reply watched to the end, and one finished while away sta
   await page.goBack();
   await expect(card).toBeVisible();
   await expect(card).not.toHaveAttribute('data-thread-unread');
+});
+
+test('reads a reply finished elsewhere that this device knows only as a bundled edit', async ({
+  page,
+}) => {
+  test.skip(!hasPrimaryCredentials() || !getSecondaryCredentials(), 'Two Matrix accounts required');
+  const {
+    agent,
+    credentials,
+    editReply,
+    homeserver,
+    reader,
+    readReply,
+    roomId,
+    roomName,
+    send,
+    startThread,
+    streamReply,
+  } = await setupStreamRoom('Bundled stream finish');
+  // The reader read each reply mid-stream on another device, and it finished while away.
+  const finishWhileAway = async (rootId: string, answer: string) => {
+    const replyId = await streamReply(rootId, 'Thinking');
+    await editReply(replyId, 'Partial answer', 'streaming');
+    await readReply(rootId, replyId);
+    return editReply(replyId, answer, 'completed');
+  };
+  const olderRoot = await startThread('Older question');
+  const olderFinish = await finishWhileAway(olderRoot, 'Older answer');
+  // Push the older thread out of the first sync, so its finish is known only bundled with its reply.
+  for (let index = 0; index < 25; index += 1) {
+    await send(agent.accessToken, { msgtype: 'm.text', body: `Filler ${index}` });
+  }
+  const newerRoot = await startThread('Newer question');
+  const newerFinish = await finishWhileAway(newerRoot, 'Newer answer');
+
+  const receipts: Request[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/receipt/')) receipts.push(request);
+  });
+  const receiptResponse = async (eventId: string) => {
+    const request = receipts.find(
+      (entry) =>
+        entry.url().includes(`/rooms/${encodeURIComponent(roomId)}/receipt/`) &&
+        entry.url().endsWith(`/${encodeURIComponent(eventId)}`)
+    );
+    return (await request?.response())?.status();
+  };
+
+  await loginWithPassword(page, { homeserver, ...credentials });
+  await expectLoggedInShellStable(page);
+  await seedRoomOverviewState({
+    page,
+    roomId,
+    userId: reader.userId,
+    viewMode: 'compact',
+    filterState: createDefaultThreadFilterState(),
+  });
+  const roomLink = page.getByRole('link', { name: roomName }).first();
+  await roomLink.click();
+  const olderCard = page.locator(`[data-thread-root-id="${olderRoot}"]`);
+  const newerCard = page.locator(`[data-thread-root-id="${newerRoot}"]`);
+  await expect(olderCard).toHaveAttribute('data-thread-unread', 'true');
+  await expect(newerCard).toHaveAttribute('data-thread-unread', 'true');
+
+  // Opening the thread reads its finish.
+  await olderCard.click();
+  await expect(page.getByText('Older answer')).toBeVisible();
+  await expect.poll(() => receiptResponse(olderFinish)).toBe(200);
+  await page.goBack();
+  await expect(olderCard).toBeVisible();
+  await expect(olderCard).not.toHaveAttribute('data-thread-unread');
+
+  // Marking the room read reads the newest finish.
+  await roomLink.click({ button: 'right' });
+  await page.getByRole('button', { name: 'Mark as Read', exact: true }).click();
+  await expect.poll(() => receiptResponse(newerFinish)).toBe(200);
+  await expect(newerCard).not.toHaveAttribute('data-thread-unread');
 });
