@@ -21,7 +21,6 @@ import {
 } from '../notifications/readReceipts';
 import { isTerminalStreamEdit } from './roomThreadList';
 import { getEventTimeline, getFirstLinkedTimeline } from './timelinePagination';
-import { isScrollNearBottom } from './timelineScrollUtils';
 import type { ThreadInitialRenderMode } from './threadRenderUtils';
 import { eventBelongsToThread } from './threadUtils';
 
@@ -35,9 +34,6 @@ type OpenEventHandler = (
   highlight?: boolean,
   onScroll?: (scrolled: boolean) => void
 ) => void | Promise<void>;
-
-// The bottom anchor counts as in view within this distance of the viewport.
-const AT_BOTTOM_MARGIN_PX = 100;
 
 export const useTimelineReadReceiptController = ({
   atBottom,
@@ -89,9 +85,10 @@ export const useTimelineReadReceiptController = ({
     }
   }, [hideActivity, mx, readUptoEventIdRef, room]);
 
-  // Replaced when the thread view goes away or the user stops watching a reply
-  // finish, so marks scheduled before then do not read what the user missed.
+  // Replaced when the thread view goes away, so marks scheduled before then send nothing.
   const threadViewRef = useRef({});
+  // Whether the bottom anchor is in view now; the bottom state turns false a second late.
+  const anchorInViewRef = useRef(true);
   useEffect(
     () => () => {
       threadViewRef.current = {};
@@ -110,11 +107,16 @@ export const useTimelineReadReceiptController = ({
     }
 
     // The receipt names the newest reply when the frame runs; one that arrives
-    // after the window lost focus, the user left the thread, or the user stopped
-    // watching a finish has not been seen.
+    // after the window lost focus, the user left the thread or its live end, or
+    // the bottom left the viewport has not been seen.
     const view = threadViewRef.current;
     requestAnimationFrame(() => {
-      if (view === threadViewRef.current && atLiveEndRef.current && document.hasFocus()) {
+      if (
+        view === threadViewRef.current &&
+        anchorInViewRef.current &&
+        atLiveEndRef.current &&
+        document.hasFocus()
+      ) {
         markThreadAsRead(mx, room.roomId, threadId, hideActivity);
       }
     });
@@ -139,35 +141,18 @@ export const useTimelineReadReceiptController = ({
     if (!threadId) return undefined;
     const handleReplaced = (event: MatrixEvent) => {
       if (
-        event.getRoomId() !== room.roomId ||
-        !eventBelongsToThread(event, threadId) ||
-        !isTerminalStreamEdit(event.replacingEvent()) ||
-        !atLiveEndRef.current
-      ) {
-        return;
-      }
-      // The bottom state turns false a second late, so measure the viewport now,
-      // before the finished content renders.
-      const scrollElement = getScrollElement();
-      if (
-        scrollElement &&
-        isScrollNearBottom({
-          scrollHeight: scrollElement.scrollHeight,
-          scrollTop: scrollElement.scrollTop,
-          clientHeight: scrollElement.clientHeight,
-          thresholdPx: AT_BOTTOM_MARGIN_PX,
-        })
+        event.getRoomId() === room.roomId &&
+        eventBelongsToThread(event, threadId) &&
+        isTerminalStreamEdit(event.replacingEvent())
       ) {
         tryAutoMarkThreadAsRead();
-      } else {
-        threadViewRef.current = {};
       }
     };
     mx.on(MatrixEventEvent.Replaced, handleReplaced);
     return () => {
       mx.removeListener(MatrixEventEvent.Replaced, handleReplaced);
     };
-  }, [atLiveEndRef, getScrollElement, mx, room.roomId, threadId, tryAutoMarkThreadAsRead]);
+  }, [mx, room.roomId, threadId, tryAutoMarkThreadAsRead]);
 
   const debounceSetAtBottom = useDebounce(
     useCallback(
@@ -185,7 +170,10 @@ export const useTimelineReadReceiptController = ({
         const target = atBottomAnchorRef.current;
         if (!target) return;
         const targetEntry = getIntersectionObserverEntry(target, entries);
-        if (targetEntry) debounceSetAtBottom(targetEntry);
+        if (targetEntry) {
+          debounceSetAtBottom(targetEntry);
+          anchorInViewRef.current = targetEntry.isIntersecting;
+        }
         if (targetEntry?.isIntersecting && atLiveEndRef.current) {
           setAtBottom(true);
           if (document.hasFocus()) {
@@ -210,7 +198,7 @@ export const useTimelineReadReceiptController = ({
     useCallback(
       () => ({
         root: getScrollElement(),
-        rootMargin: `${AT_BOTTOM_MARGIN_PX}px`,
+        rootMargin: '100px',
       }),
       [getScrollElement]
     ),

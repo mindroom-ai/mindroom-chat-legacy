@@ -6,6 +6,7 @@ import { act, create } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { markThreadAsRead } from '../notifications/readReceipts';
 import { useTimelineReadReceiptController } from './timelineReadReceiptController';
+import { useThreadRenderState } from './useThreadRenderState';
 
 vi.mock('../notifications/readReceipts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../notifications/readReceipts')>()),
@@ -65,10 +66,12 @@ const makeEmitter = () => {
 };
 
 let hasFocus = true;
+let reportIntersection: (entries: IntersectionObserverEntry[]) => void = () => undefined;
 
 beforeEach(() => {
   hasFocus = true;
   vi.mocked(markThreadAsRead).mockClear();
+  vi.stubGlobal('window', { clearTimeout, setTimeout });
   vi.stubGlobal('document', {
     addEventListener: vi.fn(),
     hasFocus: vi.fn(() => hasFocus),
@@ -77,6 +80,10 @@ beforeEach(() => {
   vi.stubGlobal(
     'IntersectionObserver',
     class {
+      constructor(callback: (entries: IntersectionObserverEntry[]) => void) {
+        reportIntersection = callback;
+      }
+
       disconnect = vi.fn();
 
       observe = vi.fn();
@@ -96,28 +103,30 @@ afterEach(() => {
 
 type ViewOptions = {
   atLiveEnd?: boolean;
-  distanceFromBottom?: number;
+  scrolledAway?: boolean;
   threadOpen?: boolean;
 };
+
+const anchor = {} as HTMLElement;
+
+// The observer reports the bottom anchor leaving the viewport at once; the bottom
+// state follows a second later.
+const scrollAway = () =>
+  act(() => reportIntersection([{ isIntersecting: false, target: anchor } as never]));
 
 const renderController = (
   mx: MatrixClient,
   room: RoomModel,
-  { atLiveEnd = true, distanceFromBottom = 0, threadOpen = true }: ViewOptions = {}
+  { atLiveEnd = true, scrolledAway = false, threadOpen = true }: ViewOptions = {}
 ) => {
-  const scrollElement = {
-    clientHeight: 500,
-    scrollHeight: 2000,
-    scrollTop: 1500 - distanceFromBottom,
-  } as HTMLElement;
   // Stable props, as the timeline passes them; new refs each render would loop the observer.
   const props = {
     atBottom: true,
-    atBottomAnchorRef: { current: null },
+    atBottomAnchorRef: { current: anchor },
     // The debounced bottom state still says bottom for a second after the user scrolls away.
     atBottomRef: { current: true },
     atLiveEndRef: { current: atLiveEnd },
-    getScrollElement: () => scrollElement,
+    getScrollElement: () => null,
     handleOpenEvent: vi.fn(),
     hideActivity: true,
     mx,
@@ -140,12 +149,12 @@ const renderController = (
   act(() => {
     renderer = create(<Harness />);
   });
+  if (scrolledAway) scrollAway();
   // Opening the thread at its live end marks it read once; only later receipts matter here.
   vi.mocked(markThreadAsRead).mockClear();
   vi.mocked(document.hasFocus).mockClear();
   return {
     atLiveEndRef: props.atLiveEndRef,
-    scrollElement,
     unmount: () => act(() => renderer?.unmount()),
   };
 };
@@ -191,7 +200,7 @@ describe('useTimelineReadReceiptController stream finish', () => {
   });
 
   it.each<[string, ViewOptions, Parameters<typeof rawReply>[0]]>([
-    ['the user scrolled away before the bottom state caught up', { distanceFromBottom: 1500 }, {}],
+    ['the user scrolled away before the bottom state caught up', { scrolledAway: true }, {}],
     ['the timeline is not at its live end', { atLiveEnd: false }, {}],
     ['the reply is in another thread', {}, { threadId: '$other-root' }],
     ['the reply is in another room', {}, { roomId: '!other:example.org' }],
@@ -224,10 +233,10 @@ describe('useTimelineReadReceiptController stream finish', () => {
   // read a finish the user no longer watches when the frame runs.
   it('drops a scheduled mark when the user scrolls away and the reply then finishes', () => {
     const { frames, run } = holdFrames();
-    const { finish, scrollElement } = setup();
+    const { finish } = setup();
     expect(frames).toHaveLength(1);
 
-    scrollElement.scrollTop = 0;
+    scrollAway();
     finish();
     run();
 
@@ -286,6 +295,7 @@ describe('useTimelineReadReceiptController stream finish with SDK models', () =>
 
   afterEach(() => {
     Thread.hasServerSideSupport = previousThreadSupport;
+    vi.mocked(markThreadAsRead).mockReset();
     vi.restoreAllMocks();
   });
 
@@ -309,7 +319,7 @@ describe('useTimelineReadReceiptController stream finish with SDK models', () =>
     thread.initialEventsFetched = true;
     thread.addEvent(mapEvent(rawReply()), false, false);
     renderController(mx, room);
-    return { mapEvent, thread };
+    return { mapEvent, mx, room, thread };
   };
 
   it('marks the thread read when the terminal edit arrives in the open thread', async () => {
@@ -334,4 +344,111 @@ describe('useTimelineReadReceiptController stream finish with SDK models', () =>
     expect(thread.findEventById('$reply')?.replacingEvent()?.getId()).toBe('$edit-completed');
     expect(markThreadAsRead).toHaveBeenCalledTimes(1);
   });
+
+  // The finish also grows the rendered thread, and that render schedules a mark
+  // after the edit arrived; React renders concurrently, as in the app.
+  it.each(['thread', 'room'])(
+    'does not read a finish that arrives through the %s after the user scrolled away',
+    async (via) => {
+      const actual = await vi.importActual<typeof import('../notifications/readReceipts')>(
+        '../notifications/readReceipts'
+      );
+      vi.mocked(markThreadAsRead).mockImplementation(actual.markThreadAsRead);
+      const { frames } = holdFrames();
+      const mx = createClient({ baseUrl: 'https://example.org', userId: '@alice:example.org' });
+      vi.spyOn(mx, 'supportsThreads').mockReturnValue(true);
+      const requests = vi.spyOn(mx.http, 'authedRequest').mockResolvedValue({});
+      const room = new Room(ROOM_ID, mx, '@alice:example.org');
+      mx.store.storeRoom(room);
+      const mapEvent = mx.getEventMapper();
+      const root = mapEvent({
+        content: { body: 'Question', msgtype: 'm.text' },
+        event_id: THREAD_ID,
+        origin_server_ts: 0,
+        room_id: ROOM_ID,
+        sender: '@alice:example.org',
+        type: 'm.room.message',
+      });
+      room.getUnfilteredTimelineSet().addLiveEvent(root, { addToState: false });
+      const thread = room.createThread(THREAD_ID, root, [], false);
+      thread.initialEventsFetched = true;
+      thread.addEvent(mapEvent(rawReply()), false, false);
+      room.addReceipt(
+        new MatrixEvent({
+          content: {
+            [THREAD_ID]: { 'm.read': { '@alice:example.org': { thread_id: THREAD_ID, ts: 0 } } },
+          },
+          room_id: ROOM_ID,
+          type: 'm.receipt',
+        })
+      );
+
+      const props = {
+        atBottom: true,
+        atBottomAnchorRef: { current: anchor },
+        atBottomRef: { current: true },
+        atLiveEndRef: { current: true },
+        getScrollElement: () => null,
+        handleOpenEvent: vi.fn(),
+        hideActivity: false,
+        mx,
+        readUptoEventIdRef: { current: undefined },
+        room,
+        setAtBottom: vi.fn(),
+        threadId: THREAD_ID,
+        threadInitialRenderMode: 'live' as const,
+        threadTailLoaded: true,
+        timelineAtLiveEnd: true,
+        unreadInfo: undefined,
+      };
+      let renderedEvents = 0;
+      const Harness = () => {
+        const { threadEvents } = useThreadRenderState({
+          room,
+          roomTimelineSet: room.getUnfilteredTimelineSet(),
+          threadTimelineSet: thread.getUnfilteredTimelineSet(),
+          threadId: THREAD_ID,
+          thread,
+          threadInitialCacheHydrated: true,
+          threadInitialSdkLoaded: true,
+        });
+        renderedEvents = threadEvents.length;
+        useTimelineReadReceiptController({ ...props, threadEventsLength: threadEvents.length });
+        return null;
+      };
+      const sendScheduledReceipts = () =>
+        act(async () => {
+          frames.splice(0).forEach((callback) => callback(0));
+          await Promise.all(vi.mocked(markThreadAsRead).mock.results.map(({ value }) => value));
+        });
+      vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+      let renderer: ReturnType<typeof create> | undefined;
+      act(() => {
+        renderer = create(<Harness />, { unstable_isConcurrent: true } as never);
+      });
+      expect(renderedEvents).toBe(2);
+      // Opening the thread reads the partial reply.
+      await sendScheduledReceipts();
+      expect(requests).toHaveBeenCalledWith(
+        'POST',
+        expect.stringContaining('/receipt/m.read/%24reply'),
+        undefined,
+        expect.anything()
+      );
+      requests.mockClear();
+
+      scrollAway();
+      await act(async () => {
+        const edit = mapEvent(rawEdit('completed'));
+        if (via === 'thread') thread.addEvent(edit, false, false);
+        else await room.addLiveEvents([edit], { addToState: false });
+      });
+      expect(renderedEvents).toBe(3);
+      expect(frames.length).toBeGreaterThan(0);
+      await sendScheduledReceipts();
+      act(() => renderer?.unmount());
+
+      expect(requests).not.toHaveBeenCalled();
+    }
+  );
 });

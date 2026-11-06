@@ -151,16 +151,8 @@ export const getThreadUnread = (thread: Thread, userId: string): boolean => {
   const latest =
     finish && (!latestReply || finish.getTs() >= latestReply.getTs()) ? finish : latestReply;
   if (!latest || latest.getSender() === userId) return false;
-  const readState = getThreadReadState(thread, userId);
-  if (readState?.readUpToTs === undefined) return true;
-  const { readEventIds, readUpToTs } = readState;
-  if (latest.getTs() !== readUpToTs) return latest.getTs() > readUpToTs;
-  // A finish in the same millisecond as the reply a receipt names still follows it.
-  return (
-    latest === finish &&
-    !readEventIds.has(latest.getId()!) &&
-    readEventIds.has(latest.getAssociatedId()!)
-  );
+  const readUpToTs = getThreadReadState(thread, userId)?.readUpToTs;
+  return readUpToTs === undefined || latest.getTs() > readUpToTs;
 };
 
 /**

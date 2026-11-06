@@ -356,13 +356,14 @@ describe('thread receipt unread state with SDK models', () => {
   });
 
   it('acknowledges the bundled finish of a reply read mid-stream when the room is marked read', async () => {
-    const { mx, room, requests } = await setupRoom({
+    const { mx, room, thread, requests } = await setupRoom({
       replyEdit: rawStreamEdit('$completed', 4000, 'completed'),
     });
     syncThreadReceipt(room, '$reply', 3500);
 
     await markRoomAndThreadsAsRead(mx, ROOM_ID, false);
     expect(requests).toHaveBeenLastCalledWith('POST', receiptPath('$completed'), undefined, {});
+    expect(getThreadUnread(thread, USER_ID)).toBe(false);
   });
 
   it('acknowledges the bundled finish of the latest reply without a thread model', async () => {
@@ -403,14 +404,6 @@ describe('thread receipt unread state with SDK models', () => {
     requests.mockClear();
     await markThreadAsRead(mx, ROOM_ID, '$root', false);
     expect(requests).not.toHaveBeenCalled();
-  });
-
-  it('shows a finish in the same millisecond as its read reply as unread', async () => {
-    const { room, thread } = await setupRoom();
-    syncThreadReceipt(room, '$reply', 3500);
-    await room.addLiveEvents([streamEdit('$completed', 3000, 'completed')], { addToState: false });
-
-    expect(getThreadUnread(thread, USER_ID)).toBe(true);
   });
 
   it('reads a finished reply once a receipt reaches its terminal edit', async () => {
