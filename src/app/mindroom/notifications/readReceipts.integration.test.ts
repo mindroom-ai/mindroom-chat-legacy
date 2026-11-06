@@ -230,6 +230,7 @@ describe('thread receipt unread state with SDK models', () => {
     thread.addEvent(streamEdit('$completed', 4000, 'completed'), false, false);
     requests.mockClear();
     await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(requests).toHaveBeenCalledTimes(1);
     expect(requests).toHaveBeenCalledWith(
       'POST',
       `/rooms/${encodeURIComponent(ROOM_ID)}/receipt/${ReceiptType.Read}/%24completed`,

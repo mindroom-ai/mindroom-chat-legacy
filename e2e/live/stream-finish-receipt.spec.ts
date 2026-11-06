@@ -135,6 +135,7 @@ test('reads a streamed reply watched to the end, and one finished while away sta
   expect(receiptSent(unfocusedFinish)).toBeUndefined();
   await setWindowFocus(page, true);
   await expect.poll(() => !!receiptSent(unfocusedFinish)).toBe(true);
+  expect((await receiptSent(unfocusedFinish)!.response())?.ok()).toBe(true);
 
   // A reply read half-way is unread again when it finishes while the user is
   // away from the thread, and reading it to the end clears the card.
@@ -149,6 +150,7 @@ test('reads a streamed reply watched to the end, and one finished while away sta
   await card.click();
   await expect(page.getByText('Third answer')).toBeVisible();
   await expect.poll(() => !!receiptSent(awayFinish)).toBe(true);
+  expect((await receiptSent(awayFinish)!.response())?.ok()).toBe(true);
   await page.goBack();
   await expect(card).toBeVisible();
   await expect(card).not.toHaveAttribute('data-thread-unread');
