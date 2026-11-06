@@ -23,7 +23,27 @@ const message = (id: string, ts: number, threadId?: string) =>
     },
   });
 
-const setupRoom = async () => {
+const rawStreamEdit = (id: string, ts: number, status: string, targetId = '$reply') => ({
+  event_id: id,
+  room_id: ROOM_ID,
+  sender: '@bob:example.org',
+  type: 'm.room.message',
+  origin_server_ts: ts,
+  content: {
+    msgtype: 'm.text',
+    body: '* answer',
+    'm.new_content': { msgtype: 'm.text', body: 'answer', 'io.mindroom.stream_status': status },
+    'm.relates_to': { rel_type: RelationType.Replace, event_id: targetId },
+  },
+});
+
+const streamEdit = (id: string, ts: number, status: string, targetId?: string) =>
+  new MatrixEvent(rawStreamEdit(id, ts, status, targetId));
+
+const receiptPath = (eventId: string, receiptType = ReceiptType.Read) =>
+  `/rooms/${encodeURIComponent(ROOM_ID)}/receipt/${receiptType}/${encodeURIComponent(eventId)}`;
+
+const setupRoom = async ({ replyEdit }: { replyEdit?: object } = {}) => {
   const mx = createClient({ baseUrl: 'https://example.org', userId: USER_ID });
   vi.spyOn(mx, 'supportsThreads').mockReturnValue(true);
   const room = new Room(ROOM_ID, mx, USER_ID);
@@ -31,6 +51,8 @@ const setupRoom = async () => {
   const requests = vi.spyOn(mx.http, 'authedRequest').mockResolvedValue({});
   const root = message('$root', 1000);
   const reply = message('$reply', 3000, '$root');
+  // The server bundles a reply's latest edit with it.
+  if (replyEdit) reply.setUnsigned({ 'm.relations': { [RelationType.Replace]: replyEdit } });
   root.setUnsigned({
     'm.relations': {
       [RelationType.Thread]: {
@@ -58,6 +80,15 @@ const setupRoom = async () => {
   );
   return { mx, room, thread, requests };
 };
+
+const syncThreadReceipt = (room: Room, eventId: string, ts: number) =>
+  room.addReceipt(
+    new MatrixEvent({
+      type: 'm.receipt',
+      room_id: ROOM_ID,
+      content: { [eventId]: { [ReceiptType.Read]: { [USER_ID]: { thread_id: '$root', ts } } } },
+    })
+  );
 
 describe('thread receipt unread state with SDK models', () => {
   let previousThreadSupport: FeatureSupport;
@@ -187,24 +218,6 @@ describe('thread receipt unread state with SDK models', () => {
     const { mx, thread, requests } = await setupRoom();
     thread.initialEventsFetched = true;
     thread.addEvent(message('$reply', 3000, '$root'), false, false);
-    const streamEdit = (id: string, ts: number, status: string) =>
-      new MatrixEvent({
-        event_id: id,
-        room_id: ROOM_ID,
-        sender: '@bob:example.org',
-        type: 'm.room.message',
-        origin_server_ts: ts,
-        content: {
-          msgtype: 'm.text',
-          body: '* answer',
-          'm.new_content': {
-            msgtype: 'm.text',
-            body: 'answer',
-            'io.mindroom.stream_status': status,
-          },
-          'm.relates_to': { rel_type: RelationType.Replace, event_id: '$reply' },
-        },
-      });
     thread.addEvent(streamEdit('$streaming', 3500, 'streaming'), false, false);
     await markThreadAsRead(mx, ROOM_ID, '$root', false);
     expect(requests).toHaveBeenLastCalledWith(
@@ -227,6 +240,80 @@ describe('thread receipt unread state with SDK models', () => {
     requests.mockClear();
     await markThreadAsRead(mx, ROOM_ID, '$root', false);
     expect(requests).not.toHaveBeenCalled();
+  });
+
+  it('honors a synchronized receipt on the bundled edit that finished a summary-only reply', async () => {
+    const { mx, room, thread, requests } = await setupRoom({
+      replyEdit: rawStreamEdit('$completed', 4000, 'completed'),
+    });
+    expect(thread.replyToEvent?.replacingEvent()?.getId()).toBe('$completed');
+    syncThreadReceipt(room, '$completed', 4500);
+
+    expect(getThreadUnread(thread, USER_ID)).toBe(false);
+    requests.mockClear();
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(requests).not.toHaveBeenCalled();
+  });
+
+  it('honors a synchronized receipt on the terminal edit an unopened thread buffered', async () => {
+    const { mx, room, thread, requests } = await setupRoom();
+    await room.addLiveEvents([streamEdit('$completed', 4000, 'completed')], { addToState: false });
+    expect(thread.replayEvents?.map((event) => event.getId())).toEqual(['$completed']);
+    syncThreadReceipt(room, '$completed', 4500);
+
+    expect(getThreadUnread(thread, USER_ID)).toBe(false);
+    requests.mockClear();
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(requests).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges the edit bundled with a loaded reply in the thread', async () => {
+    const { mx, thread, requests } = await setupRoom();
+    thread.initialEventsFetched = true;
+    // A reply fetched with its thread history carries its latest edit bundled.
+    const reply = mx.getEventMapper()({
+      ...message('$reply', 3000, '$root').event,
+      unsigned: { 'm.relations': { [RelationType.Replace]: rawStreamEdit('$done', 4000, 'done') } },
+    });
+    thread.addEvent(reply, false, false);
+    expect(thread.events.map((event) => event.getId())).not.toContain('$done');
+
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(requests).toHaveBeenLastCalledWith('POST', receiptPath('$done'), undefined, {
+      thread_id: '$root',
+    });
+
+    requests.mockClear();
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(requests).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges a reply that finished in an unopened thread after it was read', async () => {
+    const { mx, room, requests } = await setupRoom();
+    syncThreadReceipt(room, '$reply', 3500);
+    await room.addLiveEvents([streamEdit('$completed', 4000, 'completed')], { addToState: false });
+
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(requests).toHaveBeenLastCalledWith('POST', receiptPath('$completed'), undefined, {
+      thread_id: '$root',
+    });
+
+    requests.mockClear();
+    await markRoomAndThreadsAsRead(mx, ROOM_ID, false);
+    expect(requests).toHaveBeenLastCalledWith('POST', receiptPath('$completed'), undefined, {});
+  });
+
+  it('never targets a terminal edit of the root with a thread receipt', async () => {
+    const { mx, room, thread, requests } = await setupRoom();
+    await room.addLiveEvents([streamEdit('$root-done', 4000, 'completed', '$root')], {
+      addToState: false,
+    });
+    expect(thread.replayEvents?.map((event) => event.getId())).toEqual(['$root-done']);
+
+    await markThreadAsRead(mx, ROOM_ID, '$root', false);
+    expect(requests).toHaveBeenLastCalledWith('POST', receiptPath('$reply'), undefined, {
+      thread_id: '$root',
+    });
   });
 
   it('rejects a receipt for a bundled reply that belongs to another thread', async () => {

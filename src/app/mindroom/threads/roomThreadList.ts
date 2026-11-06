@@ -5,6 +5,7 @@ import { ReceiptType } from 'matrix-js-sdk/lib/@types/read_receipts';
 import type { MatrixEvent } from 'matrix-js-sdk';
 import type { Room } from 'matrix-js-sdk/lib/models/room';
 import { Thread } from 'matrix-js-sdk/lib/models/thread';
+import { getBufferedThreadRelations } from './sdk/threadBootstrapSdk';
 import { isVisibleThreadReplyEvent } from './threadUtils';
 
 /** A thread that has not loaded its latest page knows its newest reply from the root's summary. */
@@ -23,12 +24,32 @@ export const getLatestVisibleReply = (thread: Thread): MatrixEvent | undefined =
   return loaded && loaded.getTs() >= summary.getTs() ? loaded : summary;
 };
 
-const findThreadReceiptEvent = (thread: Thread, eventId: string): MatrixEvent | undefined => {
-  const timelineEvent = thread.events?.find((event) => event.getId() === eventId);
-  if (timelineEvent) return timelineEvent;
-  if (thread.replyToEvent?.getId?.() === eventId) return thread.replyToEvent;
-  if (thread.rootEvent?.getId?.() === eventId) return thread.rootEvent;
-  return undefined;
+/**
+ * The event a thread receipt names, with the thread it belongs to.
+ * A receipt on the edit that ended a streamed reply counts through that reply,
+ * whose latest edit the server bundles; an unopened thread buffers live edits.
+ */
+const findThreadReceiptEvent = (
+  thread: Thread,
+  eventId: string
+): { event: MatrixEvent; threadRootId: string | undefined } | undefined => {
+  const match = (event: MatrixEvent | null | undefined) => {
+    if (!event) return undefined;
+    if (event.getId?.() === eventId) return { event, threadRootId: event.threadRootId };
+    const edit = event.replacingEvent?.();
+    return edit?.getId() === eventId
+      ? { event: edit, threadRootId: event.threadRootId }
+      : undefined;
+  };
+  for (const event of thread.events ?? []) {
+    const found = match(event);
+    if (found) return found;
+  }
+  return (
+    match(thread.replyToEvent) ??
+    match(thread.rootEvent) ??
+    match(getBufferedThreadRelations(thread).find((event) => event.getId() === eventId))
+  );
 };
 
 export const getThreadReadState = (
@@ -52,11 +73,11 @@ export const getThreadReadState = (
   const validReadEventIds = new Set<string>();
   for (const eventId of readEventIds) {
     if (!eventId) continue;
-    const event = findThreadReceiptEvent(thread, eventId);
+    const found = findThreadReceiptEvent(thread, eventId);
     // Preserve the SDK's consistency check for raw receipt targets.
-    if (!event || (eventId !== readUpToId && event.threadRootId !== thread.id)) continue;
+    if (!found || (eventId !== readUpToId && found.threadRootId !== thread.id)) continue;
     validReadEventIds.add(eventId);
-    const eventTs = event.getTs();
+    const eventTs = found.event.getTs();
     if (readUpToTs === undefined || eventTs > readUpToTs) {
       readUpToTs = eventTs;
     }

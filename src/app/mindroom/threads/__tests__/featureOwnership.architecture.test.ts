@@ -170,6 +170,7 @@ describe('feature ownership architecture', () => {
         file: 'mindroom/threads/sdk/threadBootstrapSdk.ts',
         accesses: [
           { name: 'initialEventsFetched', kind: 'read' },
+          { name: 'replayEvents', kind: 'read' },
           { name: 'initialEventsFetched', kind: 'write' },
           { name: 'replayEvents', kind: 'write' },
         ],
